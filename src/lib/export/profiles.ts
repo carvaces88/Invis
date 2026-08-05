@@ -1,0 +1,334 @@
+import type {
+  InventoryLine,
+  InventorySession,
+  Product,
+  Recipe,
+  StockMovement,
+} from '../../data/types';
+import { lineTotal, sessionTotals } from '../../data/store';
+import type { Messages } from '../../i18n/en';
+import {
+  computeRestolutionMetrics,
+  productCodeForLine,
+} from './restolutionMetrics';
+
+/** Preset column sets for inventory export / on-screen spreadsheet */
+export type ExportProfileId =
+  | 'amounts'
+  | 'withPrice'
+  | 'nameQty'
+  | 'restolution';
+
+export type ExportColumnId =
+  | 'name'
+  | 'unit'
+  | 'qty'
+  | 'price'
+  | 'total'
+  | 'date'
+  | 'productCode'
+  | 'openingStock'
+  | 'purchases'
+  | 'closingStock'
+  | 'usage'
+  | 'need'
+  | 'variance'
+  | 'turnover';
+
+export type ExportProfile = {
+  id: ExportProfileId;
+  columns: ExportColumnId[];
+  /** Session qty + value footer (only when price columns present) */
+  includeTotals: boolean;
+  /**
+   * When true, file exports use Finnish Restolution POS headers
+   * regardless of UI language (import compatibility).
+   */
+  finnishExportHeaders?: boolean;
+};
+
+/** Optional context for movement / code columns */
+export type ExportCellContext = {
+  session: InventorySession;
+  movements?: StockMovement[];
+  products?: Product[];
+  recipes?: Recipe[];
+};
+
+export const EXPORT_PROFILES: ExportProfile[] = [
+  {
+    id: 'amounts',
+    columns: ['name', 'unit', 'qty'],
+    includeTotals: false,
+  },
+  {
+    id: 'withPrice',
+    columns: ['name', 'unit', 'qty', 'price', 'total'],
+    includeTotals: true,
+  },
+  {
+    id: 'nameQty',
+    columns: ['name', 'qty'],
+    includeTotals: false,
+  },
+  {
+    id: 'restolution',
+    // Restolution / movement template (identifying + stock movement cols)
+    columns: [
+      'date',
+      'productCode',
+      'name',
+      'unit',
+      'openingStock',
+      'purchases',
+      'closingStock',
+      'usage',
+      'need',
+      'variance',
+      'turnover',
+    ],
+    includeTotals: false,
+    finnishExportHeaders: true,
+  },
+];
+
+export const DEFAULT_EXPORT_PROFILE: ExportProfileId = 'amounts';
+
+/** Finnish Restolution sheet headers — used in Excel/PDF/Word for that profile. */
+export const RESTOLUTION_FI_HEADERS: Partial<Record<ExportColumnId, string>> = {
+  date: 'Päivämäärä',
+  productCode: 'Tuotekoodi',
+  name: 'Tuote',
+  unit: 'Yksikkö',
+  openingStock: 'Alkuvarasto',
+  purchases: 'Ostot',
+  closingStock: 'Loppuvarasto',
+  usage: 'Ainekäyttö',
+  need: 'Tarve',
+  variance: 'Ero',
+  turnover: 'Varastonkiertonopeus',
+};
+
+export function getExportProfile(id: ExportProfileId): ExportProfile {
+  return EXPORT_PROFILES.find((p) => p.id === id) ?? EXPORT_PROFILES[0];
+}
+
+export function isNumericColumn(column: ExportColumnId): boolean {
+  return (
+    column === 'qty' ||
+    column === 'price' ||
+    column === 'total' ||
+    column === 'openingStock' ||
+    column === 'purchases' ||
+    column === 'closingStock' ||
+    column === 'usage' ||
+    column === 'need' ||
+    column === 'variance' ||
+    column === 'turnover'
+  );
+}
+
+export function columnHeader(
+  column: ExportColumnId,
+  labels: Messages,
+  options?: { finnishRestolution?: boolean },
+): string {
+  if (options?.finnishRestolution && RESTOLUTION_FI_HEADERS[column]) {
+    return RESTOLUTION_FI_HEADERS[column]!;
+  }
+  switch (column) {
+    case 'name':
+      return labels.name;
+    case 'unit':
+      return labels.unit;
+    case 'qty':
+      return labels.qty;
+    case 'price':
+      return labels.priceExclVat;
+    case 'total':
+      return labels.total;
+    case 'date':
+      return labels.colDate;
+    case 'productCode':
+      return labels.colProductCode;
+    case 'openingStock':
+      return labels.colOpeningStock;
+    case 'purchases':
+      return labels.colPurchases;
+    case 'closingStock':
+      return labels.colClosingStock;
+    case 'usage':
+      return labels.colUsage;
+    case 'need':
+      return labels.colNeed;
+    case 'variance':
+      return labels.colVariance;
+    case 'turnover':
+      return labels.colTurnover;
+  }
+}
+
+function metricsFor(
+  line: InventoryLine,
+  ctx?: ExportCellContext,
+) {
+  return computeRestolutionMetrics(line, ctx?.movements ?? [], {
+    recipes: ctx?.recipes,
+  });
+}
+
+export function cellValue(
+  column: ExportColumnId,
+  line: InventoryLine,
+  ctx?: ExportCellContext,
+): string | number {
+  switch (column) {
+    case 'name':
+      return line.officialName;
+    case 'unit':
+      return line.unit;
+    case 'qty':
+      return line.quantity ?? '';
+    case 'price':
+      return line.unitPriceAlv0;
+    case 'total':
+      return line.quantity == null ? '' : lineTotal(line);
+    case 'date': {
+      const iso = ctx?.session.date ?? '';
+      if (!iso) return '';
+      // Restolution / FI sheets use DD.MM.YYYY
+      const parts = iso.split('-');
+      return parts.length === 3
+        ? `${parts[2]}.${parts[1]}.${parts[0]}`
+        : iso;
+    }
+    case 'productCode':
+      return productCodeForLine(line, ctx?.products ?? []);
+    case 'openingStock':
+      return metricsFor(line, ctx).alkuvarasto;
+    case 'purchases':
+      return metricsFor(line, ctx).ostot;
+    case 'closingStock':
+      return line.quantity ?? '';
+    case 'usage': {
+      const v = metricsFor(line, ctx).ainekaytto;
+      return v == null ? '' : v;
+    }
+    case 'need':
+      return metricsFor(line, ctx).tarve;
+    case 'variance': {
+      const v = metricsFor(line, ctx).ero;
+      return v == null ? '' : v;
+    }
+    case 'turnover': {
+      const v = metricsFor(line, ctx).varastonkiertonopeus;
+      return v == null ? '' : v;
+    }
+  }
+}
+
+export function cellDisplay(
+  column: ExportColumnId,
+  line: InventoryLine,
+  ctx?: ExportCellContext,
+): string {
+  const raw = cellValue(column, line, ctx);
+  if (raw === '') {
+    if (
+      column === 'turnover' ||
+      column === 'usage' ||
+      column === 'variance' ||
+      column === 'closingStock' ||
+      column === 'qty'
+    ) {
+      return '—';
+    }
+    return '';
+  }
+  if (typeof raw === 'number') {
+    if (column === 'price' || column === 'total') {
+      return raw.toFixed(2).replace('.', ',');
+    }
+    return String(raw).replace('.', ',');
+  }
+  return raw;
+}
+
+export function buildExportRows(
+  session: InventorySession,
+  profile: ExportProfile,
+  labels: Messages,
+  ctx?: Omit<ExportCellContext, 'session'>,
+): Record<string, string | number>[] {
+  const fullCtx: ExportCellContext = { session, ...ctx };
+  const fiHeaders = Boolean(profile.finnishExportHeaders);
+  return session.lines.map((line) => {
+    const row: Record<string, string | number> = {};
+    for (const col of profile.columns) {
+      const header = columnHeader(col, labels, {
+        finnishRestolution: fiHeaders,
+      });
+      row[header] = cellValue(col, line, fullCtx);
+    }
+    return row;
+  });
+}
+
+export function totalsFooterCells(
+  session: InventorySession,
+  profile: ExportProfile,
+  labels: Messages,
+): string[] | null {
+  if (!profile.includeTotals) return null;
+  const totals = sessionTotals(session);
+  return profile.columns.map((col) => {
+    switch (col) {
+      case 'name':
+        return labels.foodTotal;
+      case 'qty':
+        return String(totals.quantity).replace('.', ',');
+      case 'total':
+        return totals.value.toFixed(2).replace('.', ',');
+      default:
+        return '';
+    }
+  });
+}
+
+export type ExportProfileTitleKey =
+  | 'exportProfileAmounts'
+  | 'exportProfileWithPrice'
+  | 'exportProfileNameQty'
+  | 'exportProfileRestolution';
+
+export type ExportProfileHintKey =
+  | 'exportProfileAmountsHint'
+  | 'exportProfileWithPriceHint'
+  | 'exportProfileNameQtyHint'
+  | 'exportProfileRestolutionHint';
+
+export function profileTitleKey(id: ExportProfileId): ExportProfileTitleKey {
+  switch (id) {
+    case 'amounts':
+      return 'exportProfileAmounts';
+    case 'withPrice':
+      return 'exportProfileWithPrice';
+    case 'nameQty':
+      return 'exportProfileNameQty';
+    case 'restolution':
+      return 'exportProfileRestolution';
+  }
+}
+
+export function profileHintKey(id: ExportProfileId): ExportProfileHintKey {
+  switch (id) {
+    case 'amounts':
+      return 'exportProfileAmountsHint';
+    case 'withPrice':
+      return 'exportProfileWithPriceHint';
+    case 'nameQty':
+      return 'exportProfileNameQtyHint';
+    case 'restolution':
+      return 'exportProfileRestolutionHint';
+  }
+}

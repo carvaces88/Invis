@@ -1,0 +1,337 @@
+/**
+ * English UI copy — single source for common labels.
+ * Catalog product official names stay as POS data (not translated).
+ */
+
+export const en = {
+  appBrand: 'Invis by Cesar',
+  inventory: 'Inventory',
+  kitchenInventory: 'Kitchen inventory',
+  inventorySheet: 'Inventory sheet RR',
+
+  // Table / export columns
+  alsoAs: 'also as:',
+  name: 'Name',
+  unit: 'Unit',
+  qty: 'Qty',
+  price: 'Price',
+  priceExclVat: 'Price (excl. VAT)',
+  total: 'Total',
+  foodTotal: 'Food total',
+  date: 'Date',
+  colDate: 'Date',
+  colProductCode: 'Product code',
+  colOpeningStock: 'Opening stock',
+  colPurchases: 'Purchases',
+  colClosingStock: 'Closing stock',
+  colUsage: 'Usage',
+  colNeed: 'Need',
+  colVariance: 'Difference',
+  colTurnover: 'Inventory turnover',
+  exclVat: 'excl. VAT',
+  alvZero: '0% ALV',
+  alvWith: 'With ALV',
+  alvToggleHint: 'Stored at 0% ALV · With ALV adds {rate}%',
+  unitHintHint: 'Shows Finnish and English meaning of this unit code',
+  unitHintUnknown: 'Unknown unit code',
+  unitHintDismiss: 'Tap outside to close',
+  unitColumnLegendTitle: 'Unit codes (YKSIKKÖ)',
+  unitColumnLegendA11y: 'Unit column — show meanings of PSS, LTK, and other codes',
+
+  // Features
+  delivery: 'Delivery',
+  deliveryList: 'Delivery list',
+  foodWaste: 'Food waste',
+  foodWasteLog: 'Food waste log',
+  topProducts: 'Top products',
+
+  // Tabs / nav
+  tabHome: 'Home',
+  tabList: 'Inventory',
+  tabScan: 'Scan',
+  tabCatalog: 'Catalog',
+  tabMore: 'More',
+
+  currentInventory: 'Current inventory',
+  currentInventorySub:
+    '{count} item(s) recorded · tap qty to set absolute · Record adds to stock',
+  currentInventoryEmpty:
+    'Nothing recorded yet — use Record inventory on Home.',
+  inventorySearchPlaceholder: 'Search inventory…',
+  inventorySearchEmpty: 'No products match this search.',
+  inventorySearchClear: 'Clear search',
+  showFullSheet: 'Show full sheet',
+  showRecordedOnly: 'Recorded only',
+  notCountedYet: 'Not counted yet',
+  startInventoryScratch: 'Start inventory from scratch',
+  startInventoryScratchConfirm:
+    'This clears all counted stock. Continue?',
+  startInventoryScratchDone: 'Inventory cleared — value is €0.',
+  recentActivityTitle: 'Recent updates',
+  recentActivitySub: 'Last 20 adds — spot accidental double-counts.',
+  recentActivityEmpty: 'No recent adds yet.',
+  recentActivityOpen: 'Recent updates',
+  recentActivityOpenSub: 'Last inventory adds across places',
+  recentAddWarnTitle: 'Added recently',
+  recentAddWarnBody:
+    'You added this {minutes} min ago (+{delta}). Add again anyway?',
+  recentAddWarnYes: 'Add again',
+  cancel: 'Cancel',
+  recordAddsHint: 'Adds to current stock',
+  recordAddedSummary:
+    'Added {added} · total now {total} · last update {time}',
+
+  unitsGuide: 'Units guide',
+  unitsGuideSub: 'bag, box, PSS… what each amount means',
+  unitsGuideTitle: 'Amount & unit guide',
+  unitsGuideIntro:
+    'Friendly names used when counting, POS codes from Finnish inventaario sheets, and translations.',
+  unitsGuideColFriendly: 'Name',
+  unitsGuideColCode: 'Code',
+  unitsGuideColMeaning: 'Meaning',
+  unitsGuideColFi: 'Finnish',
+
+  // Home / Welcome
+  homeGreeting: 'Hello Chef! What do you want to do?',
+  chefYes: 'Yes chef!',
+  chefThinking: "I'm thinking, chef…",
+  homeRecordInventory: 'Record inventory',
+  homeRecordInventorySub: 'Photo or type · then confirm count',
+  homeCurrentInventory: 'Current inventory',
+  homeCurrentInventorySub: 'View spreadsheet · choose columns',
+  homeScanProduct: 'Scan a product',
+  homeLogDelivery: 'Log a delivery',
+  homeLogWaste: 'Log food waste',
+  homeFindProduct: 'Find a product',
+  homeAskReport: 'Ask a report',
+  homeInventoryValue: 'My inventory value right now',
+  homeInventoryValueSub: 'Sum of counted lines · excl. VAT',
+  homeMoreSettings: 'More / Settings',
+
+  inventoryValueTitle: 'My inventory value right now',
+  inventoryValueExclVat: 'excl. VAT / 0% ALV',
+  inventoryValueWithAlv: 'with {rate}% ALV',
+  inventoryValueAlsoWithAlv: 'With {rate}% ALV: {amount} €',
+  inventoryValueAlsoExcl: 'At 0% ALV: {amount} €',
+  inventoryValueSub:
+    '{count} line(s) with quantity · Σ units {qty}',
+  inventoryValueClose: 'Close',
+  moreInventoryValueSub: 'Quick monetary snapshot of counted stock',
+
+  packCheckTitle: 'Pack count check',
+  packCheckBody:
+    'This product is often counted as {base} ({per} per pack). You entered {packQty} {pack} ≈ {pieceQty} {base2}. Is that right?',
+  packCheckBodyUnknown:
+    '{packQty} {pack} — did you mean {packQty} {pack}, or {packQty} {base}?',
+  packCheckAskPerPack: 'How many {base} in one {packOne}?',
+  packCheckPerPackPlaceholder: 'e.g. 6',
+  packCheckNeedPerPack: 'Need a count per box first, chef.',
+  packCheckYes: 'Yes, {n} {pack}',
+  packCheckChange: 'Change to {n} {base}',
+  packCheckChangeUnknown: 'Change to {n} {base}',
+  packCheckEdit: 'Edit',
+  packHint:
+    '1 {pack} = {per} {base} for this item',
+
+  spreadsheetChooseColumns: 'What columns to show?',
+  spreadsheetChooseColumnsSub:
+    'Same layouts as export — pick what appears in the on-screen sheet.',
+  spreadsheetApplyColumns: 'Show columns',
+  spreadsheetColumnsBtn: 'Columns',
+
+
+  fridgeReviewKicker: 'Fridge / shelf',
+  fridgeReviewTitle: 'Review items',
+  fridgeReviewSub:
+    'We zoom into each detected product and pair it with the catalog photo. Confirm, pick another, or skip.',
+  fridgeRecognized: 'Matched products',
+  fridgeSuggestedSection: 'Suggested · not recognized',
+  fridgeSuggestedHint:
+    'These crops need your help. Would you like to add this item?',
+  fridgeSuggested: 'Suggested',
+  fridgeNoneRecognized: 'No clear catalog matches in this photo.',
+  fridgeNoneSuggested: 'Nothing left unrecognized — nice.',
+  fridgeConfirmItem: 'Confirm',
+  fridgeYes: 'Yes',
+  fridgePickAnother: 'No · pick another',
+  fridgePickAnotherTitle: 'Pick a different product',
+  fridgePickAnotherSub: 'Search the catalog and choose the right match.',
+  fridgeIsThisProduct: 'Is this the product you meant?',
+  fridgeDetectedCrop: 'Your shelf',
+  fridgeOfficialPhoto: 'Catalog photo',
+  fridgeSkip: 'Skip',
+  fridgeAddItem: 'Yes — add this item',
+  fridgeAskDetails: 'Ask for more details',
+  fridgeWouldYouAdd: 'Would you like to add this item?',
+  fridgeUnrecognizedDefault:
+    'Something is visible here, but the label could not be read.',
+  fridgeNoCatalogMatch: 'No catalog match yet',
+  fridgeNeedMatch: 'Add to catalog first',
+  fridgeNeedMatchBody:
+    'This line has no catalog match. Use Add, or skip it.',
+  fridgeConfirmed: 'Confirmed · saved',
+  fridgeSkipped: 'Skipped',
+  fridgeSentToAdd: 'Opening add form…',
+  fridgeDetailsTitle: 'Describe this item',
+  fridgeDetailsSub:
+    'Tell the kitchen what this is (brand, contents, size). Then you can add it to the catalog.',
+  fridgeDetailsPlaceholder: 'e.g. green bottle of herb oil, 500 ml…',
+  fridgeDetailsNeeded: 'Please describe the item first.',
+  fridgeDetailsContinue: 'Continue to add',
+  fridgeFinishPartial: 'Done for now',
+  fridgeFinishDone: 'Finish review',
+  fridgeDoneTitle: 'Fridge review',
+  fridgeDoneBody:
+    'Confirmed {confirmed} item(s). {pending} still pending.',
+  kruokaPhotoCredit: 'Product photos: K-Ruoka (public listings) · demo seed',
+
+  // Record inventory entry
+  recordInventoryTitle: 'Record inventory',
+  recordInventorySub:
+    'Upload a photo or type a name. Confirm before stock is updated.',
+  recordPhoto: 'Photo',
+  recordPhotoHint: 'Take or choose a photo of the product / label',
+  recordPhotoModeSingle: 'One product',
+  recordPhotoModeFridge: 'Fridge / shelf',
+  recordPhotoFridgeHint:
+    'Wide or panoramic shot of the fridge or shelf — AI lists every item it sees',
+  recordAnalyzePhoto: 'Analyze photo',
+  recordAnalyzeDemo: 'Run demo (AI → confirm)',
+  recordAnalyzeFridge: 'Analyze fridge / shelf',
+  recordAnalyzeFridgeDemo: 'Run shelf demo (mayo → confirm)',
+  recordAnalyzeFridgeFreshDemo: 'Run fresh demo (cilantro → confirm)',
+  recordAnalyzeFreshDemo: 'Run fresh demo (cilantro → confirm)',
+  recordItemName: 'Item name',
+  recordItemPlaceholder: 'Try “coriander”, “cilantro”, or “yogurt”…',
+  recordNoMatch: 'No match yet — you can still add this name',
+  recordMoreUnits: 'More units',
+  recordUnitCatalogNote:
+    'Count will save with catalog unit {unit}.',
+  recordAddToInventory: 'Add to inventory',
+  recordOpenFullList: 'Open inventory',
+  recordPickProductTitle: 'Pick a product',
+  recordPickProductBody:
+    'Select a catalog suggestion, type a new name to add it, or analyze a photo.',
+  recordInvalidQty: 'Enter a valid quantity.',
+  recordSavedTitle: 'Saved',
+  recordQtyOther: 'Other',
+  recordQtyOtherPlaceholder: '___',
+  didYouMeanTitle: 'Did you mean…?',
+  didYouMeanBody:
+    '“{name}” looks close to something already in the catalog. Use the existing product (we’ll remember this name) or create a new one.',
+  didYouMeanUse: 'Use this',
+  didYouMeanCreate: 'Create “{name}” as new',
+  didYouMeanAliasAdded:
+    'Added “{alias}” as another name for {product}.',
+  didYouMeanCreated: 'Created “{name}” and added to inventory.',
+  recordNameRequiredTitle: 'Name needed',
+  recordNameRequiredBody: 'Type a product name first, chef.',
+
+  unitChipBox: 'box / crate',
+  unitChipBunch: 'bunch',
+  unitChipPiece: 'piece',
+  unitChipLiter: 'liter',
+  unitChipKg: 'kg',
+  unitChipBag: 'bag / pouch',
+  unitChipBottle: 'bottle',
+  unitChipJar: 'can / jar',
+  unitChipPacket: 'packet',
+  unitChipTray: 'box / container (RSA)',
+  unitChipTub: 'box / container (RAS)',
+  unitChipBottlePlo: 'bottle (PLO)',
+
+  // More screen
+  moreTitle: 'More',
+  moreSub: 'Reports and logs — inventory grid stays clean.',
+  reportsChat: 'Reports chat',
+  reportsChatSub: 'Local reports',
+  foodWasteHistory: 'Food waste history',
+  videoDemo: 'Video demo',
+  videoDemoSub: 'Paid live walkthrough stub',
+  language: 'Language',
+  languageHint: 'Switch app UI language. Product names stay as in the catalog.',
+  unitSystem: 'Units',
+  unitSystemHint: 'Metric (kg, L) or Imperial (lb, fl oz). Stock is stored in metric.',
+  unitSystemMetric: 'Metric',
+  unitSystemImperial: 'Imperial',
+  unitChipLb: 'lb',
+  unitChipFloz: 'fl oz',
+  unitsGuideImperialNote:
+    'Imperial mode shows kg as lb and liters as fl oz. POS codes stay KG / L.',
+
+  // Places / storages
+  placesTitle: 'Places',
+  placesSub: 'Site name and storages — kitchens, freezers…',
+  placesIntro:
+    'Divide stock across named places (kitchens, freezers). Counts always belong to one place.',
+  placesSiteLabel: 'Site / location',
+  placesSiteHint: 'e.g. Kamppi — shown above your places list.',
+  placesSitePlaceholder: 'My kitchen',
+  placesList: 'Places',
+  placesAdd: 'Add place',
+  placesAddPlaceholder: 'e.g. Freezer 3',
+  placesRename: 'Rename',
+  placesSave: 'Save',
+  placesDelete: 'Delete',
+  placesDeleteConfirm: 'Delete this place? Empty stock only.',
+  placesDeleteLast: 'Keep at least one place.',
+  placesDeleteHasStock:
+    'This place still has counted stock. Move or clear quantities first.',
+  placesNameRequired: 'Enter a place name.',
+  placesEmptyStock: 'No counted stock',
+  placesStockCount: '{count} counted line(s)',
+  placesActive: 'counting here',
+  placesCountingAt: 'Counting at',
+  placesFilter: 'Place',
+  placesAll: 'All places',
+  placesBreakdown: 'By place',
+
+
+  // Scan hub
+  capture: 'Capture',
+  scanHub: 'Scan hub',
+  scanHubSub: 'Image-first flows. Video walkthrough stays a paid demo stub.',
+  productPhoto: 'Product photo',
+  productPhotoSub: 'Single item → inventory count',
+  deliverySub: 'Delivery list (kuormalista)',
+  foodWasteSub: 'Waste list · subtract stock',
+  videoWalkthrough: 'Video / live walkthrough (stub)',
+
+  // Catalog
+  catalog: 'Catalog',
+  catalogSub: 'Search aliases (try “capers” or “kapris”) — not only brand A–Z',
+  catalogSearchPlaceholder: 'Try “capers” → Figaro Kapris…',
+  byIngredient: 'By ingredient',
+  azName: 'A–Z name',
+  addToDb: 'Add to DB',
+
+  // Stack titles / common actions
+  confirm: 'Confirm',
+  confirmLines: 'Confirm lines',
+  addProduct: 'Add product',
+  reports: 'Reports',
+  export: 'Export',
+  exportFailed: 'Export failed',
+  exportDocxFailed: 'Word export failed. Use Excel or PDF.',
+  exportChooseData: 'What info or data do you want to export?',
+  exportChooseDataSub: 'Choose columns for {format}, then continue.',
+  exportProfileAmounts: 'Name + amounts',
+  exportProfileAmountsHint: 'Product name, unit, and quantity — no prices.',
+  exportProfileWithPrice: 'Name + amounts + price',
+  exportProfileWithPriceHint:
+    'Includes unit price and line totals, plus a food total.',
+  exportProfileNameQty: 'Name + quantity only',
+  exportProfileNameQtyHint: 'Minimal list — name and qty, no unit or price.',
+  exportProfileRestolution: 'Restolution / movement',
+  exportProfileRestolutionHint:
+    'Opening, purchases, closing, usage, need, difference, turnover — Finnish headers in file.',
+  exportContinue: 'Export',
+  exportCancel: 'Cancel',
+  exporting: 'Exporting…',
+  camera: 'Camera',
+  library: 'Library',
+  all: 'All',
+} as const;
+
+export type MessageKey = keyof typeof en;
+export type Messages = { [K in MessageKey]: string };

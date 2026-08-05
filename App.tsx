@@ -1,0 +1,285 @@
+import React from 'react';
+import { Text } from 'react-native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ChefNudgeProvider } from './src/components/ChefNudge';
+import { InventoryProvider } from './src/data/store';
+import type { MainTabParamList, RootStackParamList } from './src/data/types';
+import { LocaleProvider, useI18n } from './src/i18n';
+import { UnitSystemProvider } from './src/lib/unitSystem';
+import { AddProductScreen } from './src/screens/AddProductScreen';
+import { BatchConfirmScreen } from './src/screens/BatchConfirmScreen';
+import { CatalogScreen } from './src/screens/CatalogScreen';
+import { ConfirmScreen } from './src/screens/ConfirmScreen';
+import { FridgeReviewScreen } from './src/screens/FridgeReviewScreen';
+import { HavikkiLogScreen } from './src/screens/HavikkiLogScreen';
+import { HavikkiScanScreen } from './src/screens/HavikkiScanScreen';
+import { HomeScreen } from './src/screens/HomeScreen';
+import { InventaarioScreen } from './src/screens/InventaarioScreen';
+import { KuormaScanScreen } from './src/screens/KuormaScanScreen';
+import { MoreScreen } from './src/screens/MoreScreen';
+import { PlacesScreen } from './src/screens/PlacesScreen';
+import { ProductScanScreen } from './src/screens/ProductScanScreen';
+import { RecordInventoryScreen } from './src/screens/RecordInventoryScreen';
+import { RecentActivityScreen } from './src/screens/RecentActivityScreen';
+import { ReportsChatScreen } from './src/screens/ReportsChatScreen';
+import { ScanScreen } from './src/screens/ScanScreen';
+import { UnitsGuideScreen } from './src/screens/UnitsGuideScreen';
+import { VideoDemoScreen } from './src/screens/VideoDemoScreen';
+import { colors } from './src/theme/colors';
+
+const Tab = createBottomTabNavigator<MainTabParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
+
+const navTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: colors.bg,
+    card: colors.bgElevated,
+    text: colors.ink,
+    border: colors.line,
+    primary: colors.primary,
+  },
+};
+
+function TabIcon({ label, focused }: { label: string; focused: boolean }) {
+  return (
+    <Text
+      style={{
+        fontSize: 11,
+        fontWeight: focused ? '700' : '500',
+        color: focused ? colors.primary : colors.inkFaint,
+      }}
+    >
+      {label}
+    </Text>
+  );
+}
+
+function MainTabs() {
+  const { t } = useI18n();
+  return (
+    <Tab.Navigator
+      initialRouteName="Home"
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: colors.bgElevated,
+          borderTopColor: colors.line,
+          height: 64,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        tabBarShowLabel: false,
+      }}
+    >
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon label={t('tabHome')} focused={focused} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Inventaario"
+        component={InventaarioScreen}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon label={t('tabList')} focused={focused} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Scan"
+        component={ScanScreen}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon label={t('tabScan')} focused={focused} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Catalog"
+        component={CatalogScreen}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon label={t('tabCatalog')} focused={focused} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="More"
+        component={MoreScreen}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon label={t('tabMore')} focused={focused} />
+          ),
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
+
+function RootNavigator() {
+  const { t } = useI18n();
+  return (
+    <NavigationContainer theme={navTheme}>
+      <StatusBar style="dark" />
+      <Stack.Navigator>
+        <Stack.Screen
+          name="MainTabs"
+          component={MainTabs}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="RecordInventory"
+          component={RecordInventoryScreen}
+          options={{
+            title: t('recordInventoryTitle'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="ProductScan"
+          component={ProductScanScreen}
+          options={{
+            title: t('productPhoto'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="KuormaScan"
+          component={KuormaScanScreen}
+          options={{
+            title: t('delivery'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="HavikkiScan"
+          component={HavikkiScanScreen}
+          options={{
+            title: t('foodWaste'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="Confirm"
+          component={ConfirmScreen}
+          options={{
+            title: t('confirm'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="BatchConfirm"
+          component={BatchConfirmScreen}
+          options={{
+            title: t('confirmLines'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="FridgeReview"
+          component={FridgeReviewScreen}
+          options={{
+            title: t('fridgeReviewTitle'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="AddProduct"
+          component={AddProductScreen}
+          options={{
+            title: t('addProduct'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="ReportsChat"
+          component={ReportsChatScreen}
+          options={{
+            title: t('reports'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="HavikkiLog"
+          component={HavikkiLogScreen}
+          options={{
+            title: t('foodWasteLog'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="RecentActivity"
+          component={RecentActivityScreen}
+          options={{
+            title: t('recentActivityTitle'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="VideoDemo"
+          component={VideoDemoScreen}
+          options={{
+            title: t('videoDemo'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="UnitsGuide"
+          component={UnitsGuideScreen}
+          options={{
+            title: t('unitsGuide'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="Places"
+          component={PlacesScreen}
+          options={{
+            title: t('placesTitle'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <LocaleProvider>
+        <UnitSystemProvider>
+          <InventoryProvider>
+            <ChefNudgeProvider>
+              <RootNavigator />
+            </ChefNudgeProvider>
+          </InventoryProvider>
+        </UnitSystemProvider>
+      </LocaleProvider>
+    </SafeAreaProvider>
+  );
+}

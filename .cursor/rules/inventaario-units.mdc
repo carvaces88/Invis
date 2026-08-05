@@ -1,0 +1,29 @@
+---
+description: Finnish inventaario YKSIKKÖ unit codes for Invis kitchen inventory
+alwaysApply: true
+---
+
+# Inventaario units (YKSIKKÖ)
+
+When working on Invis unit labels, chips, guides, exports, or POS matching, use this authoritative list:
+
+| Abbreviation | Finnish | English |
+|---|---|---|
+| L | Litra | Liter(s) |
+| KPL | Kappale | Piece(s) / Item(s) |
+| PRK | Purkki | Can(s) / Jar(s) |
+| RSA | Rasia | Box(es) / Container(s) |
+| PSS | Pussi | Bag(s) / Pouch(es) |
+| PL / PLO | Pullo | Bottle(s) |
+| LTK | Laatikko | Box / Crate |
+| KG | Kilogramma | Kilogram(s) |
+| RAS | Rasia | Box / Container |
+| PKT | Paketti | Packet / Package |
+
+Source of truth in code: `src/data/units.ts` (`UNIT_GUIDE`, `UNIT_LABELS`).
+
+Notes:
+- Stock is stored in metric POS codes; Imperial mode only changes display (KG→lb, L→fl oz).
+- RSA and RAS are both "Rasia" but different POS codes — keep them distinct.
+- PL and PLO are both "Pullo" / bottle.
+- Inventory prices are stored at **0% ALV**. The Inventory tab must offer a toggle **0% ALV** vs **With ALV** (EN) / **0 % ALV** vs **ALV:n kanssa** (FI). Display “With ALV” using food VAT rate 14% (`FOOD_ALV_RATE` in InventaarioScreen); do not rewrite stored prices.
