@@ -1,0 +1,24 @@
+---
+description: Required product photo → label analyze → Finnish supplier lookup → inventory suggest/prefill flow
+alwaysApply: true
+---
+
+# Product photo enrichment (core requirement)
+
+Users must be able to:
+
+1. **Take / pick a photo** of a product (label, pack, shelf item).
+2. **Analyze & read the label** (vision/OCR — not heuristics-only stubs in production).
+3. **Search the internet for product info**, prioritizing:
+   - First: [https://www.k-ruoka.fi](https://www.k-ruoka.fi)
+   - Then other Finnish suppliers / food wholesale sources
+4. **Match against current inventory/catalog**.
+5. If **not already in inventory**, **suggest inserting** it.
+6. **Prefill Add Product** with optimized text and fields from the extract + web match (name, unit/YKSIKKÖ, pack size, EAN, price at 0% ALV when known, image/`sourceUrl`, aliases) — not name+unit only.
+
+## Implementation notes
+
+- Scaffolding lives in `ProductScanScreen`, `RecordInventoryScreen`, `ConfirmScreen`, `FridgeReviewScreen`, `AddProductScreen`; vision is currently stubbed in `src/lib/visionStub.ts`; K-Ruoka data is offline seed (`seedKruoka.ts`), not live lookup.
+- Prefer enriching existing `VisionExtract` / `AddProduct` prefill rather than a parallel flow.
+- Keep inventory prices at **0% ALV**; use POS unit codes from `src/data/units.ts`.
+- Do not drop this flow when refining logos, demos, or unrelated UI.
