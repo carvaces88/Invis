@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExportColumnsSheet } from '../components/ExportColumnsSheet';
-import { PlaceChips } from '../components/PlaceChips';
+import { PlaceSelect } from '../components/PlaceSelect';
 import { UnitColumnLegend } from '../components/UnitColumnLegend';
 import { lineTotal, sessionTotals, useInventory } from '../data/store';
 import type { InventoryLine, RootStackParamList } from '../data/types';
@@ -454,7 +454,7 @@ export function InventaarioScreen() {
       </View>
 
       {places.length > 1 ? (
-        <PlaceChips
+        <PlaceSelect
           places={places}
           selectedId={placeFilter}
           onSelect={setPlaceFilter}

@@ -223,10 +223,17 @@ export interface DocumentExtract {
   rawNotes?: string;
 }
 
+export type ProductMatchKind =
+  | 'official'
+  | 'alias'
+  | 'ean'
+  | 'brand_pack'
+  | 'vision';
+
 export interface ProductMatch {
   product: Product;
   score: number;
-  matchedOn: 'official' | 'alias';
+  matchedOn: ProductMatchKind;
   matchedTerm: string;
 }
 

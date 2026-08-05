@@ -15,7 +15,7 @@ type Props = {
   flush?: boolean;
 };
 
-/** Horizontal place picker chips — Record inventory + Inventaario filter. */
+/** Horizontal place picker chips — Record inventory and confirm flows. */
 export function PlaceChips({
   places,
   selectedId,
