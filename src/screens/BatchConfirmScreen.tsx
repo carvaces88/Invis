@@ -211,9 +211,22 @@ export function BatchConfirmScreen({ route, navigation }: Props) {
                   navigation.navigate('AddProduct', {
                     prefillName: d.extract.suggestedName,
                     unit: d.extract.unit ?? undefined,
+                    packSize: d.extract.packSize ?? undefined,
+                    unitPriceAlv0: d.extract.unitPriceAlv0 ?? undefined,
+                    aliases: d.extract.aliases,
+                    ean: d.extract.ean ?? undefined,
+                    sourceUrl: d.extract.sourceUrl ?? undefined,
+                    imageUrl: d.extract.imageUrl ?? undefined,
+                    ingredientType: d.extract.ingredientType ?? undefined,
+                    brand: d.extract.brand ?? undefined,
+                    containerHint: d.extract.containerHint ?? undefined,
+                    photoUris: route.params.imageUri
+                      ? [route.params.imageUri]
+                      : undefined,
                     returnToBatch: true,
                     document,
                     imageUri: route.params.imageUri,
+                    extract: d.extract,
                   })
                 }
               >
