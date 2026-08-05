@@ -130,6 +130,9 @@ type Store = {
     packSize?: string;
     aliases: string[];
     ingredientType?: Product['ingredientType'];
+    ean?: string;
+    imageUrl?: string;
+    sourceUrl?: string;
     /** When set, also write this count on the active place */
     initialQuantity?: number;
   }) => Product;
@@ -540,6 +543,9 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       packSize?: string;
       aliases: string[];
       ingredientType?: Product['ingredientType'];
+      ean?: string;
+      imageUrl?: string;
+      sourceUrl?: string;
       initialQuantity?: number;
     }) => {
       const product: Product = {
@@ -550,6 +556,9 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         unitPriceAlv0: input.unitPriceAlv0 ?? 0,
         ingredientType: input.ingredientType ?? 'other',
         aliases: input.aliases.map((a) => a.trim()).filter(Boolean),
+        ean: input.ean?.trim() || undefined,
+        imageUrl: input.imageUrl?.trim() || undefined,
+        sourceUrl: input.sourceUrl?.trim() || undefined,
         lowStockThreshold: 1,
       };
       setCustomProducts((prev) => [...prev, product]);

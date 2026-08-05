@@ -180,6 +180,37 @@ export interface VisionExtract {
   /** True when the model saw something but could not name it confidently */
   unrecognized?: boolean;
   crop?: VisionCropRegion;
+  /** Pack / net weight from label or public listing, e.g. "935g/600g" */
+  packSize?: string | null;
+  /** Brand read from label or matched listing */
+  brand?: string | null;
+  /** Container type hint (purkki, pullo, pussi…) */
+  containerHint?: string | null;
+  ean?: string | null;
+  sourceUrl?: string | null;
+  imageUrl?: string | null;
+  aliases?: string[];
+  ingredientType?: IngredientType | null;
+}
+
+/** Prefill payload after analyzing one or more close-up product photos */
+export interface ProductEnrichment {
+  officialName: string;
+  unit: UnitCode;
+  packSize?: string;
+  unitPriceAlv0?: number;
+  brand?: string;
+  containerHint?: string;
+  ean?: string;
+  sourceUrl?: string;
+  imageUrl?: string;
+  aliases: string[];
+  ingredientType?: IngredientType;
+  confidence: number;
+  /** Human-readable analysis notes (source, brand, container…) */
+  notes: string;
+  /** True when matched to K-Ruoka / catalog public data */
+  matchedPublicListing?: boolean;
 }
 
 export interface DocumentExtract {
@@ -227,6 +258,17 @@ export type RootStackParamList = {
   AddProduct: {
     prefillName?: string;
     unit?: UnitCode;
+    packSize?: string;
+    unitPriceAlv0?: number;
+    aliases?: string[];
+    ean?: string;
+    sourceUrl?: string;
+    imageUrl?: string;
+    ingredientType?: IngredientType;
+    brand?: string;
+    containerHint?: string;
+    /** Close-up photo URIs already captured upstream */
+    photoUris?: string[];
     returnToConfirm?: boolean;
     extract?: VisionExtract;
     imageUri?: string;

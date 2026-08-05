@@ -16,25 +16,44 @@ const HEURISTICS: {
   name: string;
   unit?: UnitCode;
   qty?: number;
+  packSize?: string;
+  brand?: string;
+  containerHint?: string;
+  unitPriceAlv0?: number;
 }[] = [
-  { match: /caper|kapris|figaro/i, name: 'capers', unit: 'PRK', qty: 1 },
+  {
+    match: /caper|kapris|figaro/i,
+    name: 'capers',
+    unit: 'PRK',
+    qty: 1,
+    packSize: '935g/600g',
+    brand: 'Figaro',
+    containerHint: 'Purkki (can / jar)',
+    unitPriceAlv0: 4.2,
+  },
   {
     match: /herkkumaa|täysmajoneesi|taysmajoneesi|mayo|majoneesi/i,
     name: 'Herkkumaa täysmajoneesi',
     unit: 'PRK',
     qty: 1,
+    packSize: '5 kg',
+    brand: 'Herkkumaa',
+    containerHint: 'Purkki (can / jar)',
+    unitPriceAlv0: 18.5,
   },
   {
     match: /cilantro|coriander|korianteri/i,
     name: 'cilantro',
     unit: 'KPL',
     qty: 1,
+    containerHint: 'Kappale (bunch / piece)',
   },
   {
     match: /yogurt|yoghurt|jogurtti/i,
     name: 'yogurt',
     unit: 'KG',
     qty: 1,
+    containerHint: 'Kilogramma (weight)',
   },
   {
     match: /parsley|persilja/i,
@@ -57,7 +76,13 @@ const HEURISTICS: {
     qty: 12,
   },
   { match: /butter|\bvoi\b|voita/i, name: 'butter', unit: 'KG', qty: 1 },
-  { match: /olive|oliivi/i, name: 'olive oil', unit: 'L', qty: 1 },
+  {
+    match: /olive|oliivi/i,
+    name: 'olive oil',
+    unit: 'L',
+    qty: 1,
+    containerHint: 'Pullo (bottle)',
+  },
   { match: /chickpea|kikherne/i, name: 'chickpeas', unit: 'PRK', qty: 2 },
   { match: /maple|vaahtera/i, name: 'maple syrup', unit: 'KPL', qty: 1 },
   { match: /pineapple|ananas/i, name: 'pineapple', unit: 'KG', qty: 2 },
@@ -65,33 +90,79 @@ const HEURISTICS: {
   { match: /pecan|pekaani/i, name: 'pecans', unit: 'PSS', qty: 1 },
 ];
 
-export async function analyzeInventoryImage(
-  _imageUri: string,
-  hint?: string,
-): Promise<VisionExtract> {
-  await delay(700);
-  const text = hint?.trim() || '';
+function extractFromHeuristics(
+  text: string,
+  notes: string,
+): VisionExtract | null {
   for (const h of HEURISTICS) {
     if (h.match.test(text)) {
       return {
         suggestedName: h.name,
         unit: h.unit ?? null,
         quantity: h.qty ?? 1,
+        unitPriceAlv0: h.unitPriceAlv0 ?? null,
         expiryDate: null,
         confidence: 0.86,
-        rawNotes: 'Stub vision matched from hint/filename heuristics',
+        rawNotes: notes,
+        packSize: h.packSize ?? null,
+        brand: h.brand ?? null,
+        containerHint: h.containerHint ?? null,
+        aliases: [h.name],
       };
     }
   }
+  return null;
+}
+
+export async function analyzeInventoryImage(
+  _imageUri: string,
+  hint?: string,
+): Promise<VisionExtract> {
+  await delay(700);
+  const text = `${hint?.trim() || ''} ${_imageUri}`;
+  const hit = extractFromHeuristics(
+    text,
+    'Stub vision matched from hint/filename heuristics',
+  );
+  if (hit) return hit;
   return {
     suggestedName: 'capers',
     unit: 'PRK',
     quantity: 2,
+    unitPriceAlv0: 4.2,
     expiryDate: null,
     confidence: 0.78,
+    packSize: '935g/600g',
+    brand: 'Figaro',
+    containerHint: 'Purkki (can / jar)',
+    aliases: ['capers', 'kapris'],
     rawNotes:
       'Demo stub: AI returned informal name "capers" — matcher should find Figaro Kapris…',
   };
+}
+
+/**
+ * Series of close-up label / pack / barcode photos for Add Product enrichment.
+ * Stub: joins URI + filename cues; real vision would OCR each frame.
+ */
+export async function analyzeProductCloseups(
+  imageUris: string[],
+  hint?: string,
+): Promise<VisionExtract> {
+  await delay(900);
+  const combined = [hint ?? '', ...imageUris].join(' ');
+  const hit = extractFromHeuristics(
+    combined,
+    `Stub multi-photo analysis (${imageUris.length || 0} close-ups)`,
+  );
+  if (hit) {
+    return {
+      ...hit,
+      confidence: Math.min(0.94, hit.confidence + 0.06),
+      rawNotes: `${hit.rawNotes} · ${imageUris.length} close-up(s)`,
+    };
+  }
+  return analyzeInventoryImage(imageUris[0] ?? 'demo', hint);
 }
 
 /**
