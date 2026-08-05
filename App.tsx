@@ -1,10 +1,15 @@
 import React from 'react';
-import { Text } from 'react-native';
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { Platform, Text, View } from 'react-native';
+import {
+  NavigationContainer,
+  DefaultTheme,
+  useIsFocused,
+} from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { enableScreens } from 'react-native-screens';
 import { ChefNudgeProvider } from './src/components/ChefNudge';
 import { InventoryProvider } from './src/data/store';
 import type { MainTabParamList, RootStackParamList } from './src/data/types';
@@ -31,8 +36,43 @@ import { UnitsGuideScreen } from './src/screens/UnitsGuideScreen';
 import { VideoDemoScreen } from './src/screens/VideoDemoScreen';
 import { colors } from './src/theme/colors';
 
+/**
+ * On web, react-native-screens defaults to disabled (`isNativePlatformSupported`
+ * is false), so bottom-tabs falls back to plain Views stacked with
+ * `absoluteFill` + `zIndex: -1`. Inactive tabs stay in the DOM/a11y tree and
+ * can visually overlap the active tab. Re-enable screens so Screen.web applies
+ * `display: none` for inactive scenes.
+ */
+if (Platform.OS === 'web') {
+  enableScreens(true);
+}
+
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+/** Belt-and-suspenders hide for web if screens path is skipped. */
+function WebTabScene({ children }: { children: React.ReactNode }) {
+  const focused = useIsFocused();
+  if (Platform.OS !== 'web') {
+    return <>{children}</>;
+  }
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: colors.bg,
+        display: focused ? 'flex' : 'none',
+      }}
+      pointerEvents={focused ? 'auto' : 'none'}
+      accessibilityElementsHidden={!focused}
+      importantForAccessibility={focused ? 'yes' : 'no-hide-descendants'}
+      // @ts-expect-error inert is a web DOM attribute
+      inert={!focused ? true : undefined}
+    >
+      {children}
+    </View>
+  );
+}
 
 const navTheme = {
   ...DefaultTheme,
@@ -67,6 +107,7 @@ function MainTabs() {
       initialRouteName="Home"
       screenOptions={{
         headerShown: false,
+        sceneStyle: { flex: 1, backgroundColor: colors.bg },
         tabBarStyle: {
           backgroundColor: colors.bgElevated,
           borderTopColor: colors.line,
@@ -76,6 +117,7 @@ function MainTabs() {
         },
         tabBarShowLabel: false,
       }}
+      screenLayout={({ children }) => <WebTabScene>{children}</WebTabScene>}
     >
       <Tab.Screen
         name="Home"
