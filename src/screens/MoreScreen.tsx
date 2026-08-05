@@ -196,8 +196,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   wordmark: {
-    width: 260,
-    height: 80,
+    width: 340,
+    height: 104,
     alignSelf: 'flex-start',
     marginBottom: spacing.md,
   },

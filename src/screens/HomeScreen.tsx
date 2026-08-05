@@ -200,8 +200,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   logoMark: {
-    width: 52,
-    height: 52,
+    width: 72,
+    height: 72,
     marginTop: 2,
   },
   brandText: {
