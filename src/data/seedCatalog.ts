@@ -4,12 +4,17 @@ import {
   SEED_BUFFET_INGREDIENTS,
   SEED_MEAT_POULTRY,
 } from './seedBuffet';
+import {
+  INVENTAARIOPOHJA_SEED_QTY,
+  SEED_INVENTAARIOPOHJA_PRODUCTS,
+} from './seedInventaariopohja';
 import { KRUOKA_SEED_QTY, SEED_KRUOKA_PRODUCTS } from './seedKruoka';
 
 /**
  * Seeded from client inventaariopohja (RR) + Figaro kapris alias demo
  * + K-Ruoka meat/poultry + buffet mise for ~150 covers
- * + K-Ruoka public sauce + retail grocery SKUs (see seedKruoka.ts).
+ * + K-Ruoka public sauce + retail grocery SKUs (see seedKruoka.ts)
+ * + extra inventaariopohja sheet lines (see seedInventaariopohja.ts).
  * Display names: sentence style (first letter caps, Finnish åäö preserved);
  * brands title-cased when multi-word. Aliases stay lowercase for search.
  */
@@ -265,24 +270,39 @@ export const SEED_PRODUCTS: Product[] = [
   ...SEED_MEAT_POULTRY,
   ...SEED_BUFFET_INGREDIENTS,
   ...SEED_KRUOKA_PRODUCTS,
+  ...SEED_INVENTAARIOPOHJA_PRODUCTS,
 ];
 
 /** Seed quantities so inventaario totals + recipe yield demos work offline */
 export const SEED_QTY: Record<string, number> = {
   'mustah-bonne': 3,
-  vaahterasiirappi: 1,
-  kikherne: 5,
-  basmatiriisi: 4,
+  vaahterasiirappi: 2,
+  kikherne: 7,
+  basmatiriisi: 6,
   falafelpihvi: 40,
-  sushiriisi: 2,
-  ananas: 3,
-  'nacho-maissilastu': 8,
-  'pizza-kast': 6,
-  oliivioljy: 2,
+  sushiriisi: 9,
+  ananas: 5,
+  'nacho-maissilastu': 4,
+  'pizza-kast': 3,
+  oliivioljy: 4,
   'figaro-kapris': 3,
-  vadelmapyre: 2,
+  vadelmapyre: 3,
+  polenta: 2,
+  'pirkka-macarons': 2,
+  pekaanipahkina: 3,
+  'tumma-suklaa': 4,
+  sitruunavinegretti: 2,
+  focca: 2,
+  puolukka: 5,
+  'sokeri-menu': 8,
+  tomusokeri: 3,
+  rapsioljy: 3,
+  'korean-bbq': 2,
+  'kiivi-karpalo': 2,
+  'mineraalivesi-6pack': 6,
   ...BUFFET_SEED_QTY,
   ...KRUOKA_SEED_QTY,
+  ...INVENTAARIOPOHJA_SEED_QTY,
 };
 
 /** Session lines for the default place. Pass `seeded: false` for an empty sheet. */
