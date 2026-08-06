@@ -1,10 +1,10 @@
 /**
  * Optional expander for K-Ruoka public product listings.
  *
- * Live www.k-ruoka.fi is Cloudflare-protected from simple curl/fetch, so this
- * script documents the intended refresh path and writes a stub JSON shape.
- * Prefer pasting CDN image URLs into src/data/seedKruoka.ts after a respectful
- * one-time browser capture (rate-limit, cache into repo, do not hammer).
+ * Runtime lookups use src/lib/kruokaLookup.ts (+ /api/kruoka-lookup proxy).
+ * Live www.k-ruoka.fi/kr-api is Cloudflare-protected from many datacenter IPs;
+ * the browser/session path works. Prefer pasting CDN image URLs into
+ * src/data/seedKruoka.ts after a respectful one-time browser capture.
  *
  * Usage (when network allows):
  *   npx tsx scripts/fetch-kruoka.ts

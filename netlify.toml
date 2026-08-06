@@ -1,6 +1,12 @@
 [build]
   publish = "dist"
   command = "npx expo export --platform web"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/kruoka-lookup"
+  to = "/.netlify/functions/kruoka-lookup"
+  status = 200
 
 [[redirects]]
   from = "/*"

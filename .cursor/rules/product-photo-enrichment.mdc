@@ -39,7 +39,12 @@ Do not treat a pack photo match as “done” if only local/stub data is used wh
 
 - Scaffolding: `ProductScanScreen`, `RecordInventoryScreen`, `ConfirmScreen`, `FridgeReviewScreen`, `AddProductScreen`.
 - Vision may still be stubbed in `src/lib/visionStub.ts`; Gemini path in `src/lib/geminiVision.ts`.
-- K-Ruoka today may still use offline seed (`seedKruoka.ts`) — **target is live lookup** by EAN/name against k-ruoka.fi (and peers).
-- Prefer enriching existing `VisionExtract` / `AddProduct` prefill (`src/lib/productEnrichment.ts`) rather than a parallel flow.
+- **Full lookups** via `src/lib/kruokaLookup.ts` + `api/kruoka-lookup.js`:
+  1. Proxy / same-origin `/api/kruoka-lookup` (or `EXPO_PUBLIC_KRUOKA_LOOKUP_URL`)
+  2. Direct `kr-api/v2/product-search` (when Cloudflare allows)
+  3. Offline seed (`seedKruoka.ts`)
+  4. Open Food Facts + Keskofiles image + K-Ruoka search URL
+- Wire through `matchExtractListingAsync` / `enrichFromExtractAsync` / `enrichProductFromPhotos` in `productEnrichment.ts`.
+- Prefer enriching existing `VisionExtract` / `AddProduct` prefill rather than a parallel flow.
 - Keep inventory prices at **0% ALV**; convert retail (14% food ALV) when importing from K-Ruoka. POS unit codes from `src/data/units.ts`.
 - Do not drop this flow when refining logos, demos, or unrelated UI.

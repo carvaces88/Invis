@@ -29,7 +29,7 @@ import {
   similarProductCandidates,
 } from '../lib/fuzzyMatch';
 import {
-  enrichFromExtract,
+  enrichFromExtractAsync,
   enrichProductFromPhotos,
 } from '../lib/productEnrichment';
 import { IDENTITY_MATCH_MIN } from '../lib/fuzzyMatch';
@@ -128,10 +128,17 @@ export function AddProductScreen({ route, navigation }: Props) {
     setEnrichNotes(e.notes);
   }
 
-  // Prefill from upstream scan extract once on mount
+  // Prefill from upstream scan extract + live K-Ruoka lookup once on mount
   useEffect(() => {
     if (!extract) return;
-    applyEnrichment(enrichFromExtract(extract, products));
+    let cancelled = false;
+    (async () => {
+      const enrichment = await enrichFromExtractAsync(extract, products);
+      if (!cancelled) applyEnrichment(enrichment);
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot from route
   }, []);
 

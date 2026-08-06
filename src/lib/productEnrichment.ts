@@ -1,5 +1,6 @@
 /**
- * Product close-up enrichment: live/stub vision → catalog FIRST → K-Ruoka seed → Add Product prefill.
+ * Product close-up enrichment: live/stub vision → catalog FIRST → live K-Ruoka
+ * (proxy / API / seed / Open Food Facts) → Add Product prefill.
  * Prefer existing inventory match; only suggest insert when unmatched.
  */
 import { SEED_KRUOKA_PRODUCTS } from '../data/seedKruoka';
@@ -16,6 +17,7 @@ import {
   bestMatch,
   isIdentityCatalogMatch,
 } from './fuzzyMatch';
+import { lookupKruokaForExtract } from './kruokaLookup';
 import { analyzeInventoryImage, analyzeProductCloseups } from './vision';
 
 const CONTAINER_BY_UNIT: Partial<Record<UnitCode, string>> = {
@@ -105,8 +107,8 @@ function enrichmentFromExtract(
 }
 
 /**
- * Match vision extract against live catalog FIRST (EAN / name / alias / brand+pack),
- * then K-Ruoka public seed.
+ * Sync match against live catalog FIRST, then offline K-Ruoka seed.
+ * Prefer {@link matchExtractListingAsync} for full live lookups.
  */
 export function matchPublicListing(
   suggestedName: string,
@@ -124,7 +126,7 @@ export function matchPublicListing(
   return null;
 }
 
-/** Inventory-first match using full VisionExtract identity signals. */
+/** Inventory-first match using full VisionExtract identity signals (seed only). */
 export function matchExtractListing(
   extract: VisionExtract,
   catalog: Product[],
@@ -148,9 +150,67 @@ export function matchExtractListing(
   return null;
 }
 
+/** Catalog → live K-Ruoka / proxy / OFF cascade. */
+export async function matchExtractListingAsync(
+  extract: VisionExtract,
+  catalog: Product[],
+): Promise<{
+  product: Product;
+  fromKruoka: boolean;
+  score: number;
+  liveSource?: string;
+} | null> {
+  const local = matchExtractListing(extract, catalog);
+  // Strong inventory / seed identity match — skip network
+  if (local && local.score >= 0.85 && !local.fromKruoka) {
+    return local;
+  }
+  if (
+    local &&
+    local.fromKruoka &&
+    local.score >= 0.85 &&
+    (extract.ean == null || local.product.ean === extract.ean)
+  ) {
+    return local;
+  }
+
+  const live = await lookupKruokaForExtract(extract);
+  if (live) {
+    // Prefer existing catalog row when EAN/name already stocked
+    if (live.hit.ean) {
+      const inStock = catalog.find((p) => p.ean && p.ean === live.hit.ean);
+      if (inStock) {
+        return {
+          product: {
+            ...inStock,
+            packSize: live.product.packSize ?? inStock.packSize,
+            unitPriceAlv0:
+              live.product.unitPriceAlv0 > 0
+                ? live.product.unitPriceAlv0
+                : inStock.unitPriceAlv0,
+            sourceUrl: live.product.sourceUrl ?? inStock.sourceUrl,
+            imageUrl: live.product.imageUrl ?? inStock.imageUrl,
+          },
+          fromKruoka: true,
+          score: Math.max(live.score, 0.9),
+          liveSource: live.hit.source,
+        };
+      }
+    }
+    return {
+      product: live.product,
+      fromKruoka: true,
+      score: live.score,
+      liveSource: live.hit.source,
+    };
+  }
+
+  return local;
+}
+
 /**
  * Analyze a series of close-up photos and prefill Add Product fields.
- * Uses vision stub + offline K-Ruoka / catalog public data (live web later).
+ * Uses vision + live K-Ruoka lookup (with seed / OFF fallbacks).
  */
 export async function enrichProductFromPhotos(
   photoUris: string[],
@@ -162,10 +222,11 @@ export async function enrichProductFromPhotos(
       ? await analyzeProductCloseups(photoUris, hint)
       : await analyzeInventoryImage(photoUris[0] ?? 'demo', hint);
 
-  const listing = matchExtractListing(extract, catalog);
+  const listing = await matchExtractListingAsync(extract, catalog);
   if (listing) {
-    const { product, fromKruoka, score } = listing;
-    const alreadyInStock = !fromKruoka || catalog.some((p) => p.id === product.id);
+    const { product, fromKruoka, score, liveSource } = listing;
+    const alreadyInStock =
+      !fromKruoka || catalog.some((p) => p.id === product.id || (p.ean && p.ean === product.ean));
     const source = isIdentityCatalogMatch({
       product,
       score,
@@ -176,7 +237,11 @@ export async function enrichProductFromPhotos(
         ? 'Already in catalog / inventory'
         : 'Matched public K-Ruoka listing'
       : fromKruoka
-        ? 'Matched public K-Ruoka listing'
+        ? liveSource === 'openfoodfacts'
+          ? 'Matched Open Food Facts · K-Ruoka link'
+          : liveSource === 'kruoka-seed'
+            ? 'Matched offline K-Ruoka seed'
+            : 'Matched live K-Ruoka listing'
         : 'Matched inventory / supplier catalog';
     const brand = inferBrand(product.officialName, product.aliases);
     const container =
@@ -219,7 +284,7 @@ export async function enrichProductFromPhotos(
   };
 }
 
-/** Build enrichment from an existing VisionExtract (Confirm / Fridge → Add). */
+/** Sync seed/catalog-only enrich (no network). */
 export function enrichFromExtract(
   extract: VisionExtract,
   catalog: Product[],
@@ -230,7 +295,6 @@ export function enrichFromExtract(
     return enrichmentFromProduct(
       {
         ...product,
-        // Prefer extract overrides when richer
         packSize: extract.packSize ?? product.packSize,
         unitPriceAlv0:
           extract.unitPriceAlv0 != null
@@ -249,8 +313,51 @@ export function enrichFromExtract(
       })
         ? 'Already in catalog — confirm existing product'
         : fromKruoka
-          ? 'Prefill from scan + K-Ruoka public data'
+          ? 'Prefill from scan + K-Ruoka seed'
           : 'Prefill from scan + catalog match',
+      true,
+    );
+  }
+  return enrichmentFromExtract(extract);
+}
+
+/** Async enrich with live K-Ruoka / full lookup cascade. */
+export async function enrichFromExtractAsync(
+  extract: VisionExtract,
+  catalog: Product[],
+): Promise<ProductEnrichment> {
+  const listing = await matchExtractListingAsync(extract, catalog);
+  if (listing) {
+    const { product, fromKruoka, score, liveSource } = listing;
+    const note =
+      isIdentityCatalogMatch({
+        product,
+        score,
+        matchedOn: 'vision',
+        matchedTerm: extract.suggestedName,
+      })
+        ? 'Already in catalog — confirm existing product'
+        : fromKruoka
+          ? liveSource === 'openfoodfacts'
+            ? 'Prefill from scan + Open Food Facts / K-Ruoka'
+            : liveSource === 'kruoka-seed'
+              ? 'Prefill from scan + K-Ruoka seed'
+              : 'Prefill from scan + live K-Ruoka'
+          : 'Prefill from scan + catalog match';
+    return enrichmentFromProduct(
+      {
+        ...product,
+        packSize: extract.packSize ?? product.packSize,
+        unitPriceAlv0:
+          extract.unitPriceAlv0 != null && extract.unitPriceAlv0 > 0
+            ? extract.unitPriceAlv0
+            : product.unitPriceAlv0,
+        ean: extract.ean ?? product.ean,
+        sourceUrl: extract.sourceUrl ?? product.sourceUrl,
+        imageUrl: extract.imageUrl ?? product.imageUrl,
+      },
+      Math.max(extract.confidence, score),
+      note,
       true,
     );
   }
