@@ -12,7 +12,40 @@
 import { SEED_KRUOKA_PRODUCTS } from '../data/seedKruoka';
 import type { Product, UnitCode, VisionExtract } from '../data/types';
 import { FOOD_ALV_RATE } from './alv';
-import { bestExtractMatch, bestMatch } from './fuzzyMatch';
+import {
+  bestExtractMatch,
+  bestMatch,
+  isGarbageProductName,
+  normalizeLoose,
+} from './fuzzyMatch';
+
+/** Queries that must never hit Open Food Facts / fuzzy seed (Aldi "Unknown" trap). */
+export function isUsableLookupQuery(query: string | null | undefined): boolean {
+  const q = (query ?? '').trim();
+  if (!q) return false;
+  if (/^\d{8,14}$/.test(q.replace(/\D/g, '')) && q.replace(/\D/g, '').length >= 8) {
+    return true;
+  }
+  if (isGarbageProductName(q)) return false;
+  // Need a non-generic token (brand / product line)
+  const loose = normalizeLoose(q);
+  if (loose.length < 3) return false;
+  return !isGarbageProductName(loose);
+}
+
+/**
+ * Vision extracts that are safe to enrich via live K-Ruoka / OFF.
+ * Stub / unconfigured OCR ("Unknown product") must not search the web.
+ */
+export function extractHasLookupSignal(extract: VisionExtract): boolean {
+  const ean = (extract.ean ?? '').replace(/\D/g, '');
+  if (ean.length >= 8) return true;
+  if (extract.unrecognized) return false;
+  const name = extract.suggestedName?.trim() ?? '';
+  if (!isUsableLookupQuery(name)) return false;
+  if (extract.brand?.trim() && !isGarbageProductName(extract.brand)) return true;
+  return isUsableLookupQuery([extract.brand, name, extract.packSize].filter(Boolean).join(' '));
+}
 
 const DEFAULT_STORE = 'N106';
 const SEARCH_PATH = 'https://www.k-ruoka.fi/kr-api/v2/product-search';
@@ -355,12 +388,17 @@ function mapOff(p: OffProduct): KruokaHit | null {
     ''
   ).trim();
   if (!officialName) return null;
+  // OFF has literal products named "Unknown" (e.g. Aldi) — never surface those
+  // from a text search; EAN exact lookup may still return them intentionally.
+  if (isGarbageProductName(officialName)) return null;
   const brand = p.brands?.split(',')[0]?.trim();
+  const displayName = brand ? `${brand} ${officialName}` : officialName;
+  if (isGarbageProductName(displayName) && !ean) return null;
   const packSize = p.quantity?.trim() || undefined;
   const q = ean || officialName;
   return {
     ean,
-    officialName: brand ? `${brand} ${officialName}` : officialName,
+    officialName: displayName,
     brand,
     packSize,
     unit: 'KPL',
@@ -410,7 +448,8 @@ export async function lookupKruokaProducts(opts: {
 }): Promise<KruokaHit[]> {
   const limit = opts.limit ?? 8;
   const ean = opts.ean?.replace(/\D/g, '') || null;
-  const query = (opts.query ?? ean ?? '').trim();
+  const rawQuery = (opts.query ?? '').trim();
+  const query = isUsableLookupQuery(rawQuery) ? rawQuery : '';
   if (!query && !ean) return [];
 
   // Instant offline hit when seed already knows this EAN
@@ -433,29 +472,47 @@ export async function lookupKruokaProducts(opts: {
     if (viaLive.length) return viaLive.slice(0, limit);
   }
 
-  const seed = searchSeed(query || ean || '', ean);
-  if (seed.length) return seed;
+  // Seed fuzzy only for usable text (never "Unknown product")
+  if (query || ean) {
+    const seed = searchSeed(query || ean || '', ean);
+    if (seed.length) {
+      if (ean && seed[0].ean === ean) return seed;
+      if (query && !isGarbageProductName(query)) return seed;
+    }
+  }
 
-  return searchOpenFoodFacts(query || ean || '', ean, limit);
+  // OFF: EAN exact always OK; text search only with a real product query
+  if (ean || query) {
+    return searchOpenFoodFacts(query || ean || '', ean, limit);
+  }
+  return [];
 }
 
 /** Best single hit for a vision extract (EAN preferred, then name). */
 export async function lookupKruokaForExtract(
   extract: VisionExtract,
 ): Promise<{ product: Product; hit: KruokaHit; score: number } | null> {
+  if (!extractHasLookupSignal(extract)) return null;
+
   const query = [extract.brand, extract.suggestedName, extract.packSize]
     .filter(Boolean)
     .join(' ')
     .trim();
+  const usableQuery = isUsableLookupQuery(query)
+    ? query
+    : isUsableLookupQuery(extract.suggestedName)
+      ? extract.suggestedName
+      : undefined;
   const hits = await lookupKruokaProducts({
-    query: query || extract.suggestedName,
+    query: usableQuery,
     ean: extract.ean,
     limit: 10,
   });
   if (!hits.length) return null;
 
-  if (extract.ean) {
-    const exact = hits.find((h) => h.ean === extract.ean);
+  const eanQ = (extract.ean ?? '').replace(/\D/g, '');
+  if (eanQ) {
+    const exact = hits.find((h) => (h.ean ?? '').replace(/\D/g, '') === eanQ);
     if (exact) {
       return { product: hitToProduct(exact), hit: exact, score: 0.98 };
     }
@@ -463,12 +520,25 @@ export async function lookupKruokaForExtract(
 
   const asProducts = hits.map(hitToProduct);
   const ranked = bestExtractMatch(asProducts, extract);
-  if (ranked && ranked.score >= 0.4) {
+  // Require a real name/brand agreement — never promote a random OFF top hit
+  if (ranked && ranked.score >= 0.72) {
     const hit = hits[asProducts.indexOf(ranked.product)] ?? hits[0];
+    // Live K-Ruoka / proxy can be trusted slightly lower; OFF needs stronger score
+    if (hit.source === 'openfoodfacts' && ranked.score < 0.85) {
+      return null;
+    }
     return { product: ranked.product, hit, score: ranked.score };
   }
 
-  // Top live hit as weak suggestion
+  // Only accept an unranked top hit when it came from live K-Ruoka and
+  // vision already has a usable brand+name (not stub placeholders).
   const top = hits[0];
-  return { product: hitToProduct(top), hit: top, score: 0.55 };
+  if (
+    (top.source === 'kruoka-live' || top.source === 'kruoka-proxy') &&
+    usableQuery &&
+    !extract.unrecognized
+  ) {
+    return { product: hitToProduct(top), hit: top, score: 0.62 };
+  }
+  return null;
 }

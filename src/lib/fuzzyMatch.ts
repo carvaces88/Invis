@@ -62,6 +62,38 @@ const STOP_TOKENS = new Set([
   'kpl',
 ]);
 
+/**
+ * Generic / placeholder tokens that must never drive a high-confidence catalog
+ * or K-Ruoka identity match (e.g. stub "Unknown product" → Aldi "Unknown").
+ */
+const GENERIC_MATCH_TOKENS = new Set([
+  'unknown',
+  'product',
+  'item',
+  'container',
+  'unrecognized',
+  'n/a',
+  'na',
+  'null',
+  'none',
+  'test',
+  'demo',
+  'sample',
+  'tuote',
+  'tuntematon',
+]);
+
+export function isGenericMatchToken(token: string): boolean {
+  return GENERIC_MATCH_TOKENS.has(normalizeLoose(token));
+}
+
+/** True when a vision/catalog name is only placeholders (not a real product). */
+export function isGarbageProductName(name: string | null | undefined): boolean {
+  const tokens = significantTokens(name ?? '');
+  if (!tokens.length) return true;
+  return tokens.every((t) => isGenericMatchToken(t));
+}
+
 function buildIndex(products: Product[]): SearchRow[] {
   const rows: SearchRow[] = [];
   for (const product of products) {
@@ -119,7 +151,10 @@ function normalizePack(s: string | null | undefined): string {
 function significantTokens(s: string): string[] {
   return normalizeLoose(s)
     .split(' ')
-    .filter((t) => t.length > 1 && !STOP_TOKENS.has(t));
+    .filter(
+      (t) =>
+        t.length > 1 && !STOP_TOKENS.has(t) && !GENERIC_MATCH_TOKENS.has(t),
+    );
 }
 
 function tokenJaccard(a: string, b: string): number {
@@ -273,35 +308,43 @@ function applyIdentitySignals(
     for (const alias of product.aliases) {
       const a = normalizeTerm(alias);
       const aLoose = normalizeLoose(alias);
+      if (isGarbageProductName(alias) || isGarbageProductName(name)) continue;
       if (a === q) {
         consider(map, product, 1, 'alias', alias);
       } else if (aLoose === qLoose) {
         consider(map, product, 0.99, 'alias', alias);
       } else if (
-        aLoose.length >= 4 &&
+        aLoose.length >= 5 &&
+        !isGenericMatchToken(aLoose) &&
         (qLoose.includes(aLoose) || aLoose.includes(qLoose))
       ) {
-        // Informal vision name contained in alias (or reverse)
+        // Informal vision name contained in alias (or reverse).
+        // Require strong length ratio so "unknown" ≠ "unknown product".
         const ratio =
           Math.min(aLoose.length, qLoose.length) /
           Math.max(aLoose.length, qLoose.length);
+        if (ratio < 0.72) continue;
         consider(
           map,
           product,
-          ratio >= 0.7 ? 0.96 : 0.9,
+          ratio >= 0.85 ? 0.96 : 0.88,
           'alias',
           alias,
         );
       }
     }
 
-    const off = normalizeLoose(product.officialName);
-    if (off.startsWith(qLoose) || qLoose.startsWith(off)) {
-      consider(map, product, 0.97, 'official', product.officialName);
-    } else if (off.includes(qLoose) && qLoose.length >= 4) {
-      consider(map, product, 0.93, 'official', product.officialName);
-    } else if (qLoose.includes(off) && off.length >= 6) {
-      consider(map, product, 0.94, 'official', product.officialName);
+    if (isGarbageProductName(name) || isGarbageProductName(product.officialName)) {
+      // Placeholders never create official-name identity (Aldi Unknown trap)
+    } else {
+      const off = normalizeLoose(product.officialName);
+      if (off.startsWith(qLoose) || qLoose.startsWith(off)) {
+        consider(map, product, 0.97, 'official', product.officialName);
+      } else if (off.includes(qLoose) && qLoose.length >= 5) {
+        consider(map, product, 0.93, 'official', product.officialName);
+      } else if (qLoose.includes(off) && off.length >= 6) {
+        consider(map, product, 0.94, 'official', product.officialName);
+      }
     }
 
     const j = tokenJaccard(name, product.officialName);
@@ -356,20 +399,17 @@ function applyIdentitySignals(
     }
   }
 
-  // Catalog has a pack photo / listing image — treat strong text identity as visual confirm
+  // Catalog listing image only confirms already-strong text/EAN identity —
+  // never promote a weak fuzzy hit to 97% (false "Matched public K-Ruoka").
   if (
     (product.imageUrl || product.sourceUrl) &&
     map.get(product.id) &&
-    (map.get(product.id)!.score ?? 0) >= 0.85
+    (map.get(product.id)!.score ?? 0) >= 0.92
   ) {
     const cur = map.get(product.id)!;
-    consider(
-      map,
-      product,
-      Math.min(1, Math.max(cur.score, 0.97)),
-      cur.matchedOn === 'ean' ? 'ean' : 'vision',
-      cur.matchedTerm,
-    );
+    if (cur.matchedOn === 'ean') {
+      consider(map, product, Math.min(1, Math.max(cur.score, 0.98)), 'ean', cur.matchedTerm);
+    }
   }
 }
 

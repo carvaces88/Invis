@@ -87,25 +87,75 @@ async function searchKruoka(query, storeId, limit) {
   return { ok: true, status: res.status, products };
 }
 
+const GARBAGE_NAME_RE =
+  /^(unknown|product|item|container|tuntematon|tuote|n\/?a|none|null|test|demo)(\s+(unknown|product|item|container|tuote))?$/i;
+
+function isGarbageLookupQuery(q) {
+  const t = String(q || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9åäö\s]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!t) return true;
+  if (/^\d{8,14}$/.test(t)) return false;
+  return GARBAGE_NAME_RE.test(t);
+}
+
+function isGarbageProductName(name) {
+  const t = String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9åäö\s]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!t) return true;
+  const tokens = t.split(' ').filter(Boolean);
+  const generic = new Set([
+    'unknown',
+    'product',
+    'item',
+    'container',
+    'tuntematon',
+    'tuote',
+    'n/a',
+    'na',
+    'none',
+    'null',
+    'test',
+    'demo',
+  ]);
+  return tokens.length > 0 && tokens.every((x) => generic.has(x));
+}
+
 async function searchOff(query, limit) {
+  if (isGarbageLookupQuery(query)) return [];
   const url =
     `https://world.openfoodfacts.org/cgi/search.pl` +
     `?search_terms=${encodeURIComponent(query)}` +
     `&search_simple=1&action=process&json=1&page_size=${limit}` +
     `&fields=code,product_name,product_name_fi,brands,quantity,image_url,image_front_url`;
-  const res = await fetch(url, { headers: { accept: 'application/json' } });
+  const res = await fetch(url, {
+    headers: {
+      accept: 'application/json',
+      'user-agent':
+        'Inventaario/1.0 (+https://invis-lac.vercel.app; product-lookup)',
+    },
+  });
   if (!res.ok) return [];
   const json = await res.json();
   return (json.products || [])
     .map((p) => {
       const ean = String(p.code || '').replace(/\D/g, '') || undefined;
       const name = (p.product_name_fi || p.product_name || '').trim();
-      if (!name) return null;
+      if (!name || isGarbageProductName(name)) return null;
       const brand = (p.brands || '').split(',')[0]?.trim();
+      const officialName = brand ? `${brand} ${name}` : name;
+      if (isGarbageProductName(officialName) && !ean) return null;
       const q = ean || name;
       return {
         ean,
-        officialName: brand ? `${brand} ${name}` : name,
+        officialName,
         brand,
         packSize: p.quantity || undefined,
         unit: 'KPL',
@@ -142,6 +192,15 @@ module.exports = async function handler(req, res) {
   const storeId = String(req.query.storeId || DEFAULT_STORE).trim() || DEFAULT_STORE;
   if (!q) {
     res.status(400).json({ error: 'Missing q', products: [] });
+    return;
+  }
+  // Stub OCR placeholders must never hit Open Food Facts (Aldi "Unknown" trap)
+  if (isGarbageLookupQuery(q)) {
+    res.status(200).json({
+      products: [],
+      source: 'rejected-placeholder',
+      storeId,
+    });
     return;
   }
 

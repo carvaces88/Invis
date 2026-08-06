@@ -158,11 +158,63 @@ export function isRealImageUri(uri: string | null | undefined): boolean {
   );
 }
 
+/** Keep payloads under Vercel/serverless body limits (~4.5MB). */
+const MAX_VISION_BASE64_CHARS = 1_800_000;
+const MAX_VISION_EDGE_PX = 1280;
+
+async function maybeDownscalePayload(
+  mimeType: string,
+  base64: string,
+): Promise<ImagePayload> {
+  if (base64.length <= MAX_VISION_BASE64_CHARS) {
+    return { mimeType, base64 };
+  }
+  // Web: canvas downscale. Native: send as-is (picker quality already ~0.75).
+  if (typeof document === 'undefined' || typeof Image === 'undefined') {
+    return { mimeType, base64 };
+  }
+  try {
+    const src = `data:${mimeType};base64,${base64}`;
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error('Vision image decode failed'));
+      el.src = src;
+    });
+    const scale = Math.min(
+      1,
+      MAX_VISION_EDGE_PX / Math.max(img.width, img.height),
+    );
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return { mimeType, base64 };
+    ctx.drawImage(img, 0, 0, w, h);
+    let quality = 0.72;
+    let out = canvas.toDataURL('image/jpeg', quality);
+    while (out.length > MAX_VISION_BASE64_CHARS && quality > 0.4) {
+      quality -= 0.1;
+      out = canvas.toDataURL('image/jpeg', quality);
+    }
+    const match = /^data:([^;]+);base64,(.+)$/.exec(out);
+    if (!match) return { mimeType, base64 };
+    return { mimeType: match[1], base64: match[2] };
+  } catch {
+    return { mimeType, base64 };
+  }
+}
+
 export async function imageUriToPayload(uri: string): Promise<ImagePayload> {
   if (uri.startsWith('data:')) {
     const match = /^data:([^;]+);base64,(.+)$/s.exec(uri);
     if (!match) throw new Error('Invalid data URI for vision');
-    return { mimeType: match[1], base64: match[2].replace(/\s/g, '') };
+    return maybeDownscalePayload(
+      match[1],
+      match[2].replace(/\s/g, ''),
+    );
   }
 
   if (
@@ -177,13 +229,13 @@ export async function imageUriToPayload(uri: string): Promise<ImagePayload> {
     const mime =
       res.headers.get('content-type')?.split(';')[0]?.trim() ||
       mimeFromUri(uri);
-    return { mimeType: mime, base64 };
+    return maybeDownscalePayload(mime, base64);
   }
 
   const base64 = await readAsStringAsync(uri, {
     encoding: EncodingType.Base64,
   });
-  return { mimeType: mimeFromUri(uri), base64 };
+  return maybeDownscalePayload(mimeFromUri(uri), base64);
 }
 
 function parseUnit(raw: unknown): UnitCode | null {
@@ -338,19 +390,38 @@ async function callVisionProxy(
   hint: string | undefined,
   proxyUrl: string,
 ): Promise<VisionExtract> {
-  const res = await fetch(proxyUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({
-      images: payloads.map((p) => ({
-        mimeType: p.mimeType,
-        base64: p.base64,
-      })),
-      hint: hint?.trim() || undefined,
-      model: getGeminiModel(),
-    }),
-  });
-  const body = (await res.json()) as VisionExtract & { error?: string };
+  let res: Response;
+  try {
+    res = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({
+        images: payloads.map((p) => ({
+          mimeType: p.mimeType,
+          base64: p.base64,
+        })),
+        hint: hint?.trim() || undefined,
+        model: getGeminiModel(),
+        mode: 'product',
+      }),
+    });
+  } catch (err) {
+    throw new Error(
+      err instanceof Error
+        ? `Vision proxy unreachable: ${err.message}`
+        : 'Vision proxy unreachable',
+    );
+  }
+  let body: VisionExtract & { error?: string };
+  try {
+    body = (await res.json()) as VisionExtract & { error?: string };
+  } catch {
+    throw new Error(
+      res.status === 413
+        ? 'Photo too large for vision proxy — try a closer crop'
+        : `Vision proxy returned non-JSON (${res.status})`,
+    );
+  }
   if (!res.ok) {
     throw new Error(body.error || `Vision proxy failed (${res.status})`);
   }

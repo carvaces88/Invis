@@ -15,9 +15,13 @@ import { UNIT_LABELS } from '../data/units';
 import {
   bestExtractMatch,
   bestMatch,
+  isGarbageProductName,
   isIdentityCatalogMatch,
 } from './fuzzyMatch';
-import { lookupKruokaForExtract } from './kruokaLookup';
+import {
+  extractHasLookupSignal,
+  lookupKruokaForExtract,
+} from './kruokaLookup';
 import {
   containerLabelForUnit,
   extractEanFromText,
@@ -26,6 +30,7 @@ import {
 } from './packaging';
 import { generateProductAliases, mergeAliasLists } from './productAliases';
 import { analyzeInventoryImage, analyzeProductCloseups } from './vision';
+import { isLiveVisionEnabled } from './visionConfig';
 
 function inferBrand(officialName: string, aliases: string[]): string | undefined {
   const first = officialName.trim().split(/\s+/)[0];
@@ -160,7 +165,12 @@ function enrichmentFromExtract(
       extract.rawNotes ??
       extract.aiDescription ??
       'Label read from close-up photos',
-    matchedPublicListing: Boolean(extract.sourceUrl || ean),
+    // Never claim a public listing from stub placeholders or bare EAN guesses
+    matchedPublicListing: Boolean(
+      extract.sourceUrl &&
+        !extract.unrecognized &&
+        !isGarbageProductName(extract.suggestedName),
+    ),
   };
 }
 
@@ -212,6 +222,11 @@ export function matchExtractListing(
     };
   }
 
+  // Stub / unconfigured OCR: do not fuzzy-match "Unknown product" into seed/catalog
+  if (extract.unrecognized || isGarbageProductName(extract.suggestedName)) {
+    return null;
+  }
+
   const catalogHit = bestExtractMatch(catalog, extract);
   if (catalogHit && catalogHit.score >= 0.45) {
     return {
@@ -256,6 +271,11 @@ export async function matchExtractListingAsync(
     return local;
   }
 
+  // No live public search when vision is stubbed / placeholder-only
+  if (!extractHasLookupSignal(extract)) {
+    return local && local.score >= 0.85 ? local : null;
+  }
+
   const live = await lookupKruokaForExtract(extract);
   if (live) {
     // Prefer existing catalog row when EAN/name already stocked
@@ -290,7 +310,7 @@ export async function matchExtractListingAsync(
     };
   }
 
-  return local;
+  return local && local.score >= 0.72 ? local : null;
 }
 
 /**
@@ -319,22 +339,35 @@ export async function enrichProductFromPhotos(
             product.ean &&
             normalizeEanDigits(p.ean) === normalizeEanDigits(product.ean)),
       );
-    const source = isIdentityCatalogMatch({
+    const identity = isIdentityCatalogMatch({
       product,
       score,
       matchedOn: 'vision',
       matchedTerm: extract.suggestedName,
-    })
+    });
+    const source = identity
       ? alreadyInStock
         ? 'Already in catalog / inventory'
-        : 'Matched public K-Ruoka listing'
+        : liveSource === 'openfoodfacts'
+          ? 'Matched Open Food Facts (verify — not a live K-Ruoka hit)'
+          : 'Matched public K-Ruoka listing'
       : fromKruoka
         ? liveSource === 'openfoodfacts'
-          ? 'Matched Open Food Facts · K-Ruoka link'
+          ? 'Matched Open Food Facts · K-Ruoka search link'
           : liveSource === 'kruoka-seed'
             ? 'Matched offline K-Ruoka seed'
             : 'Matched live K-Ruoka listing'
         : 'Matched inventory / supplier catalog';
+    // Only claim a public listing when live/seed actually matched with evidence
+    const matchedPublic =
+      fromKruoka &&
+      score >= 0.72 &&
+      liveSource !== undefined &&
+      liveSource !== 'kruoka-seed'
+        ? true
+        : fromKruoka && score >= 0.85
+          ? true
+          : identity && alreadyInStock;
     const brand = extract.brand ?? inferBrand(product.officialName, product.aliases);
     const pack = resolvePackaging(
       product.unit,
@@ -360,20 +393,29 @@ export async function enrichProductFromPhotos(
       product,
       Math.max(extract.confidence, score),
       notes,
-      true,
+      Boolean(matchedPublic),
       extract,
     );
   }
 
   const base = enrichmentFromExtract(extract);
+  const visionHint = !isLiveVisionEnabled()
+    ? 'Live label reading is not configured on this build (set GEMINI_API_KEY on /api/vision).'
+    : extract.unrecognized
+      ? null
+      : null;
   return {
     ...base,
+    matchedPublicListing: false,
     notes: [
       base.notes,
+      visionHint,
       base.brand ? `Brand: ${base.brand}` : null,
       base.containerHint ? `Packaging: ${base.containerHint}` : null,
       `Unit: ${UNIT_LABELS[base.unit]}`,
-      'No inventory match — review suggested fields to add as new',
+      extract.unrecognized || isGarbageProductName(extract.suggestedName)
+        ? 'No public match — add manually or retry with a clearer label/barcode photo'
+        : 'No inventory match — review suggested fields to add as new',
     ]
       .filter(Boolean)
       .join(' · '),

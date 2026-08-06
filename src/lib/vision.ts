@@ -18,9 +18,40 @@ import {
   isPaidDocumentVisionEnabled,
   isVideoAnalysisEnabled,
 } from './visionStub';
+import { isLiveVisionEnabled } from './visionConfig';
 
 export { isLiveVisionEnabled } from './visionConfig';
 export { isPaidDocumentVisionEnabled, isVideoAnalysisEnabled, isRealImageUri };
+
+function unrecognizedFromError(
+  hint: string | undefined,
+  err: unknown,
+): VisionExtract {
+  const msg = err instanceof Error ? err.message : 'Vision failed';
+  const configured = isLiveVisionEnabled();
+  const notes = /not configured|GEMINI_API_KEY|Vision API not configured/i.test(
+    msg,
+  )
+    ? 'Photo received, but live label reading is not configured. Set GEMINI_API_KEY on the server (/api/vision) for production web, or EXPO_PUBLIC_GEMINI_API_KEY for local Expo.'
+    : configured
+      ? `Live label reading failed: ${msg}. Match an inventory product or add this as new — we will not invent a K-Ruoka match.`
+      : 'Photo received, but live label reading is not configured. Match an inventory product or add this as new.';
+  return {
+    suggestedName: hint?.trim() || 'Unknown product',
+    unit: 'KPL',
+    quantity: 1,
+    unitPriceAlv0: null,
+    expiryDate: null,
+    confidence: hint?.trim() ? 0.35 : 0.12,
+    packSize: null,
+    brand: null,
+    containerHint: null,
+    ean: null,
+    aliases: hint?.trim() ? [hint.trim().toLowerCase()] : [],
+    unrecognized: true,
+    rawNotes: notes,
+  };
+}
 
 export async function analyzeInventoryImage(
   imageUri: string,
@@ -29,9 +60,9 @@ export async function analyzeInventoryImage(
   if (isRealImageUri(imageUri)) {
     try {
       return await analyzeImagesWithGemini([imageUri], hint);
-    } catch {
-      // No key / proxy down — never invent Figaro/capers for a real photo
-      return stubInventory(imageUri, hint);
+    } catch (err) {
+      // Never invent Figaro/capers — and never a fake public listing either
+      return unrecognizedFromError(hint, err);
     }
   }
   return stubInventory(imageUri, hint);
@@ -45,8 +76,8 @@ export async function analyzeProductCloseups(
   if (real.length) {
     try {
       return await analyzeImagesWithGemini(real, hint);
-    } catch {
-      return stubCloseups(real, hint);
+    } catch (err) {
+      return unrecognizedFromError(hint, err);
     }
   }
   return stubCloseups(imageUris, hint);
@@ -59,7 +90,7 @@ export async function analyzeFridgePanoramaImage(
     try {
       return await analyzeFridgeShelfWithGemini(imageUri);
     } catch {
-      // No key / proxy down — fall back to stub demos
+      // No key / proxy down — fall back to stub demos for fridge walkthroughs
       return stubFridge(imageUri);
     }
   }

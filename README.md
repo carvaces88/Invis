@@ -2,18 +2,31 @@
 
 Minimal kitchen inventory app for Finnish restaurants. Digital inventory sheet (Name · Unit · Qty · Price excl. VAT · Total) with **photo → AI extract → catalog match → confirm**.
 
-Local-first demo — no Supabase required. **Product photo analysis** uses **Gemini** when `EXPO_PUBLIC_GEMINI_API_KEY` is set (see `env.example`); otherwise a DEV stub keeps alias demos working offline.
+Local-first demo — no Supabase required. **Product photo analysis** uses **Gemini** via client key or production `/api/vision` (see `env.example`). Without a key, real photos stay unrecognized — they never invent a public K-Ruoka match.
 
 UI is English throughout. Catalog product official names may stay Finnish when they mirror real POS / distributor names.
 
 ## Live vision (Gemini)
+
+### Local Expo
 
 1. Copy `env.example` → `.env.local`
 2. Set `EXPO_PUBLIC_GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/apikey)
 3. `npx expo start` (restart after changing env)
 4. Scan hub → Product photo → take a real label photo → Confirm shows name/price (0% ALV) and **inventory-first** match
 
-Without a key, Analyze falls back to the offline stub (not live OCR).
+### Production web (Vercel — e.g. invis-lac.vercel.app)
+
+Set **server-only** env (Production + Preview), then redeploy:
+
+| Variable | Required | Notes |
+|---|---|---|
+| `GEMINI_API_KEY` | **Yes** | Google AI Studio key for `/api/vision` |
+| `EXPO_PUBLIC_GEMINI_API_KEY` | Optional | Only if you also want the key in the client bundle |
+| `EXPO_PUBLIC_VISION_URL` | Optional | Defaults to same-origin `/api/vision` on web |
+| `EXPO_PUBLIC_KRUOKA_LOOKUP_URL` | Optional | Defaults to same-origin `/api/kruoka-lookup` |
+
+Without `GEMINI_API_KEY`, Analyze shows that live label reading is not configured and **does not** claim a K-Ruoka match.
 
 ## Run
 
