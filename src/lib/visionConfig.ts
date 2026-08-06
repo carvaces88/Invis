@@ -1,13 +1,13 @@
 /**
  * Live product vision config.
  *
- * Set in `.env` or `.env.local` (never commit secrets):
- *   EXPO_PUBLIC_GEMINI_API_KEY=your_key_here
- * Optional:
+ * Client (optional, inlined at build):
+ *   EXPO_PUBLIC_GEMINI_API_KEY=...
  *   EXPO_PUBLIC_GEMINI_MODEL=gemini-2.0-flash
+ *   EXPO_PUBLIC_VISION_URL=https://your-app.vercel.app/api/vision
  *
- * Expo inlines EXPO_PUBLIC_* at bundle time — use a backend/Edge Function
- * proxy in production rather than shipping long-lived keys in the client.
+ * Production preferred: set server-only GEMINI_API_KEY on Vercel for /api/vision
+ * so the key is not shipped in the web bundle.
  */
 export function getGeminiApiKey(): string | undefined {
   const key = process.env.EXPO_PUBLIC_GEMINI_API_KEY?.trim();
@@ -20,7 +20,20 @@ export function getGeminiModel(): string {
   );
 }
 
-/** True when a live Gemini key is configured (prefer real pixels over stub). */
+/** Same-origin or absolute URL for the serverless vision proxy. */
+export function getVisionProxyUrl(): string | undefined {
+  const explicit = process.env.EXPO_PUBLIC_VISION_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, '');
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}/api/vision`;
+  }
+  return undefined;
+}
+
+/**
+ * True when we can attempt live photo reading (client key and/or vision proxy).
+ * Demo stub (Figaro/capers) is only for explicit offline demos without a real photo.
+ */
 export function isLiveVisionEnabled(): boolean {
-  return Boolean(getGeminiApiKey());
+  return Boolean(getGeminiApiKey() || getVisionProxyUrl());
 }

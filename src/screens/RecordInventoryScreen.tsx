@@ -25,7 +25,8 @@ import {
 import { useChefNudge } from '../components/ChefNudge';
 import { DidYouMeanModal } from '../components/DidYouMeanModal';
 import { PackCheckModal } from '../components/PackCheckModal';
-import { PlaceChips } from '../components/PlaceChips';
+import { PhotoCaptureTip } from '../components/PhotoCaptureTip';
+import { PlaceSelect } from '../components/PlaceSelect';
 import { useI18n } from '../i18n';
 import { alertAck, alertInfo } from '../lib/alertAck';
 import { confirmIfRecentAdd } from '../lib/confirmIfRecentAdd';
@@ -62,7 +63,7 @@ import { colors, radius, spacing } from '../theme/colors';
 type Props = NativeStackScreenProps<RootStackParamList, 'RecordInventory'>;
 type PhotoMode = 'single' | 'fridge';
 
-export function RecordInventoryScreen({ navigation }: Props) {
+export function RecordInventoryScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { t, locale } = useI18n();
   const { thinkingChef, yesChef } = useChefNudge();
@@ -83,9 +84,12 @@ export function RecordInventoryScreen({ navigation }: Props) {
     setLastRecordUnit,
   } = useInventory();
 
+  const heroFridge = route.params?.heroFridge === true;
   const [uri, setUri] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [photoMode, setPhotoMode] = useState<PhotoMode>('single');
+  const [photoMode, setPhotoMode] = useState<PhotoMode>(
+    heroFridge ? 'fridge' : 'single',
+  );
 
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ProductMatch | null>(null);
@@ -262,7 +266,9 @@ export function RecordInventoryScreen({ navigation }: Props) {
         .replace('{total}', `${totalDisp} ${unitLabel}`)
         .replace('{time}', time);
       const body = afterMsg ? `${afterMsg}\n${summary}` : summary;
-      alertAck(t('recordSavedTitle'), body, resetFormAfterSave);
+      alertAck(t('recordSavedTitle'), body, () => {
+        resetFormAfterSave();
+      });
     };
     confirmIfRecentAdd(
       getRecentAddWarning(match.product.id, activePlaceId),
@@ -449,21 +455,26 @@ export function RecordInventoryScreen({ navigation }: Props) {
       keyboardDismissMode="on-drag"
     >
       <Text style={styles.kicker}>{t('appBrand')}</Text>
-      <Text style={styles.title}>{t('recordInventoryTitle')}</Text>
-      <Text style={styles.sub}>{t('recordInventorySub')}</Text>
+      <Text style={styles.title}>
+        {heroFridge
+          ? t('recordInventoryHeroTitle')
+          : t('recordInventoryTitle')}
+      </Text>
+      <Text style={styles.sub}>
+        {heroFridge
+          ? t('recordInventoryHeroSub')
+          : t('recordInventorySub')}
+      </Text>
 
       {places.length > 0 ? (
         <View style={styles.placeBlock}>
-          <Text style={styles.label}>
-            {t('placesCountingAt')}
-            {siteName ? ` · ${siteName}` : ''}
-          </Text>
-          <PlaceChips
+          <PlaceSelect
             places={places}
             selectedId={activePlaceId}
             onSelect={(id) => {
               if (id !== 'all') setActivePlaceId(id);
             }}
+            label={`${t('placesCountingAt')}${siteName ? ` · ${siteName}` : ''}`}
             flush
           />
         </View>
@@ -471,43 +482,38 @@ export function RecordInventoryScreen({ navigation }: Props) {
 
       <Text style={styles.label}>{t('recordPhoto')}</Text>
       <View style={styles.modeRow}>
-        <Pressable
-          onPress={() => setPhotoMode('single')}
-          style={[
-            styles.modeChip,
-            photoMode === 'single' && styles.modeChipOn,
-          ]}
-          accessibilityRole="button"
-          accessibilityState={{ selected: photoMode === 'single' }}
-        >
-          <Text
+        {(heroFridge
+          ? (['fridge', 'single'] as const)
+          : (['single', 'fridge'] as const)
+        ).map((mode) => (
+          <Pressable
+            key={mode}
+            onPress={() => setPhotoMode(mode)}
             style={[
-              styles.modeChipText,
-              photoMode === 'single' && styles.modeChipTextOn,
+              styles.modeChip,
+              photoMode === mode && styles.modeChipOn,
             ]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: photoMode === mode }}
           >
-            {t('recordPhotoModeSingle')}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setPhotoMode('fridge')}
-          style={[
-            styles.modeChip,
-            photoMode === 'fridge' && styles.modeChipOn,
-          ]}
-          accessibilityRole="button"
-          accessibilityState={{ selected: photoMode === 'fridge' }}
-        >
-          <Text
-            style={[
-              styles.modeChipText,
-              photoMode === 'fridge' && styles.modeChipTextOn,
-            ]}
-          >
-            {t('recordPhotoModeFridge')}
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.modeChipText,
+                photoMode === mode && styles.modeChipTextOn,
+              ]}
+            >
+              {mode === 'fridge'
+                ? t('recordPhotoModeFridge')
+                : t('recordPhotoModeSingle')}
+            </Text>
+          </Pressable>
+        ))}
       </View>
+      {photoMode === 'single' ? (
+        <PhotoCaptureTip text={t('photoCaptureTip')} />
+      ) : (
+        <PhotoCaptureTip text={t('recordPhotoFridgeHint')} />
+      )}
       <View style={styles.preview}>
         {uri ? (
           <Image source={{ uri }} style={styles.image} />
@@ -723,6 +729,15 @@ export function RecordInventoryScreen({ navigation }: Props) {
 
       <Pressable style={styles.linkBtn} onPress={openFullList}>
         <Text style={styles.linkText}>{t('recordOpenFullList')}</Text>
+      </Pressable>
+
+      <Pressable
+        style={styles.linkBtn}
+        onPress={() =>
+          navigation.navigate('VerifyAmounts', { mode: 'recent' })
+        }
+      >
+        <Text style={styles.linkText}>{t('verifyAmountsOpen')}</Text>
       </Pressable>
 
       <Modal

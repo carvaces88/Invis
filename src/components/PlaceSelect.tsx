@@ -20,11 +20,13 @@ type Props = {
   includeAll?: boolean;
   allLabel?: string;
   label?: string;
+  /** Skip horizontal inset when parent already pads */
+  flush?: boolean;
 };
 
 /**
- * Compact place filter — single dropdown trigger + bottom sheet.
- * Used on Current inventory; Record inventory keeps PlaceChips.
+ * Compact place picker — single dropdown trigger + bottom sheet.
+ * Prefer this over PlaceChips for counting flows (Record / Confirm / Fridge).
  */
 export function PlaceSelect({
   places,
@@ -33,6 +35,7 @@ export function PlaceSelect({
   includeAll = false,
   allLabel,
   label,
+  flush = false,
 }: Props) {
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
@@ -54,7 +57,7 @@ export function PlaceSelect({
   }
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, flush && styles.wrapFlush]}>
       <Text style={styles.label}>{resolvedLabel}</Text>
       <Pressable
         onPress={() => setOpen(true)}
@@ -159,11 +162,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
   },
+  wrapFlush: {
+    paddingHorizontal: 0,
+  },
   label: {
     fontSize: 12,
     fontWeight: '600',
     color: colors.inkMuted,
     marginBottom: spacing.xs,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
   trigger: {
     flexDirection: 'row',
@@ -178,7 +186,7 @@ const styles = StyleSheet.create({
   },
   triggerText: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     color: colors.ink,
   },

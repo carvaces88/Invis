@@ -312,15 +312,23 @@ export function createInitialSessionLines(
   opts?: { seeded?: boolean },
 ) {
   const seeded = opts?.seeded !== false;
-  return products.map((p) => ({
-    id: `line-${p.id}-${placeId}`,
-    productId: p.id,
-    placeId,
-    quantity: seeded ? (SEED_QTY[p.id] ?? null) : null,
-    officialName: p.officialName,
-    unit: p.unit,
-    unitPriceAlv0: p.unitPriceAlv0,
-    countedAt: undefined as string | undefined,
-    lastUpdatedAt: undefined as string | undefined,
-  }));
+  return products.map((p) => {
+    const quantity = seeded ? (SEED_QTY[p.id] ?? null) : null;
+    return {
+      id: `line-${p.id}-${placeId}`,
+      productId: p.id,
+      placeId,
+      quantity,
+      officialName: p.officialName,
+      unit: p.unit,
+      unitPriceAlv0: p.unitPriceAlv0,
+      countedAt: undefined as string | undefined,
+      lastUpdatedAt: undefined as string | undefined,
+      // Seed demo stock is pre-accepted; user counts start pending on add/edit
+      verificationStatus:
+        quantity != null && quantity > 0
+          ? ('correct' as const)
+          : undefined,
+    };
+  });
 }

@@ -4,12 +4,16 @@
  */
 import { EncodingType, readAsStringAsync } from 'expo-file-system/legacy';
 import type {
+  DocumentExtract,
   IngredientType,
   UnitCode,
+  VisionCropRegion,
   VisionExtract,
 } from '../data/types';
 import { UNIT_CODES } from '../data/units';
-import { getGeminiApiKey, getGeminiModel } from './visionConfig';
+import { normalizeEanDigits } from './packaging';
+import { generateProductAliases, mergeAliasLists } from './productAliases';
+import { getGeminiApiKey, getGeminiModel, getVisionProxyUrl } from './visionConfig';
 
 const UNIT_SET = new Set<string>(UNIT_CODES);
 
@@ -65,7 +69,8 @@ const VISION_SCHEMA = {
     containerHint: {
       type: 'string',
       nullable: true,
-      description: 'Purkki / Pullo / Pussi etc.',
+      description:
+        'Packaging style from label/logo: e.g. "Tetra Pak / kartonki", Purkki, Pullo, Pussi, Rasia, Laatikko. Read Tetra Pak marks, C/PAP, kartonki recycling cues.',
     },
     quantity: { type: 'number', nullable: true },
     unitPriceAlv0: {
@@ -74,11 +79,17 @@ const VISION_SCHEMA = {
       description:
         'Estimated unit price excl. VAT (0% ALV). If shelf price includes 14% food VAT, convert to ALV0.',
     },
-    ean: { type: 'string', nullable: true },
+    ean: {
+      type: 'string',
+      nullable: true,
+      description:
+        'EAN/GTIN digits only (8–14). CRITICAL: if a barcode is visible (bars + human-readable digits under it), read those digits carefully even when glare or crop is tight. Prefer the printed number under the bars.',
+    },
     aliases: {
       type: 'array',
       items: { type: 'string' },
-      description: 'Informal EN/FI nicknames staff might type',
+      description:
+        'Informal EN/FI search nicknames: brand, product line (Tuuti 2 / Tuuti2), category words (vieroitusvalmiste, follow-on formula), OCR variants without spaces/hyphens',
     },
     ingredientType: {
       type: 'string',
@@ -203,21 +214,54 @@ function toVisionExtract(raw: Record<string, unknown>): VisionExtract {
     typeof raw.suggestedName === 'string' && raw.suggestedName.trim()
       ? raw.suggestedName.trim()
       : 'Unknown item';
-  const aliases = Array.isArray(raw.aliases)
+  const brand =
+    typeof raw.brand === 'string' && raw.brand.trim()
+      ? raw.brand.trim()
+      : null;
+  const packSize =
+    typeof raw.packSize === 'string' && raw.packSize.trim()
+      ? raw.packSize.trim()
+      : null;
+  const containerHint =
+    typeof raw.containerHint === 'string' && raw.containerHint.trim()
+      ? raw.containerHint.trim()
+      : null;
+  const ean =
+    typeof raw.ean === 'string' ? normalizeEanDigits(raw.ean) : null;
+  const modelAliases = Array.isArray(raw.aliases)
     ? raw.aliases
         .filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
         .map((a) => a.trim())
     : [];
-  if (!aliases.includes(suggestedName)) aliases.unshift(suggestedName);
+  const aliases = mergeAliasLists(
+    generateProductAliases({
+      officialName: suggestedName,
+      brand,
+      packSize,
+      ean,
+      containerHint,
+      extra: modelAliases,
+    }),
+  );
 
   const confidence =
     typeof raw.confidence === 'number'
       ? Math.min(1, Math.max(0, raw.confidence))
       : 0.7;
 
+  // Liquid cartons (Tetra / kartonki) are usually counted as KPL + packSize volume
+  let unit = parseUnit(raw.unit);
+  if (
+    containerHint &&
+    /tetra|kartonk/i.test(containerHint) &&
+    (unit === 'L' || unit == null)
+  ) {
+    unit = 'KPL';
+  }
+
   return {
     suggestedName,
-    unit: parseUnit(raw.unit),
+    unit,
     quantity:
       typeof raw.quantity === 'number' && Number.isFinite(raw.quantity)
         ? raw.quantity
@@ -232,22 +276,10 @@ function toVisionExtract(raw: Record<string, unknown>): VisionExtract {
       typeof raw.rawNotes === 'string' && raw.rawNotes.trim()
         ? raw.rawNotes.trim()
         : 'Live Gemini label read',
-    packSize:
-      typeof raw.packSize === 'string' && raw.packSize.trim()
-        ? raw.packSize.trim()
-        : null,
-    brand:
-      typeof raw.brand === 'string' && raw.brand.trim()
-        ? raw.brand.trim()
-        : null,
-    containerHint:
-      typeof raw.containerHint === 'string' && raw.containerHint.trim()
-        ? raw.containerHint.trim()
-        : null,
-    ean:
-      typeof raw.ean === 'string' && raw.ean.trim()
-        ? raw.ean.replace(/\s/g, '')
-        : null,
+    packSize,
+    brand,
+    containerHint,
+    ean,
     aliases,
     ingredientType: parseIngredient(raw.ingredientType),
     unrecognized: Boolean(raw.unrecognized),
@@ -255,22 +287,26 @@ function toVisionExtract(raw: Record<string, unknown>): VisionExtract {
 }
 
 const SYSTEM_PROMPT = `You are Inventaario kitchen inventory vision for Finnish restaurants.
-Read product label / pack photos carefully (OCR). Return JSON only.
-Use Finnish POS unit codes (YKSIKKÖ): L, KPL, PRK, RSA, PSS, PL, PLO, LTK, KG, RAS, PKT.
-Prices must be estimated at 0% ALV (excl. VAT). Finnish food shelf prices usually include 14% VAT — convert shelf€ / 1.14 when estimating.
-Prefer official-looking product names from the label; also give informal aliases staff might type (EN + FI).
-If barcode/EAN is visible, include digits only.
-If unsure, set unrecognized true and explain in rawNotes — still guess best suggestedName.`;
+Read product label / pack / barcode photos carefully (OCR). Return JSON only.
+
+PRIORITY when multiple photos:
+1) Barcode close-ups: read EAN-13 digits under the bars (digits only in "ean"). Glare is common — still try.
+2) Front label: brand + product line + Finnish title + size (e.g. Valio Tuuti2 / TUUTI 2, 1 L).
+3) Packaging cues: Tetra Pak logo, "kartonki", C/PAP, pullo, purkki → containerHint + POS unit.
+
+YKSIKKÖ (POS unit): L, KPL, PRK, RSA, PSS, PL, PLO, LTK, KG, RAS, PKT.
+- Ready-to-drink Tetra Pak / kartonki sold per carton → unit KPL, packSize like "1 L" (volume in packSize, not unit L).
+- Loose liquids by liter → L; bottles → PL/PLO; cans/jars → PRK.
+
+Prices at 0% ALV. Finnish food shelf € usually includes 14% VAT → shelf€ / 1.14.
+suggestedName: prefer official Finnish retail style when readable (brand + product + size/age).
+aliases: FI + EN nicknames staff type (Tuuti 2, vieroitusvalmiste, follow-on formula, etc.).
+If unsure, unrecognized true + rawNotes — still best-guess suggestedName.`;
 
 export async function analyzeImagesWithGemini(
   imageUris: string[],
   hint?: string,
 ): Promise<VisionExtract> {
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) {
-    throw new Error('EXPO_PUBLIC_GEMINI_API_KEY is not set');
-  }
-
   const realUris = imageUris.filter(isRealImageUri);
   if (!realUris.length) {
     throw new Error('No product photo to analyze');
@@ -282,6 +318,68 @@ export async function analyzeImagesWithGemini(
     payloads.push(await imageUriToPayload(uri));
   }
 
+  const apiKey = getGeminiApiKey();
+  if (apiKey) {
+    return callGeminiDirect(payloads, hint, apiKey);
+  }
+
+  const proxyUrl = getVisionProxyUrl();
+  if (proxyUrl) {
+    return callVisionProxy(payloads, hint, proxyUrl);
+  }
+
+  throw new Error(
+    'Live vision is not configured. Set EXPO_PUBLIC_GEMINI_API_KEY or GEMINI_API_KEY on /api/vision.',
+  );
+}
+
+async function callVisionProxy(
+  payloads: ImagePayload[],
+  hint: string | undefined,
+  proxyUrl: string,
+): Promise<VisionExtract> {
+  const res = await fetch(proxyUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({
+      images: payloads.map((p) => ({
+        mimeType: p.mimeType,
+        base64: p.base64,
+      })),
+      hint: hint?.trim() || undefined,
+      model: getGeminiModel(),
+    }),
+  });
+  const body = (await res.json()) as VisionExtract & { error?: string };
+  if (!res.ok) {
+    throw new Error(body.error || `Vision proxy failed (${res.status})`);
+  }
+  if (!body.suggestedName) {
+    throw new Error('Vision proxy returned an empty extract');
+  }
+  return {
+    suggestedName: body.suggestedName,
+    unit: (body.unit as VisionExtract['unit']) ?? 'KPL',
+    quantity: body.quantity ?? 1,
+    unitPriceAlv0: body.unitPriceAlv0 ?? null,
+    expiryDate: body.expiryDate ?? null,
+    confidence: body.confidence ?? 0.5,
+    rawNotes: body.rawNotes ?? 'Live Gemini (proxy)',
+    packSize: body.packSize ?? null,
+    brand: body.brand ?? null,
+    containerHint: body.containerHint ?? null,
+    ean: body.ean ?? null,
+    aliases: body.aliases ?? [],
+    ingredientType: body.ingredientType ?? null,
+    unrecognized: body.unrecognized,
+  };
+}
+
+async function callGeminiDirect(
+  payloads: ImagePayload[],
+  hint: string | undefined,
+  apiKey: string,
+): Promise<VisionExtract> {
   const parts: GeminiPart[] = [
     ...payloads.map((p) => ({
       inlineData: { mimeType: p.mimeType, data: p.base64 },
@@ -292,7 +390,8 @@ export async function analyzeImagesWithGemini(
         hint?.trim()
           ? `Optional staff hint (may be wrong): ${hint.trim()}`
           : null,
-        `Analyze ${payloads.length} close-up photo(s) of one product.`,
+        `Analyze ${payloads.length} close-up photo(s) of one product (front label and/or barcode).`,
+        'If any photo shows a barcode, put EAN digits in "ean". Prefer official Finnish retail name when readable.',
       ]
         .filter(Boolean)
         .join('\n'),
@@ -348,4 +447,267 @@ export async function analyzeImagesWithGemini(
     .filter(Boolean)
     .join(' · ');
   return extract;
+}
+
+const FRIDGE_SYSTEM_PROMPT = `You are Inventaario kitchen inventory vision for Finnish restaurants.
+Analyze a WIDE fridge / walk-in / shelf panorama photo. Return JSON only.
+
+List EVERY distinct product visible (do not merge different brands/sizes).
+For each product estimate quantity by counting cans, bottles, jars, packs, bags, or crates you can see.
+YKSIKKÖ (POS unit codes — pick one): L, KPL, PRK, RSA, PSS, PL, PLO, LTK, KG, RAS, PKT.
+- RSA and RAS are both "Rasia" but DIFFERENT codes — prefer RAS for retail tubs/trays, RSA when labeled as rasia pack count.
+- Bottles → PL or PLO; cans/jars → PRK; bags → PSS; crates/boxes → LTK; packets → PKT; pieces → KPL; weight → KG; volume bulk → L.
+
+crop: normalized 0–1 box {x,y,width,height} around that product in the photo when you can locate it.
+confidence: 0–1 how sure you are of the name.
+brand, packSize (e.g. "5 kg", "380 g"), containerHint (purkki, pullo, pussi…), aliases (FI/EN nicknames).
+Prices at 0% ALV if you see a shelf tag (€ ÷ 1.14 for 14% food VAT).
+If a pack is unreadable, still include a line with unrecognized true + best-guess suggestedName + aiDescription.
+suggestedName: Finnish retail style when readable (brand + product).`;
+
+const FRIDGE_LINE_SCHEMA = {
+  type: 'object',
+  properties: {
+    suggestedName: { type: 'string' },
+    brand: { type: 'string', nullable: true },
+    unit: {
+      type: 'string',
+      nullable: true,
+      description: 'L, KPL, PRK, RSA, PSS, PL, PLO, LTK, KG, RAS, PKT',
+    },
+    packSize: { type: 'string', nullable: true },
+    containerHint: { type: 'string', nullable: true },
+    quantity: { type: 'number', nullable: true },
+    unitPriceAlv0: { type: 'number', nullable: true },
+    ean: { type: 'string', nullable: true },
+    aliases: { type: 'array', items: { type: 'string' } },
+    ingredientType: { type: 'string', nullable: true },
+    confidence: { type: 'number' },
+    rawNotes: { type: 'string', nullable: true },
+    aiDescription: { type: 'string', nullable: true },
+    unrecognized: { type: 'boolean', nullable: true },
+    crop: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        x: { type: 'number' },
+        y: { type: 'number' },
+        width: { type: 'number' },
+        height: { type: 'number' },
+      },
+      required: ['x', 'y', 'width', 'height'],
+    },
+  },
+  required: ['suggestedName', 'confidence'],
+} as const;
+
+const FRIDGE_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: { type: 'string', nullable: true },
+    confidence: { type: 'number' },
+    rawNotes: { type: 'string', nullable: true },
+    lines: {
+      type: 'array',
+      items: FRIDGE_LINE_SCHEMA,
+    },
+  },
+  required: ['lines', 'confidence'],
+} as const;
+
+function clamp01(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(1, Math.max(0, n));
+}
+
+function parseCrop(raw: unknown): VisionCropRegion | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const c = raw as Record<string, unknown>;
+  const x = typeof c.x === 'number' ? c.x : NaN;
+  const y = typeof c.y === 'number' ? c.y : NaN;
+  const width = typeof c.width === 'number' ? c.width : NaN;
+  const height = typeof c.height === 'number' ? c.height : NaN;
+  if (![x, y, width, height].every(Number.isFinite)) return undefined;
+  if (width <= 0 || height <= 0) return undefined;
+  return {
+    x: clamp01(x),
+    y: clamp01(y),
+    width: clamp01(width),
+    height: clamp01(height),
+  };
+}
+
+function toFridgeLine(raw: Record<string, unknown>): VisionExtract {
+  const base = toVisionExtract(raw);
+  const aiDescription =
+    typeof raw.aiDescription === 'string' && raw.aiDescription.trim()
+      ? raw.aiDescription.trim()
+      : undefined;
+  const crop = parseCrop(raw.crop);
+  return {
+    ...base,
+    aiDescription,
+    crop,
+  };
+}
+
+function toDocumentExtract(
+  raw: Record<string, unknown>,
+  noteSuffix: string,
+): DocumentExtract {
+  const linesRaw = Array.isArray(raw.lines) ? raw.lines : [];
+  const lines = linesRaw
+    .filter((l): l is Record<string, unknown> => !!l && typeof l === 'object')
+    .map(toFridgeLine);
+  const confidence =
+    typeof raw.confidence === 'number'
+      ? Math.min(1, Math.max(0, raw.confidence))
+      : lines.length
+        ? lines.reduce((s, l) => s + l.confidence, 0) / lines.length
+        : 0.5;
+  const title =
+    typeof raw.title === 'string' && raw.title.trim()
+      ? raw.title.trim()
+      : 'Fridge / shelf';
+  const rawNotes = [
+    typeof raw.rawNotes === 'string' && raw.rawNotes.trim()
+      ? raw.rawNotes.trim()
+      : null,
+    noteSuffix,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return {
+    kind: 'fridge',
+    title,
+    lines,
+    confidence,
+    rawNotes,
+  };
+}
+
+/**
+ * Multi-item fridge / shelf panorama → DocumentExtract for FridgeReview.
+ */
+export async function analyzeFridgeShelfWithGemini(
+  imageUri: string,
+): Promise<DocumentExtract> {
+  if (!isRealImageUri(imageUri)) {
+    throw new Error('No fridge photo to analyze');
+  }
+
+  const payload = await imageUriToPayload(imageUri);
+  const apiKey = getGeminiApiKey();
+  if (apiKey) {
+    return callGeminiFridgeDirect([payload], apiKey);
+  }
+
+  const proxyUrl = getVisionProxyUrl();
+  if (proxyUrl) {
+    return callVisionFridgeProxy([payload], proxyUrl);
+  }
+
+  throw new Error(
+    'Live vision is not configured. Set EXPO_PUBLIC_GEMINI_API_KEY or GEMINI_API_KEY on /api/vision.',
+  );
+}
+
+async function callVisionFridgeProxy(
+  payloads: ImagePayload[],
+  proxyUrl: string,
+): Promise<DocumentExtract> {
+  const res = await fetch(proxyUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({
+      mode: 'fridge',
+      images: payloads.map((p) => ({
+        mimeType: p.mimeType,
+        base64: p.base64,
+      })),
+      model: getGeminiModel(),
+    }),
+  });
+  const body = (await res.json()) as DocumentExtract & { error?: string };
+  if (!res.ok) {
+    throw new Error(body.error || `Vision proxy failed (${res.status})`);
+  }
+  if (!Array.isArray(body.lines)) {
+    throw new Error('Vision proxy returned an empty fridge extract');
+  }
+  return {
+    kind: 'fridge',
+    title: body.title ?? 'Fridge / shelf',
+    lines: body.lines.map((l) => ({
+      ...l,
+      unit: (l.unit as VisionExtract['unit']) ?? null,
+      quantity: l.quantity ?? 1,
+      confidence: l.confidence ?? 0.5,
+    })),
+    confidence: body.confidence ?? 0.5,
+    rawNotes: body.rawNotes ?? 'Live Gemini fridge (proxy)',
+  };
+}
+
+async function callGeminiFridgeDirect(
+  payloads: ImagePayload[],
+  apiKey: string,
+): Promise<DocumentExtract> {
+  const parts: GeminiPart[] = [
+    ...payloads.map((p) => ({
+      inlineData: { mimeType: p.mimeType, data: p.base64 },
+    })),
+    {
+      text: [
+        FRIDGE_SYSTEM_PROMPT,
+        'Analyze this fridge/shelf panorama. List every distinct product with estimated count.',
+      ].join('\n'),
+    },
+  ];
+
+  const model = getGeminiModel();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts }],
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+        responseSchema: FRIDGE_SCHEMA,
+      },
+    }),
+  });
+
+  const body = (await res.json()) as GeminiResponse;
+  if (!res.ok) {
+    throw new Error(
+      body.error?.message || `Gemini fridge vision failed (${res.status})`,
+    );
+  }
+
+  const text = body.candidates?.[0]?.content?.parts
+    ?.map((p) => p.text ?? '')
+    .join('')
+    .trim();
+  if (!text) {
+    throw new Error('Gemini returned empty fridge vision result');
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(extractJsonText(text)) as Record<string, unknown>;
+  } catch {
+    throw new Error('Gemini returned non-JSON fridge vision result');
+  }
+
+  return toDocumentExtract(
+    parsed,
+    `Live Gemini fridge (${model}) · ${payloads.length} photo(s)`,
+  );
 }

@@ -413,6 +413,14 @@ export async function lookupKruokaProducts(opts: {
   const query = (opts.query ?? ean ?? '').trim();
   if (!query && !ean) return [];
 
+  // Instant offline hit when seed already knows this EAN
+  if (ean) {
+    const seedHit = searchSeed(query || ean, ean);
+    if (seedHit.length && seedHit[0].ean === ean) {
+      return seedHit;
+    }
+  }
+
   const searches = [query, ean].filter(
     (q, i, arr): q is string => Boolean(q) && arr.indexOf(q) === i,
   );

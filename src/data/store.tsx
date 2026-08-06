@@ -67,17 +67,24 @@ function reconcileSessionLines(
   );
   const missing = products
     .filter((p) => !haveDefault.has(p.id))
-    .map((p) => ({
-      id: `line-${p.id}-${defaultPlaceId}`,
-      productId: p.id,
-      placeId: defaultPlaceId,
-      quantity: (SEED_QTY[p.id] ?? null) as number | null,
-      officialName: p.officialName,
-      unit: p.unit,
-      unitPriceAlv0: p.unitPriceAlv0,
-      countedAt: undefined as string | undefined,
-      lastUpdatedAt: undefined as string | undefined,
-    }));
+    .map((p) => {
+      const quantity = (SEED_QTY[p.id] ?? null) as number | null;
+      return {
+        id: `line-${p.id}-${defaultPlaceId}`,
+        productId: p.id,
+        placeId: defaultPlaceId,
+        quantity,
+        officialName: p.officialName,
+        unit: p.unit,
+        unitPriceAlv0: p.unitPriceAlv0,
+        countedAt: undefined as string | undefined,
+        lastUpdatedAt: undefined as string | undefined,
+        verificationStatus:
+          quantity != null && quantity > 0
+            ? ('correct' as const)
+            : undefined,
+      };
+    });
   return [...kept, ...missing];
 }
 
@@ -133,6 +140,7 @@ type Store = {
     aliases: string[];
     ingredientType?: Product['ingredientType'];
     ean?: string;
+    productCode?: string;
     imageUrl?: string;
     sourceUrl?: string;
     /** When set, also write this count on the active place */
@@ -148,6 +156,16 @@ type Store = {
   ) => void;
   /** Absolute set — Inventaario tab tap-to-edit */
   updateLineQuantity: (lineId: string, quantity: number | null) => void;
+  /** Mark swipe-verify result on a counted line */
+  setLineVerification: (
+    lineId: string,
+    status: 'pending' | 'correct' | 'incorrect',
+  ) => void;
+  /** Edit qty + unit during verify (resets verification to pending) */
+  updateLineCountDetails: (
+    lineId: string,
+    args: { quantity: number; unit: UnitCode },
+  ) => void;
   /**
    * Absolute set — prefer addQuantity for Record / Add flows.
    * Kept for rare absolute-count use cases.
@@ -546,6 +564,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       aliases: string[];
       ingredientType?: Product['ingredientType'];
       ean?: string;
+      productCode?: string;
       imageUrl?: string;
       sourceUrl?: string;
       initialQuantity?: number;
@@ -559,6 +578,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         ingredientType: input.ingredientType ?? 'other',
         aliases: input.aliases.map((a) => a.trim()).filter(Boolean),
         ean: input.ean?.trim() || undefined,
+        productCode: input.productCode?.trim() || undefined,
         imageUrl: input.imageUrl?.trim() || undefined,
         sourceUrl: input.sourceUrl?.trim() || undefined,
         lowStockThreshold: 1,
@@ -695,6 +715,42 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
                 quantity,
                 countedAt: now,
                 lastUpdatedAt: now,
+                verificationStatus:
+                  quantity != null && quantity > 0 ? 'pending' : undefined,
+              }
+            : line,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const setLineVerification = useCallback(
+    (lineId: string, status: 'pending' | 'correct' | 'incorrect') => {
+      setSession((prev) => ({
+        ...prev,
+        lines: prev.lines.map((line) =>
+          line.id === lineId ? { ...line, verificationStatus: status } : line,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const updateLineCountDetails = useCallback(
+    (lineId: string, args: { quantity: number; unit: UnitCode }) => {
+      const now = new Date().toISOString();
+      setSession((prev) => ({
+        ...prev,
+        lines: prev.lines.map((line) =>
+          line.id === lineId
+            ? {
+                ...line,
+                quantity: args.quantity,
+                unit: args.unit,
+                countedAt: now,
+                lastUpdatedAt: now,
+                verificationStatus: 'pending',
               }
             : line,
         ),
@@ -734,6 +790,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           notes: args.notes ?? line.notes,
           // Keep existing unit price — never wipe when counting
           unitPriceAlv0: line.unitPriceAlv0 || product.unitPriceAlv0,
+          verificationStatus: 'pending',
         };
         const movement: StockMovement = {
           id: `mov-${Date.now()}-${args.productId}`,
@@ -803,6 +860,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           lastUpdatedAt: now,
           notes: args.notes ?? line.notes,
           unitPriceAlv0: line.unitPriceAlv0 || product.unitPriceAlv0,
+          verificationStatus: 'pending',
         };
         return {
           ...next,
@@ -884,6 +942,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           lastUpdatedAt: undefined,
           notes: undefined,
           expiryDate: undefined,
+          verificationStatus: undefined,
         })),
       };
       // Persist immediately so a remount/refresh cannot reseed from SEED_QTY
@@ -1019,6 +1078,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       addProductAlias,
       setProductPackInfo,
       updateLineQuantity,
+      setLineVerification,
+      updateLineCountDetails,
       upsertCountedProduct,
       addQuantity,
       getRecentAddWarning,
@@ -1049,6 +1110,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       addProductAlias,
       setProductPackInfo,
       updateLineQuantity,
+      setLineVerification,
+      updateLineCountDetails,
       upsertCountedProduct,
       addQuantity,
       getRecentAddWarning,

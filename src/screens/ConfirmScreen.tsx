@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,10 +13,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CroppedImage } from '../components/CroppedImage';
 import { ProductSearchInput } from '../components/ProductSearchInput';
 import { PackCheckModal } from '../components/PackCheckModal';
-import { PlaceChips } from '../components/PlaceChips';
+import { PlaceSelect } from '../components/PlaceSelect';
 import { ProductThumb } from '../components/ProductThumb';
 import { getStockQty, useInventory } from '../data/store';
-import type { ProductMatch, RootStackParamList } from '../data/types';
+import type {
+  ProductMatch,
+  RootStackParamList,
+  VisionExtract,
+} from '../data/types';
 import { useI18n } from '../i18n';
 import { alertAck, alertInfo } from '../lib/alertAck';
 import { confirmIfRecentAdd } from '../lib/confirmIfRecentAdd';
@@ -30,13 +35,31 @@ import {
   type PackCheckInfo,
   type PackCheckResolve,
 } from '../lib/packUnits';
+import {
+  enrichFromExtractAsync,
+  enrichmentToExtract,
+} from '../lib/productEnrichment';
 import { formatClockTime } from '../lib/relativeTime';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Confirm'>;
 
+const SUGGESTION_LIMIT = 8;
+const SUGGESTIONS_VISIBLE_DEFAULT = 3;
+
+function isDevOrStubNote(note: string): boolean {
+  const n = note.toLowerCase();
+  return (
+    n.includes('stub') ||
+    n.includes('offline demo') ||
+    n.includes('gemini_api_key') ||
+    n.includes('expo_public_') ||
+    n.includes('not configured')
+  );
+}
+
 export function ConfirmScreen({ route, navigation }: Props) {
-  const { extract, imageUri } = route.params;
+  const { extract: routeExtract, imageUri } = route.params;
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const {
@@ -51,27 +74,104 @@ export function ConfirmScreen({ route, navigation }: Props) {
     setProductPackInfo,
   } = useInventory();
 
-  const initialMatch = useMemo(
-    () => bestExtractMatch(products, extract),
-    [products, extract],
-  );
-  const suggestions = useMemo(
-    () => matchExtractToCatalog(products, extract, 5),
-    [products, extract],
-  );
+  const [extract, setExtract] = useState<VisionExtract>(routeExtract);
+  const [enriching, setEnriching] = useState(true);
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false);
 
-  const [selected, setSelected] = useState<ProductMatch | null>(initialMatch);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // Unrecognized / low-confidence photos: don't invent Figaro via seed lookup
+        if (
+          routeExtract.unrecognized &&
+          !routeExtract.ean &&
+          routeExtract.confidence < 0.45
+        ) {
+          if (!cancelled) setEnriching(false);
+          return;
+        }
+        const enrichment = await enrichFromExtractAsync(routeExtract, products);
+        if (cancelled) return;
+        const next = enrichmentToExtract(enrichment);
+        setExtract({
+          ...next,
+          quantity: routeExtract.quantity ?? next.quantity,
+          expiryDate: routeExtract.expiryDate ?? next.expiryDate,
+          crop: routeExtract.crop ?? next.crop,
+          confidence: Math.max(routeExtract.confidence, next.confidence),
+          unrecognized: routeExtract.unrecognized || next.unrecognized,
+          rawNotes: [routeExtract.rawNotes, enrichment.notes]
+            .filter(Boolean)
+            .join(' · '),
+        });
+      } finally {
+        if (!cancelled) setEnriching(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot catalog enrich
+  }, []);
+
+  const initialMatch = useMemo(() => {
+    const hit = bestExtractMatch(products, extract);
+    if (!hit) return null;
+    if (extract.unrecognized && hit.score < 0.85) return null;
+    return hit;
+  }, [products, extract]);
+  const suggestions = useMemo(() => {
+    const list = matchExtractToCatalog(products, extract, SUGGESTION_LIMIT);
+    if (extract.unrecognized) {
+      return list.filter((m) => m.score >= 0.55);
+    }
+    return list;
+  }, [products, extract]);
+  const visibleSuggestions = showAllSuggestions
+    ? suggestions
+    : suggestions.slice(0, SUGGESTIONS_VISIBLE_DEFAULT);
+  const hasMoreSuggestions = suggestions.length > SUGGESTIONS_VISIBLE_DEFAULT;
+
+  const [selected, setSelected] = useState<ProductMatch | null>(null);
+  useEffect(() => {
+    setSelected(initialMatch);
+  }, [initialMatch]);
+
   const [qty, setQty] = useState(
-    extract.quantity != null ? String(extract.quantity) : '1',
+    routeExtract.quantity != null ? String(routeExtract.quantity) : '1',
   );
-  const [expiry, setExpiry] = useState(extract.expiryDate ?? '');
+  const [expiry, setExpiry] = useState(routeExtract.expiryDate ?? '');
   const [packCheck, setPackCheck] = useState<PackCheckInfo | null>(null);
 
   const strongMatch = isStrongCatalogMatch(selected);
   const identityMatch = isIdentityCatalogMatch(selected);
+  const unmatched = !strongMatch;
   const onHand = selected
     ? getStockQty(session, selected.product.id, activePlaceId)
     : 0;
+
+  const showRawNotes =
+    Boolean(extract.rawNotes) &&
+    !extract.unrecognized &&
+    !unmatched &&
+    !isDevOrStubNote(extract.rawNotes ?? '');
+
+  const extractMeta = [
+    extract.brand ? `${t('addProductBrand')}: ${extract.brand}` : null,
+    extract.containerHint
+      ? `${t('addProductContainer')}: ${extract.containerHint}`
+      : null,
+    extract.packSize
+      ? `${t('addProductPackSize')}: ${extract.packSize}`
+      : null,
+    extract.ean ? `${t('addProductEan')}: ${extract.ean}` : null,
+    extract.aliases?.length
+      ? `${t('alsoAs')} ${extract.aliases.slice(0, 6).join(', ')}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   function commitSave(n: number) {
     if (!selected) return;
@@ -190,18 +290,22 @@ export function ConfirmScreen({ route, navigation }: Props) {
           .replace('{pct}', String(Math.round(extract.confidence * 100)))}
       </Text>
 
+      {enriching ? (
+        <View style={styles.enrichRow}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={styles.enrichText}>{t('confirmEnriching')}</Text>
+        </View>
+      ) : null}
+
       {places.length > 0 ? (
         <View style={{ marginBottom: spacing.sm }}>
-          <Text style={styles.label}>
-            {t('placesCountingAt')}
-            {siteName ? ` · ${siteName}` : ''}
-          </Text>
-          <PlaceChips
+          <PlaceSelect
             places={places}
             selectedId={activePlaceId}
             onSelect={(id) => {
               if (id !== 'all') setActivePlaceId(id);
             }}
+            label={`${t('placesCountingAt')}${siteName ? ` · ${siteName}` : ''}`}
             flush
           />
         </View>
@@ -229,7 +333,11 @@ export function ConfirmScreen({ route, navigation }: Props) {
       </View>
 
       {strongMatch && selected ? (
-        <View style={styles.alreadyBox}>
+        <View
+          style={styles.alreadyBox}
+          accessibilityRole="summary"
+          accessibilityLabel={t('confirmAlreadyHaveTitle')}
+        >
           <Text style={styles.alreadyTitle}>
             {identityMatch
               ? t('confirmAlreadyHaveTitle')
@@ -243,9 +351,33 @@ export function ConfirmScreen({ route, navigation }: Props) {
               .replace('{unit}', selected.product.unit)}
           </Text>
         </View>
+      ) : (
+        <View
+          style={styles.notHaveBox}
+          accessibilityRole="summary"
+          accessibilityLabel={t('confirmNotHaveTitle')}
+        >
+          <Text style={styles.notHaveTitle}>{t('confirmNotHaveTitle')}</Text>
+          <Text style={styles.notHaveBody}>{t('confirmNotHaveBody')}</Text>
+          <Pressable
+            style={styles.addPrimary}
+            onPress={openAddProduct}
+            accessibilityRole="button"
+            accessibilityLabel={t('confirmAddToCatalog')}
+          >
+            <Text style={styles.addPrimaryText}>{t('confirmAddToCatalog')}</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {extractMeta ? (
+        <View style={styles.metaBox}>
+          <Text style={styles.metaLabel}>{t('confirmExtractMeta')}</Text>
+          <Text style={styles.metaBody}>{extractMeta}</Text>
+        </View>
       ) : null}
 
-      {extract.rawNotes ? (
+      {showRawNotes ? (
         <View style={styles.note}>
           <Text style={styles.noteText}>{extract.rawNotes}</Text>
         </View>
@@ -255,30 +387,52 @@ export function ConfirmScreen({ route, navigation }: Props) {
       {suggestions.length === 0 ? (
         <Text style={styles.empty}>{t('confirmNoCatalogHit')}</Text>
       ) : (
-        suggestions.map((m) => {
-          const on = selected?.product.id === m.product.id;
-          const stock = getStockQty(session, m.product.id, activePlaceId);
-          return (
+        <>
+          {visibleSuggestions.map((m) => {
+            const on = selected?.product.id === m.product.id;
+            const stock = getStockQty(session, m.product.id, activePlaceId);
+            return (
+              <Pressable
+                key={m.product.id}
+                onPress={() => setSelected(m)}
+                style={[styles.matchRow, on && styles.matchRowOn]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+              >
+                <ProductThumb product={m.product} size={48} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.matchName}>{m.product.officialName}</Text>
+                  <Text style={styles.matchMeta}>
+                    {m.product.unit}
+                    {m.product.packSize ? ` · ${m.product.packSize}` : ''} · via “
+                    {m.matchedTerm}” ({Math.round(m.score * 100)}%)
+                    {stock > 0
+                      ? ` · ${t('confirmOnHand').replace('{qty}', String(stock))}`
+                      : ''}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+          {hasMoreSuggestions ? (
             <Pressable
-              key={m.product.id}
-              onPress={() => setSelected(m)}
-              style={[styles.matchRow, on && styles.matchRowOn]}
+              onPress={() => setShowAllSuggestions((v) => !v)}
+              style={styles.seeMore}
+              accessibilityRole="button"
+              accessibilityLabel={
+                showAllSuggestions
+                  ? t('confirmSeeFewerSuggestions')
+                  : t('confirmSeeMoreSuggestions')
+              }
             >
-              <ProductThumb product={m.product} size={48} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.matchName}>{m.product.officialName}</Text>
-                <Text style={styles.matchMeta}>
-                  {m.product.unit}
-                  {m.product.packSize ? ` · ${m.product.packSize}` : ''} · via “
-                  {m.matchedTerm}” ({Math.round(m.score * 100)}%)
-                  {stock > 0
-                    ? ` · ${t('confirmOnHand').replace('{qty}', String(stock))}`
-                    : ''}
-                </Text>
-              </View>
+              <Text style={styles.seeMoreText}>
+                {showAllSuggestions
+                  ? t('confirmSeeFewerSuggestions')
+                  : t('confirmSeeMoreSuggestions')}
+              </Text>
             </Pressable>
-          );
-        })
+          ) : null}
+        </>
       )}
 
       <Text style={[styles.label, { marginTop: spacing.lg }]}>
@@ -290,15 +444,11 @@ export function ConfirmScreen({ route, navigation }: Props) {
         onSelect={(m) => setSelected(m)}
       />
 
-      {!strongMatch ? (
-        <Pressable style={styles.addBtn} onPress={openAddProduct}>
-          <Text style={styles.addBtnText}>{t('addToDb')}</Text>
-        </Pressable>
-      ) : (
+      {strongMatch ? (
         <Pressable style={styles.addBtnGhost} onPress={openAddProduct}>
           <Text style={styles.addBtnGhostText}>{t('confirmAddDifferent')}</Text>
         </Pressable>
-      )}
+      ) : null}
 
       <Text style={styles.label}>{t('qty')}</Text>
       <TextInput
@@ -348,6 +498,13 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 22, fontWeight: '700', color: colors.ink, marginTop: 4 },
   sub: { color: colors.inkMuted, marginTop: 6, fontSize: 14, lineHeight: 20 },
+  enrichRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: spacing.sm,
+  },
+  enrichText: { color: colors.inkMuted, fontSize: 13 },
   matchPair: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -390,6 +547,49 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 4,
   },
+  notHaveBox: {
+    marginTop: spacing.md,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: spacing.md,
+    borderRadius: radius.md,
+  },
+  notHaveTitle: {
+    color: colors.ink,
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  notHaveBody: {
+    color: colors.inkMuted,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  addPrimary: {
+    marginTop: spacing.md,
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    alignItems: 'center',
+  },
+  addPrimaryText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  metaBox: {
+    marginTop: spacing.md,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: spacing.md,
+    borderRadius: radius.md,
+  },
+  metaLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  metaBody: { color: colors.ink, fontSize: 13, lineHeight: 20 },
   note: {
     marginTop: spacing.md,
     backgroundColor: colors.warningSoft,
@@ -422,15 +622,15 @@ const styles = StyleSheet.create({
   },
   matchName: { fontWeight: '700', color: colors.ink, fontSize: 14 },
   matchMeta: { color: colors.inkMuted, fontSize: 12, marginTop: 4 },
-  addBtn: {
-    marginTop: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: 12,
+  seeMore: {
+    paddingVertical: 10,
     alignItems: 'center',
   },
-  addBtnText: { color: colors.primary, fontWeight: '700' },
+  seeMoreText: {
+    color: colors.primary,
+    fontWeight: '600',
+    fontSize: 13,
+  },
   addBtnGhost: {
     marginTop: spacing.md,
     paddingVertical: 10,

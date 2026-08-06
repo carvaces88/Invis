@@ -13,6 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RootStackParamList } from '../data/types';
+import { useI18n } from '../i18n';
 import { alertInfo } from '../lib/alertAck';
 import {
   analyzeInventoryImage,
@@ -24,6 +25,7 @@ import { colors, radius, spacing } from '../theme/colors';
 /** Single-product photo scan (previous Scan tab body) */
 export function ProductScanScreen() {
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [uri, setUri] = useState<string | null>(null);
@@ -52,10 +54,7 @@ export function ProductScanScreen() {
 
   async function analyze() {
     if (isLiveVisionEnabled() && !isRealImageUri(uri)) {
-      alertInfo(
-        'Photo required',
-        'Take or choose a product photo for live AI analysis.',
-      );
+      alertInfo(t('productScanNeedPhotoTitle'), t('productScanNeedPhotoBody'));
       return;
     }
     setBusy(true);
@@ -70,8 +69,8 @@ export function ProductScanScreen() {
       });
     } catch (e) {
       alertInfo(
-        'Analysis failed',
-        e instanceof Error ? e.message : 'Could not analyze photo',
+        t('productScanFailedTitle'),
+        e instanceof Error ? e.message : t('addProductAnalyzeFailedBody'),
       );
     } finally {
       setBusy(false);
@@ -79,38 +78,39 @@ export function ProductScanScreen() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: spacing.md, paddingBottom: insets.bottom }]}>
+    <View
+      style={[
+        styles.root,
+        { paddingTop: spacing.md, paddingBottom: insets.bottom },
+      ]}
+    >
       <View style={styles.header}>
-        <Text style={styles.title}>Product photo</Text>
-        <Text style={styles.sub}>
-          Photo → AI name → catalog match → confirm.
-        </Text>
+        <Text style={styles.title}>{t('productScanTitle')}</Text>
+        <Text style={styles.sub}>{t('productScanSub')}</Text>
       </View>
 
       <View style={styles.preview}>
         {uri ? (
           <Image source={{ uri }} style={styles.image} />
         ) : (
-          <Text style={styles.placeholder}>
-            Take or choose a photo of the product / label
-          </Text>
+          <Text style={styles.placeholder}>{t('productScanPlaceholder')}</Text>
         )}
       </View>
 
       <View style={styles.actions}>
         <Pressable style={styles.btnPrimary} onPress={() => pick(true)}>
-          <Text style={styles.btnPrimaryText}>Camera</Text>
+          <Text style={styles.btnPrimaryText}>{t('camera')}</Text>
         </Pressable>
         <Pressable style={styles.btnGhost} onPress={() => pick(false)}>
-          <Text style={styles.btnGhostText}>Library</Text>
+          <Text style={styles.btnGhostText}>{t('library')}</Text>
         </Pressable>
       </View>
 
-      <Text style={styles.label}>Optional hint (demo aliases)</Text>
+      <Text style={styles.label}>{t('productScanHintLabel')}</Text>
       <TextInput
         value={hint}
         onChangeText={setHint}
-        placeholder='e.g. “capers” or leave empty for demo'
+        placeholder={t('productScanHintPlaceholder')}
         placeholderTextColor={colors.inkFaint}
         style={styles.input}
         autoCapitalize="none"
@@ -126,10 +126,10 @@ export function ProductScanScreen() {
         ) : (
           <Text style={styles.analyzeText}>
             {uri
-              ? 'Analyze photo'
+              ? t('productScanAnalyze')
               : isLiveVisionEnabled()
-                ? 'Add a photo to analyze'
-                : 'Run demo (offline stub)'}
+                ? t('productScanNeedPhoto')
+                : t('productScanDemo')}
           </Text>
         )}
       </Pressable>

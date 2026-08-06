@@ -11,6 +11,7 @@ import {
   DEMO_KUORMA_B,
 } from '../data/seedDocuments';
 import type { DocumentExtract, UnitCode, VisionExtract } from '../data/types';
+import { extractEanFromText } from './packaging';
 
 const HEURISTICS: {
   match: RegExp;
@@ -21,7 +22,31 @@ const HEURISTICS: {
   brand?: string;
   containerHint?: string;
   unitPriceAlv0?: number;
+  ean?: string;
+  aliases?: string[];
+  ingredientType?: VisionExtract['ingredientType'];
 }[] = [
+  {
+    match: /6408430492312|tuuti\s*2|tuuti2|vieroitusvalmiste/i,
+    name: 'Valio Tuuti2 vieroitusvalmiste 1l 6-12kk',
+    unit: 'KPL',
+    qty: 1,
+    packSize: '1 L',
+    brand: 'Valio',
+    containerHint: 'Tetra Pak / kartonki (carton)',
+    unitPriceAlv0: 2.32,
+    ean: '6408430492312',
+    ingredientType: 'dairy',
+    aliases: [
+      'valio tuuti2',
+      'tuuti 2',
+      'tuuti2',
+      'vieroitusvalmiste',
+      'follow-on formula',
+      'baby formula',
+      '6408430492312',
+    ],
+  },
   {
     match: /caper|kapris|figaro/i,
     name: 'capers',
@@ -68,7 +93,7 @@ const HEURISTICS: {
     unit: 'KPL',
     qty: 1,
   },
-  { match: /milk|maito/i, name: 'milk', unit: 'L', qty: 1 },
+  { match: /\bmilk\b|\bmaito\b(?!pohj)/i, name: 'milk', unit: 'L', qty: 1 },
   { match: /cream|kerma|ruokakerma/i, name: 'cream', unit: 'L', qty: 1 },
   {
     match: /\beggs?\b|kananmun/i,
@@ -95,6 +120,27 @@ function extractFromHeuristics(
   text: string,
   notes: string,
 ): VisionExtract | null {
+  // Bare EAN in hint / URI (barcode-only path)
+  const eanOnly = extractEanFromText(text);
+  if (eanOnly === '6408430492312' && !/tuuti|vieroitus/i.test(text)) {
+    const hit = HEURISTICS[0];
+    return {
+      suggestedName: hit.name,
+      unit: hit.unit ?? null,
+      quantity: hit.qty ?? 1,
+      unitPriceAlv0: hit.unitPriceAlv0 ?? null,
+      expiryDate: null,
+      confidence: 0.92,
+      rawNotes: `${notes} · EAN ${eanOnly}`,
+      packSize: hit.packSize ?? null,
+      brand: hit.brand ?? null,
+      containerHint: hit.containerHint ?? null,
+      ean: eanOnly,
+      aliases: hit.aliases ?? [hit.name],
+      ingredientType: hit.ingredientType ?? null,
+    };
+  }
+
   for (const h of HEURISTICS) {
     if (h.match.test(text)) {
       return {
@@ -108,7 +154,9 @@ function extractFromHeuristics(
         packSize: h.packSize ?? null,
         brand: h.brand ?? null,
         containerHint: h.containerHint ?? null,
-        aliases: [h.name],
+        ean: h.ean ?? extractEanFromText(text),
+        aliases: h.aliases ?? [h.name],
+        ingredientType: h.ingredientType ?? null,
       };
     }
   }
@@ -116,11 +164,31 @@ function extractFromHeuristics(
 }
 
 export async function analyzeInventoryImage(
-  _imageUri: string,
+  imageUri: string,
   hint?: string,
 ): Promise<VisionExtract> {
   await delay(700);
-  const text = `${hint?.trim() || ''} ${_imageUri}`;
+  // Real phone photos must never fake the Figaro/capers demo — that belongs to
+  // explicit offline demos only (no URI / demo URI).
+  if (isRealPhotoUri(imageUri)) {
+    return {
+      suggestedName: hint?.trim() || 'Unknown product',
+      unit: 'KPL',
+      quantity: 1,
+      unitPriceAlv0: null,
+      expiryDate: null,
+      confidence: hint?.trim() ? 0.35 : 0.15,
+      packSize: null,
+      brand: null,
+      containerHint: null,
+      ean: null,
+      aliases: hint?.trim() ? [hint.trim().toLowerCase()] : [],
+      unrecognized: true,
+      rawNotes:
+        'Photo received, but live label reading is not configured. Match an inventory product or add this as new.',
+    };
+  }
+  const text = `${hint?.trim() || ''} ${imageUri}`;
   const hit = extractFromHeuristics(
     text,
     'Stub vision matched from hint/filename heuristics',
@@ -138,8 +206,24 @@ export async function analyzeInventoryImage(
     containerHint: 'Purkki (can / jar)',
     aliases: ['capers', 'kapris'],
     rawNotes:
-      'DEV stub (no API key): informal name "capers" — set EXPO_PUBLIC_GEMINI_API_KEY for live vision',
+      'Offline demo stub: informal name "capers" — set EXPO_PUBLIC_GEMINI_API_KEY (or GEMINI_API_KEY on /api/vision) for live photo reading',
   };
+}
+
+function isRealPhotoUri(uri: string | null | undefined): boolean {
+  if (!uri) return false;
+  const u = uri.trim();
+  if (!u || u === 'demo' || u.startsWith('demo-')) return false;
+  return (
+    u.startsWith('file:') ||
+    u.startsWith('content:') ||
+    u.startsWith('ph:') ||
+    u.startsWith('blob:') ||
+    u.startsWith('data:') ||
+    u.startsWith('http://') ||
+    u.startsWith('https://') ||
+    u.includes('/')
+  );
 }
 
 /**
@@ -151,6 +235,11 @@ export async function analyzeProductCloseups(
   hint?: string,
 ): Promise<VisionExtract> {
   await delay(900);
+  const hasReal = imageUris.some(isRealPhotoUri);
+  if (hasReal) {
+    // Do not invent catalog hits from filename noise — same path as single photo
+    return analyzeInventoryImage(imageUris[0] ?? 'demo', hint);
+  }
   const combined = [hint ?? '', ...imageUris].join(' ');
   const hit = extractFromHeuristics(
     combined,

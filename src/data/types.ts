@@ -60,6 +60,11 @@ export interface Product {
   imageUrl?: string;
   /** EAN / GTIN when known from retailer listing */
   ean?: string;
+  /**
+   * Restolution / POS product code (Tuotekoodi), e.g. M1001.
+   * Used in Restolution export columns ahead of EAN.
+   */
+  productCode?: string;
   /** Public product page used as source attribution */
   sourceUrl?: string;
 }
@@ -74,6 +79,9 @@ export interface Place {
   kind?: PlaceKind;
   sortOrder: number;
 }
+
+/** Final amount check — swipe verify before trusting totals */
+export type LineVerificationStatus = 'pending' | 'correct' | 'incorrect';
 
 export interface InventoryLine {
   id: string;
@@ -91,6 +99,11 @@ export interface InventoryLine {
   countedAt?: string;
   /** ISO timestamp of last qty change on this line */
   lastUpdatedAt?: string;
+  /**
+   * Amount verification (swipe right/left/up).
+   * New counts start `pending`; seed/demo lines may be pre-marked `correct`.
+   */
+  verificationStatus?: LineVerificationStatus;
 }
 
 /** Recent additive stock updates (Record / confirm flows) — last ~20 */
@@ -287,13 +300,21 @@ export type RootStackParamList = {
   ProductScan: undefined;
   KuormaScan: undefined;
   HavikkiScan: undefined;
-  RecordInventory: undefined;
+  RecordInventory: { heroFridge?: boolean } | undefined;
   ReportsChat: undefined;
   HavikkiLog: undefined;
   VideoDemo: undefined;
   UnitsGuide: undefined;
   Places: undefined;
   RecentActivity: undefined;
+  ExportPreview: undefined;
+  /** Swipe-verify counted amounts (boxes vs pieces, etc.) */
+  VerifyAmounts:
+    | {
+        /** Only lines touched in recent activity (default: all pending) */
+        mode?: 'pending' | 'recent';
+      }
+    | undefined;
   FridgeReview: {
     document: DocumentExtract;
     imageUri?: string;

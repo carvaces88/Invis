@@ -30,9 +30,14 @@ export async function exportSessionExcel(
   const data = buildExportRows(session, profile, labels, dataCtx);
   const sheet = XLSX.utils.json_to_sheet(data.length ? data : [{}]);
   const book = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(book, sheet, labels.inventory);
+  const sheetName =
+    profileId === 'restolution' ? 'Restolution' : labels.inventory;
+  XLSX.utils.book_append_sheet(book, sheet, sheetName.slice(0, 31));
   const wbout = XLSX.write(book, { type: 'base64', bookType: 'xlsx' });
-  const filename = `inventory-${session.date}.xlsx`;
+  const filename =
+    profileId === 'restolution'
+      ? `restolution-${session.date}.xlsx`
+      : `inventory-${session.date}.xlsx`;
   return shareOrDownloadBase64({
     base64: wbout,
     filename,

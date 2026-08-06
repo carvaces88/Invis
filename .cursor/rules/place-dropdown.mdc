@@ -1,0 +1,18 @@
+---
+description: Place / site picker is a minimal dropdown, not chip rows
+globs: src/screens/**/*.tsx,src/components/Place*.tsx
+alwaysApply: false
+---
+
+# Counting place picker (minimal dropdown)
+
+**“Counting at · {site}”** (e.g. Kamppi) is a **dropdown**, not a static label over horizontal chips.
+
+## Rules
+
+- Prefer `PlaceSelect` (single trigger + bottom sheet) over `PlaceChips` for inventory counting flows: Record inventory, Confirm, Fridge review.
+- Keep the UI **minimal and easy to read**: one line to change place — no chip carousels for storage places.
+- Label pattern: `Counting at` + ` · ` + site name when set (`placesCountingAt` + `siteName`).
+- Trigger shows the **selected place name** with a clear chevron; options list places in a sheet.
+- Inventory list filter may use the same dropdown pattern (`PlaceSelect` with optional “All places”).
+- Do not reintroduce dense pill/chip rows for place selection unless the screen explicitly needs multi-select (it does not today).

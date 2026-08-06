@@ -13,6 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DidYouMeanModal } from '../components/DidYouMeanModal';
+import { PhotoCaptureTip } from '../components/PhotoCaptureTip';
 import { useInventory } from '../data/store';
 import type {
   IngredientType,
@@ -316,6 +317,7 @@ export function AddProductScreen({ route, navigation }: Props) {
       <Text style={styles.sub}>{t('addProductPhotoSub')}</Text>
 
       <Text style={styles.label}>{t('addProductPhotos')}</Text>
+      <PhotoCaptureTip text={t('photoCaptureTip')} />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -382,7 +384,7 @@ export function AddProductScreen({ route, navigation }: Props) {
         value={officialName}
         onChangeText={setOfficialName}
         style={styles.input}
-        placeholder="Figaro Kapris etikkaliemessä 935g/600g"
+        placeholder="Valio Tuuti2 vieroitusvalmiste 1l 6-12kk"
         placeholderTextColor={colors.inkFaint}
       />
 
@@ -392,7 +394,7 @@ export function AddProductScreen({ route, navigation }: Props) {
         onChangeText={setAliasesText}
         style={[styles.input, { minHeight: 72 }]}
         multiline
-        placeholder="kapris, capers, figaro kapris"
+        placeholder={t('alsoAsHint')}
         placeholderTextColor={colors.inkFaint}
       />
 
@@ -401,7 +403,7 @@ export function AddProductScreen({ route, navigation }: Props) {
         value={brand}
         onChangeText={setBrand}
         style={styles.input}
-        placeholder="Figaro"
+        placeholder="Valio"
         placeholderTextColor={colors.inkFaint}
       />
 
@@ -410,7 +412,7 @@ export function AddProductScreen({ route, navigation }: Props) {
         value={containerHint}
         onChangeText={setContainerHint}
         style={styles.input}
-        placeholder="Purkki (can / jar)"
+        placeholder="Tetra Pak / kartonki (carton)"
         placeholderTextColor={colors.inkFaint}
       />
 
@@ -458,7 +460,7 @@ export function AddProductScreen({ route, navigation }: Props) {
         value={packSize}
         onChangeText={setPackSize}
         style={styles.input}
-        placeholder="935g/600g"
+        placeholder="1 L"
         placeholderTextColor={colors.inkFaint}
       />
 
@@ -476,7 +478,7 @@ export function AddProductScreen({ route, navigation }: Props) {
         onChangeText={setEan}
         keyboardType="number-pad"
         style={styles.input}
-        placeholder="6411300002355"
+        placeholder="6408430492312"
         placeholderTextColor={colors.inkFaint}
       />
 

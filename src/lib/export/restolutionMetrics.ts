@@ -42,6 +42,11 @@ function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
 }
 
+/** Restolution sheets show turnover with two decimal places (e.g. 3.18). */
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 /**
  * Sum planned need for a product from recipes × guest covers.
  * Without a covers/plan input this stays 0 (recipes are per-portion only).
@@ -117,7 +122,7 @@ export function computeRestolutionMetrics(
     ero = round3(ainekaytto - tarve);
     const avgStock = (alkuvarasto + loppuvarasto) / 2;
     if (avgStock > 0) {
-      varastonkiertonopeus = round3(ainekaytto / avgStock);
+      varastonkiertonopeus = round2(ainekaytto / avgStock);
     }
   }
 
@@ -132,10 +137,16 @@ export function computeRestolutionMetrics(
   };
 }
 
+/**
+ * Restolution Tuotekoodi: prefer POS / Restolution product code (e.g. M1001),
+ * then EAN when no code is set.
+ */
 export function productCodeForLine(
   line: InventoryLine,
   products: Product[],
 ): string {
   const product = products.find((p) => p.id === line.productId);
+  const code = product?.productCode?.trim();
+  if (code) return code;
   return product?.ean?.trim() || '';
 }

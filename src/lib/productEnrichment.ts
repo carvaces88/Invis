@@ -18,21 +18,14 @@ import {
   isIdentityCatalogMatch,
 } from './fuzzyMatch';
 import { lookupKruokaForExtract } from './kruokaLookup';
+import {
+  containerLabelForUnit,
+  extractEanFromText,
+  inferPackaging,
+  normalizeEanDigits,
+} from './packaging';
+import { generateProductAliases, mergeAliasLists } from './productAliases';
 import { analyzeInventoryImage, analyzeProductCloseups } from './vision';
-
-const CONTAINER_BY_UNIT: Partial<Record<UnitCode, string>> = {
-  PRK: 'Purkki (can / jar)',
-  RSA: 'Rasia (box / container)',
-  RAS: 'Rasia (box / container)',
-  PSS: 'Pussi (bag / pouch)',
-  PL: 'Pullo (bottle)',
-  PLO: 'Pullo (bottle)',
-  LTK: 'Laatikko (crate / box)',
-  PKT: 'Paketti (packet / package)',
-  L: 'Litra (liquid volume)',
-  KG: 'Kilogramma (weight)',
-  KPL: 'Kappale (piece / item)',
-};
 
 function inferBrand(officialName: string, aliases: string[]): string | undefined {
   const first = officialName.trim().split(/\s+/)[0];
@@ -46,9 +39,40 @@ function inferBrand(officialName: string, aliases: string[]): string | undefined
   return undefined;
 }
 
-function containerFor(unit: UnitCode, override?: string | null): string | undefined {
-  if (override?.trim()) return override.trim();
-  return CONTAINER_BY_UNIT[unit];
+function resolvePackaging(
+  unit: UnitCode,
+  containerHint?: string | null,
+  packSize?: string | null,
+): { unit: UnitCode; containerHint: string } {
+  const inferred = inferPackaging(containerHint, packSize, unit);
+  if (inferred) {
+    return {
+      unit: inferred.unit ?? unit,
+      containerHint: inferred.containerHint,
+    };
+  }
+  return {
+    unit,
+    containerHint: containerLabelForUnit(unit) ?? unit,
+  };
+}
+
+function buildAliases(opts: {
+  officialName: string;
+  brand?: string | null;
+  packSize?: string | null;
+  ean?: string | null;
+  containerHint?: string | null;
+  extra?: string[];
+}): string[] {
+  return generateProductAliases({
+    officialName: opts.officialName,
+    brand: opts.brand,
+    packSize: opts.packSize,
+    ean: opts.ean,
+    containerHint: opts.containerHint,
+    extra: opts.extra,
+  });
 }
 
 function enrichmentFromProduct(
@@ -56,20 +80,37 @@ function enrichmentFromProduct(
   confidence: number,
   notes: string,
   matchedPublicListing: boolean,
+  extract?: VisionExtract,
 ): ProductEnrichment {
-  const brand = inferBrand(product.officialName, product.aliases);
-  const containerHint = containerFor(product.unit);
+  const brand =
+    extract?.brand ?? inferBrand(product.officialName, product.aliases);
+  const pack = resolvePackaging(
+    product.unit,
+    extract?.containerHint ?? null,
+    product.packSize ?? extract?.packSize,
+  );
+  const ean = normalizeEanDigits(product.ean ?? extract?.ean) ?? undefined;
+  const aliases = mergeAliasLists(
+    buildAliases({
+      officialName: product.officialName,
+      brand,
+      packSize: product.packSize ?? extract?.packSize,
+      ean,
+      containerHint: pack.containerHint,
+      extra: [...product.aliases, ...(extract?.aliases ?? [])],
+    }),
+  );
   return {
     officialName: product.officialName,
-    unit: product.unit,
-    packSize: product.packSize,
+    unit: pack.unit,
+    packSize: product.packSize ?? extract?.packSize ?? undefined,
     unitPriceAlv0: product.unitPriceAlv0,
     brand,
-    containerHint,
-    ean: product.ean,
+    containerHint: pack.containerHint,
+    ean,
     sourceUrl: product.sourceUrl,
     imageUrl: product.imageUrl,
-    aliases: [...product.aliases],
+    aliases,
     ingredientType: product.ingredientType,
     confidence,
     notes,
@@ -81,18 +122,35 @@ function enrichmentFromExtract(
   extract: VisionExtract,
   fallbackUnit: UnitCode = 'KPL',
 ): ProductEnrichment {
-  const unit = extract.unit ?? fallbackUnit;
-  const aliases = extract.aliases?.length
-    ? [...extract.aliases]
-    : [extract.suggestedName];
+  const pack = resolvePackaging(
+    extract.unit ?? fallbackUnit,
+    extract.containerHint,
+    extract.packSize,
+  );
+  const ean =
+    normalizeEanDigits(extract.ean) ??
+    extractEanFromText(
+      [extract.suggestedName, ...(extract.aliases ?? []), extract.rawNotes ?? ''].join(
+        ' ',
+      ),
+    ) ??
+    undefined;
+  const aliases = buildAliases({
+    officialName: extract.suggestedName,
+    brand: extract.brand,
+    packSize: extract.packSize,
+    ean,
+    containerHint: pack.containerHint,
+    extra: extract.aliases,
+  });
   return {
     officialName: extract.suggestedName,
-    unit,
+    unit: pack.unit,
     packSize: extract.packSize ?? undefined,
     unitPriceAlv0: extract.unitPriceAlv0 ?? undefined,
     brand: extract.brand ?? inferBrand(extract.suggestedName, aliases),
-    containerHint: containerFor(unit, extract.containerHint),
-    ean: extract.ean ?? undefined,
+    containerHint: pack.containerHint,
+    ean: ean ?? undefined,
     sourceUrl: extract.sourceUrl ?? undefined,
     imageUrl: extract.imageUrl ?? undefined,
     aliases,
@@ -102,8 +160,22 @@ function enrichmentFromExtract(
       extract.rawNotes ??
       extract.aiDescription ??
       'Label read from close-up photos',
-    matchedPublicListing: Boolean(extract.sourceUrl || extract.ean),
+    matchedPublicListing: Boolean(extract.sourceUrl || ean),
   };
+}
+
+/** Prefer EAN identity on seed/catalog before fuzzy name. */
+function matchByEan(
+  ean: string | null | undefined,
+  catalog: Product[],
+): Product | null {
+  const q = normalizeEanDigits(ean);
+  if (!q) return null;
+  const inCatalog = catalog.find((p) => normalizeEanDigits(p.ean) === q);
+  if (inCatalog) return inCatalog;
+  return (
+    SEED_KRUOKA_PRODUCTS.find((p) => normalizeEanDigits(p.ean) === q) ?? null
+  );
 }
 
 /**
@@ -131,6 +203,15 @@ export function matchExtractListing(
   extract: VisionExtract,
   catalog: Product[],
 ): { product: Product; fromKruoka: boolean; score: number } | null {
+  const byEan = matchByEan(extract.ean, catalog);
+  if (byEan) {
+    return {
+      product: byEan,
+      fromKruoka: byEan.id.startsWith('kruoka-'),
+      score: 1,
+    };
+  }
+
   const catalogHit = bestExtractMatch(catalog, extract);
   if (catalogHit && catalogHit.score >= 0.45) {
     return {
@@ -169,7 +250,8 @@ export async function matchExtractListingAsync(
     local &&
     local.fromKruoka &&
     local.score >= 0.85 &&
-    (extract.ean == null || local.product.ean === extract.ean)
+    (extract.ean == null ||
+      normalizeEanDigits(local.product.ean) === normalizeEanDigits(extract.ean))
   ) {
     return local;
   }
@@ -178,7 +260,10 @@ export async function matchExtractListingAsync(
   if (live) {
     // Prefer existing catalog row when EAN/name already stocked
     if (live.hit.ean) {
-      const inStock = catalog.find((p) => p.ean && p.ean === live.hit.ean);
+      const inStock = catalog.find(
+        (p) =>
+          normalizeEanDigits(p.ean) === normalizeEanDigits(live.hit.ean),
+      );
       if (inStock) {
         return {
           product: {
@@ -226,7 +311,14 @@ export async function enrichProductFromPhotos(
   if (listing) {
     const { product, fromKruoka, score, liveSource } = listing;
     const alreadyInStock =
-      !fromKruoka || catalog.some((p) => p.id === product.id || (p.ean && p.ean === product.ean));
+      !fromKruoka ||
+      catalog.some(
+        (p) =>
+          p.id === product.id ||
+          (p.ean &&
+            product.ean &&
+            normalizeEanDigits(p.ean) === normalizeEanDigits(product.ean)),
+      );
     const source = isIdentityCatalogMatch({
       product,
       score,
@@ -243,14 +335,17 @@ export async function enrichProductFromPhotos(
             ? 'Matched offline K-Ruoka seed'
             : 'Matched live K-Ruoka listing'
         : 'Matched inventory / supplier catalog';
-    const brand = inferBrand(product.officialName, product.aliases);
-    const container =
-      extract.containerHint ?? containerFor(product.unit);
+    const brand = extract.brand ?? inferBrand(product.officialName, product.aliases);
+    const pack = resolvePackaging(
+      product.unit,
+      extract.containerHint,
+      product.packSize ?? extract.packSize,
+    );
     const notes = [
       source,
       `${Math.round(score * 100)}% match`,
       brand ? `Brand: ${brand}` : null,
-      container ? `Container: ${container}` : null,
+      pack.containerHint ? `Packaging: ${pack.containerHint}` : null,
       product.packSize ? `Size: ${product.packSize}` : null,
       product.unitPriceAlv0 > 0
         ? `Price 0% ALV: €${product.unitPriceAlv0.toFixed(2)}`
@@ -266,6 +361,7 @@ export async function enrichProductFromPhotos(
       Math.max(extract.confidence, score),
       notes,
       true,
+      extract,
     );
   }
 
@@ -275,7 +371,7 @@ export async function enrichProductFromPhotos(
     notes: [
       base.notes,
       base.brand ? `Brand: ${base.brand}` : null,
-      base.containerHint ? `Container: ${base.containerHint}` : null,
+      base.containerHint ? `Packaging: ${base.containerHint}` : null,
       `Unit: ${UNIT_LABELS[base.unit]}`,
       'No inventory match — review suggested fields to add as new',
     ]
@@ -316,6 +412,7 @@ export function enrichFromExtract(
           ? 'Prefill from scan + K-Ruoka seed'
           : 'Prefill from scan + catalog match',
       true,
+      extract,
     );
   }
   return enrichmentFromExtract(extract);
@@ -359,6 +456,7 @@ export async function enrichFromExtractAsync(
       Math.max(extract.confidence, score),
       note,
       true,
+      extract,
     );
   }
   return enrichmentFromExtract(extract);

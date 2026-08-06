@@ -1,0 +1,46 @@
+---
+description: Restolution spreadsheet export is the primary app output — keep column order and bilingual headers exact
+globs:
+  - src/lib/export/**
+  - src/screens/InventaarioScreen.tsx
+  - src/components/ExportColumnsSheet.tsx
+  - src/data/types.ts
+---
+
+# Restolution export (core purpose)
+
+Inventaario’s main job is easy inventory input → a spreadsheet Restolution can read.
+
+## Required column order (do not reorder)
+
+| # | Header (exact) |
+|---|---|
+| 1 | Tuotekoodi / Product Code |
+| 2 | Tuote / Product Name |
+| 3 | Alkuvarasto / Beginning Inventory |
+| 4 | Ostot / Purchases |
+| 5 | Loppuvarasto / Ending Inventory |
+| 6 | Ainekäyttö / Actual Usage |
+| 7 | Tarve / Theoretical Need |
+| 8 | Ero / Variance |
+| 9 | Varastonkiertonopeus / Inventory Turnover |
+
+Source of truth: `RESTOLUTION_FI_HEADERS` + `restolution` profile in `src/lib/export/profiles.ts`.
+Default export/view profile is `restolution`.
+
+## Formulas
+
+- Ainekäyttö = Alkuvarasto + Ostot − Loppuvarasto
+- Ero = Ainekäyttö − Tarve
+- Varastonkiertonopeus = Ainekäyttö / ((Alku + Loppu) / 2) — **two decimal places**
+
+## Product code
+
+Prefer `Product.productCode` (Restolution codes like `M1001`), then `Product.ean`. Do not drop Tuotekoodi from the export profile.
+
+## Notes
+
+- Do not add Päivämäärä / Yksikkö to the Restolution profile — they are not in the Restolution template.
+- Other profiles (amounts, withPrice, nameQty) stay available for casual lists; Restolution stays first/default.
+- Tarve may be 0 until meal-plan/covers wiring exists; keep the column.
+---

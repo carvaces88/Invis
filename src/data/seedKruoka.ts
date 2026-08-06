@@ -347,6 +347,42 @@ export const SEED_KRUOKA_PRODUCTS: Product[] = [
       '6407800019265',
     ],
   },
+  {
+    // Reference case: pack photo / barcode → official K-Ruoka fields
+    id: 'kruoka-valio-tuuti2-vieroitusvalmiste-1l',
+    officialName: 'Valio Tuuti2 vieroitusvalmiste 1l 6-12kk',
+    unit: 'KPL',
+    packSize: '1 L',
+    unitPriceAlv0: 2.32, // 2.65 € shelf ÷ 1.14 food ALV
+    ingredientType: 'dairy',
+    section: 'K-Ruoka · dairy',
+    isTop: true,
+    lowStockThreshold: 1,
+    ean: '6408430492312',
+    sourceUrl:
+      'https://www.k-ruoka.fi/haku?q=6408430492312',
+    imageUrl:
+      'https://public.keskofiles.com/f/k-ruoka/product/6408430492312',
+    aliases: [
+      'valio tuuti2',
+      'valio tuuti 2',
+      'tuuti2',
+      'tuuti 2',
+      'valio tuuti',
+      'tuuti',
+      'vieroitusvalmiste',
+      'käyttövalmis maitopohjainen vieroitusvalmiste',
+      'kayttovalmis maitopohjainen vieroitusvalmiste',
+      'follow-on formula',
+      'follow on formula',
+      'baby formula',
+      'infant formula',
+      'ready to feed formula',
+      'valio baby formula',
+      'tuuti 1l',
+      '6408430492312',
+    ],
+  },
 
   // --- Spices & salt ---
   {

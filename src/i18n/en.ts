@@ -57,9 +57,16 @@ export const en = {
     '{count} item(s) recorded · tap qty to set absolute · Record adds to stock',
   currentInventoryEmpty:
     'Nothing recorded yet — use Record inventory on Home.',
-  inventorySearchPlaceholder: 'Search inventory…',
+  inventorySearchPlaceholder: 'Search name or product code…',
   inventorySearchEmpty: 'No products match this search.',
   inventorySearchClear: 'Clear search',
+  exportPreviewTitle: 'Export preview',
+  exportPreviewOpen: 'Preview export',
+  exportPreviewOpenSub: 'Restolution sheet · search · then Excel / PDF / Word',
+  exportPreviewSearch: 'Search name or product code…',
+  exportPreviewMeta: '{profile} · {date} · {count} row(s)',
+  exportPreviewEmpty: 'Nothing to preview — record inventory first.',
+  exportPreviewExportHint: 'Export matches this preview (same columns & order).',
   showFullSheet: 'Show full sheet',
   showRecordedOnly: 'Recorded only',
   notCountedYet: 'Not counted yet',
@@ -72,6 +79,33 @@ export const en = {
   recentActivityEmpty: 'No recent adds yet.',
   recentActivityOpen: 'Recent updates',
   recentActivityOpenSub: 'Last inventory adds across places',
+
+  verifyAmountsTitle: 'Verify amounts',
+  verifyAmountsSub:
+    'Check each count before you trust the total — boxes are not the same as pieces.',
+  verifyAmountsOpen: 'Verify amounts',
+  verifyAmountsOpenSub: 'Swipe to confirm boxes vs pieces',
+  verifyAmountsProgress: '{total} left to check',
+  verifyAmountsDone: 'All checked',
+  verifyAmountsDoneBody:
+    'Every pending count is marked correct. Next: preview Restolution export, or open current inventory.',
+  verifyAmountsExport: 'Preview Restolution export',
+  verifySwipeHint: '→ correct · ← incorrect · ↑ edit',
+  verifySwipeCorrect: 'CORRECT',
+  verifySwipeIncorrect: 'WRONG',
+  verifySwipeEdit: 'EDIT',
+  verifyBtnCorrect: 'Correct',
+  verifyBtnIncorrect: 'Incorrect',
+  verifyBtnEdit: 'Edit',
+  verifyEditTitle: 'Edit amount',
+  verifyFlagged: 'Flagged incorrect — fix, then swipe correct',
+  verifyPackRiskKnown:
+    'Counted as {qty} {unit}. That is about {inner} {base} if the pack is full. Is the unit right?',
+  verifyPackRiskUnknown:
+    'Counted as {qty} {unit} (boxes/packs). Did you mean pieces or bottles instead?',
+  verifyEmpty: 'Nothing left to verify.',
+  save: 'Save',
+
   recentAddWarnTitle: 'Added recently',
   recentAddWarnBody:
     'You added this {minutes} min ago (+{delta}). Add again anyway?',
@@ -95,10 +129,12 @@ export const en = {
   homeGreeting: 'Hello Chef! What do you want to do?',
   chefYes: 'Yes chef!',
   chefThinking: "I'm thinking, chef…",
+  homeScanFridge: 'Scan fridge',
+  homeScanFridgeSub: 'Photo many items · confirm · verify · Restolution',
   homeRecordInventory: 'Record inventory',
   homeRecordInventorySub: 'Photo or type · then confirm count',
   homeCurrentInventory: 'Current inventory',
-  homeCurrentInventorySub: 'View spreadsheet · choose columns',
+  homeCurrentInventorySub: 'Spreadsheet · preview Restolution export',
   homeScanProduct: 'Scan a product',
   homeLogDelivery: 'Log a delivery',
   homeLogWaste: 'Log food waste',
@@ -182,7 +218,10 @@ export const en = {
   fridgeFinishDone: 'Finish review',
   fridgeDoneTitle: 'Fridge review',
   fridgeDoneBody:
-    'Confirmed {confirmed} item(s). {pending} still pending.',
+    'Confirmed {confirmed} item(s). {pending} still pending. Next: verify amounts, then Restolution export.',
+  recordInventoryHeroTitle: 'Scan fridge',
+  recordInventoryHeroSub:
+    'Wide photo of the fridge or shelf — AI lists every item, then you confirm, verify, and export.',
   kruokaPhotoCredit: 'Product photos: K-Ruoka (public listings) · demo seed',
 
   // Record inventory entry
@@ -191,6 +230,8 @@ export const en = {
     'Upload a photo or type a name. Confirm before stock is updated.',
   recordPhoto: 'Photo',
   recordPhotoHint: 'Take or choose a photo of the product / label',
+  photoCaptureTip:
+    'Tip: Capture the whole pack when you can — name readable on the label, expiry if you see it, and the barcode when possible.',
   recordPhotoModeSingle: 'One product',
   recordPhotoModeFridge: 'Fridge / shelf',
   recordPhotoFridgeHint:
@@ -310,37 +351,60 @@ export const en = {
   confirmLines: 'Confirm lines',
   addProduct: 'Add product',
   addProductPhotoSub:
-    'Upload close-up photos of the label and pack — we read brand, size, container, and public price cues, then prefill the form.',
+    'Upload close-ups of the front label and/or barcode — we read name, size, packaging style, EAN, and public price cues, then prefill the form.',
   addProductPhotos: 'Close-up photos',
   addProductPhotosHint:
-    'Add several angles (front label, barcode, weight). Library allows multi-select.',
+    'Library allows multi-select (up to 8 close-ups).',
   addProductAnalyze: 'Analyze photos & prefill',
   addProductAnalyzeDemo: 'Run offline stub analysis',
   addProductAnalyzeNeedPhoto: 'Add close-up photos to analyze',
   addProductNeedPhotoTitle: 'Photos needed',
   addProductNeedPhotoBody:
-    'Live analysis needs at least one close-up of the label or pack.',
+    'Live analysis needs at least one close-up of the label or barcode.',
   addProductAnalyzeFailedTitle: 'Analysis failed',
   addProductAnalyzeFailedBody: 'Could not analyze photos. Try again.',
   addProductAlreadyInCatalog:
     '“{name}” is already in your catalog. Prefer confirming existing stock instead of adding a duplicate.',
   addProductEnrichNotes: 'Suggested from photos & public data',
   addProductBrand: 'Brand',
-  addProductContainer: 'Container / pack type',
+  addProductContainer: 'Packaging style',
   addProductPackSize: 'Pack size / weight',
   addProductPrice: 'Price (excl. VAT / 0% ALV)',
   addProductEan: 'EAN / barcode',
   addPhotoLimitTitle: 'Photo limit',
   addPhotoLimitBody: 'You can attach up to 8 close-up photos.',
+  alsoAsHint: 'Search nicknames (FI/EN) — e.g. Tuuti 2, vieroitusvalmiste',
+
+  productScanTitle: 'Product photo',
+  productScanSub:
+    'Photo of the carton or barcode → AI read → catalog match → confirm.',
+  productScanPlaceholder: 'Take or choose a photo of the product label or barcode',
+  productScanHintLabel: 'Optional hint',
+  productScanHintPlaceholder: 'e.g. “tuuti 2” or EAN digits',
+  productScanAnalyze: 'Analyze photo',
+  productScanNeedPhoto: 'Add a photo to analyze',
+  productScanDemo: 'Run demo (offline stub)',
+  productScanNeedPhotoTitle: 'Photo required',
+  productScanNeedPhotoBody:
+    'Take or choose a product / barcode photo for live AI analysis.',
+  productScanFailedTitle: 'Analysis failed',
 
   confirmBeforeWrite: 'Confirm before write',
   confirmModelSaid: 'Model said “{name}” ({pct}%). Match to catalog, then save.',
+  confirmEnriching: 'Looking up official catalog fields…',
+  confirmExtractMeta: 'Label / catalog fields',
   confirmAlreadyHaveTitle: 'You already have this product',
   confirmStrongMatchTitle: 'Strong catalog match',
   confirmAlreadyHaveBody:
     '{name} · {pct}% identity · on hand: {qty} {unit}. Confirm to update stock — no need to add again.',
+  confirmNotHaveTitle: "You don't have this product yet",
+  confirmNotHaveBody:
+    'No strong match in your catalog. Add it to the catalog, then confirm stock.',
+  confirmAddToCatalog: 'Add to catalog',
   confirmSuggestedMatches: 'Suggested matches',
-  confirmNoCatalogHit: 'No catalog hit — add as a new product if needed.',
+  confirmSeeMoreSuggestions: 'See more suggestions',
+  confirmSeeFewerSuggestions: 'Show fewer suggestions',
+  confirmNoCatalogHit: 'No catalog match yet.',
   confirmSearchChange: 'Search / change match',
   confirmAddDifferent: 'Not the same? Add as different product',
   confirmUseExisting: 'Yes · use existing & update stock',
@@ -348,7 +412,7 @@ export const en = {
   confirmOnHand: 'on hand {qty}',
   confirmExpiryOptional: 'Expiry (optional YYYY-MM-DD)',
   confirmPickProductTitle: 'Pick a product',
-  confirmPickProductBody: 'Select a catalog match or add to database first.',
+  confirmPickProductBody: 'Select a catalog match or add to catalog first.',
   confirmInvalidQty: 'Enter a valid quantity.',
 
   reports: 'Reports',
@@ -364,9 +428,9 @@ export const en = {
     'Includes unit price and line totals, plus a food total.',
   exportProfileNameQty: 'Name + quantity only',
   exportProfileNameQtyHint: 'Minimal list — name and qty, no unit or price.',
-  exportProfileRestolution: 'Restolution / movement',
+  exportProfileRestolution: 'Restolution (recommended)',
   exportProfileRestolutionHint:
-    'Opening, purchases, closing, usage, need, difference, turnover — Finnish headers in file.',
+    'Product code, name, beginning/purchases/ending, usage, need, variance, turnover — bilingual headers Restolution reads.',
   exportContinue: 'Export',
   exportCancel: 'Cancel',
   exporting: 'Exporting…',

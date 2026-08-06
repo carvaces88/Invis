@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CroppedImage } from '../components/CroppedImage';
 import { useChefNudge } from '../components/ChefNudge';
 import { PackCheckModal } from '../components/PackCheckModal';
-import { PlaceChips } from '../components/PlaceChips';
+import { PlaceSelect } from '../components/PlaceSelect';
 import { ProductSearchInput } from '../components/ProductSearchInput';
 import { ProductThumb } from '../components/ProductThumb';
 import { useInventory } from '../data/store';
@@ -275,7 +275,7 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
       t('fridgeDoneBody')
         .replace('{confirmed}', String(confirmedCount))
         .replace('{pending}', String(pendingCount)),
-      () => navigation.popToTop(),
+      () => navigation.navigate('VerifyAmounts', { mode: 'recent' }),
     );
   }
 
@@ -471,16 +471,13 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
 
         {places.length > 0 ? (
           <View style={{ marginBottom: spacing.md }}>
-            <Text style={styles.section}>
-              {t('placesCountingAt')}
-              {siteName ? ` · ${siteName}` : ''}
-            </Text>
-            <PlaceChips
+            <PlaceSelect
               places={places}
               selectedId={activePlaceId}
               onSelect={(id) => {
                 if (id !== 'all') setActivePlaceId(id);
               }}
+              label={`${t('placesCountingAt')}${siteName ? ` · ${siteName}` : ''}`}
               flush
             />
           </View>

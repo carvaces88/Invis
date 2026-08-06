@@ -1,13 +1,14 @@
 /**
  * Product / document vision entry point.
- * Live Gemini when EXPO_PUBLIC_GEMINI_API_KEY is set; otherwise DEV stub.
+ * Real photos → Gemini (client key or /api/vision proxy).
+ * Offline demo URIs → stub (Figaro/capers only when no real photo).
  */
 import type { DocumentExtract, VisionExtract } from '../data/types';
 import {
+  analyzeFridgeShelfWithGemini,
   analyzeImagesWithGemini,
   isRealImageUri,
 } from './geminiVision';
-import { isLiveVisionEnabled } from './visionConfig';
 import {
   analyzeFridgePanoramaImage as stubFridge,
   analyzeHavikkiImage as stubHavikki,
@@ -25,8 +26,13 @@ export async function analyzeInventoryImage(
   imageUri: string,
   hint?: string,
 ): Promise<VisionExtract> {
-  if (isLiveVisionEnabled() && isRealImageUri(imageUri)) {
-    return analyzeImagesWithGemini([imageUri], hint);
+  if (isRealImageUri(imageUri)) {
+    try {
+      return await analyzeImagesWithGemini([imageUri], hint);
+    } catch {
+      // No key / proxy down — never invent Figaro/capers for a real photo
+      return stubInventory(imageUri, hint);
+    }
   }
   return stubInventory(imageUri, hint);
 }
@@ -36,8 +42,12 @@ export async function analyzeProductCloseups(
   hint?: string,
 ): Promise<VisionExtract> {
   const real = imageUris.filter(isRealImageUri);
-  if (isLiveVisionEnabled() && real.length) {
-    return analyzeImagesWithGemini(real, hint);
+  if (real.length) {
+    try {
+      return await analyzeImagesWithGemini(real, hint);
+    } catch {
+      return stubCloseups(real, hint);
+    }
   }
   return stubCloseups(imageUris, hint);
 }
@@ -45,7 +55,15 @@ export async function analyzeProductCloseups(
 export async function analyzeFridgePanoramaImage(
   imageUri: string,
 ): Promise<DocumentExtract> {
-  // Multi-item fridge still uses document stub until paid document vision
+  if (isRealImageUri(imageUri)) {
+    try {
+      return await analyzeFridgeShelfWithGemini(imageUri);
+    } catch {
+      // No key / proxy down — fall back to stub demos
+      return stubFridge(imageUri);
+    }
+  }
+  // demo-fresh, cilantro, mayo demos, etc.
   return stubFridge(imageUri);
 }
 

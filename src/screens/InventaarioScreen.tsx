@@ -81,21 +81,28 @@ function tableMinWidth(columns: ExportColumnId[]): number {
   return columns.reduce((sum, col) => {
     switch (col) {
       case 'name':
-        return sum + 160;
+        return sum + 180;
       case 'unit':
         return sum + 64;
       case 'qty':
-      case 'closingStock':
         return sum + 48;
+      case 'closingStock':
+        return sum + 88;
       case 'price':
       case 'total':
         return sum + 52;
       case 'date':
         return sum + 88;
       case 'productCode':
-        return sum + 100;
+        return sum + 120;
+      case 'openingStock':
+      case 'purchases':
+      case 'usage':
+      case 'need':
+      case 'variance':
+        return sum + 88;
       case 'turnover':
-        return sum + 72;
+        return sum + 120;
       default:
         return sum + 56;
     }
@@ -207,7 +214,12 @@ export function InventaarioScreen() {
     if (!q) return modeFiltered;
     return modeFiltered.filter((l) => {
       if (l.officialName.toLowerCase().includes(q)) return true;
-      const aliases = productById.get(l.productId)?.aliases;
+      const code = productById.get(l.productId);
+      const productCode = (
+        code?.productCode ?? code?.ean ?? ''
+      ).toLowerCase();
+      if (productCode && productCode.includes(q)) return true;
+      const aliases = code?.aliases;
       return (
         aliases?.some((a) => a.toLowerCase().includes(q)) ?? false
       );
@@ -411,6 +423,17 @@ export function InventaarioScreen() {
         </Text>
         <View style={styles.headerActions}>
           <Pressable
+            onPress={() => navigation.navigate('VerifyAmounts', { mode: 'pending' })}
+            style={({ pressed }) => [
+              styles.verifyBtn,
+              pressed && { opacity: 0.85 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t('verifyAmountsOpen')}
+          >
+            <Text style={styles.verifyBtnText}>{t('verifyAmountsOpen')}</Text>
+          </Pressable>
+          <Pressable
             onPress={() => navigation.navigate('RecentActivity')}
             style={({ pressed }) => [
               styles.headerLink,
@@ -563,6 +586,17 @@ export function InventaarioScreen() {
 
       <View style={styles.exportRow}>
         <Pressable
+          onPress={() => navigation.navigate('ExportPreview')}
+          style={({ pressed }) => [
+            styles.previewBtn,
+            pressed && { opacity: 0.85 },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={t('exportPreviewOpen')}
+        >
+          <Text style={styles.previewBtnText}>{t('exportPreviewOpen')}</Text>
+        </Pressable>
+        <Pressable
           onPress={() => setColumnsSheetOpen(true)}
           style={({ pressed }) => [
             styles.columnsBtn,
@@ -632,8 +666,16 @@ export function InventaarioScreen() {
               col === 'unit' ? (
                 <UnitColumnLegend key={col} />
               ) : (
-                <Text key={col} style={[styles.th, colStyle(col)]}>
-                  {columnHeader(col, strings)}
+                <Text
+                  key={col}
+                  style={[styles.th, colStyle(col)]}
+                  numberOfLines={viewProfile.finnishExportHeaders ? 3 : 1}
+                >
+                  {columnHeader(col, strings, {
+                    finnishRestolution: Boolean(
+                      viewProfile.finnishExportHeaders,
+                    ),
+                  })}
                 </Text>
               ),
             )}
@@ -738,6 +780,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 13,
   },
+  verifyBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.success,
+    backgroundColor: colors.successSoft,
+  },
+  verifyBtnText: {
+    color: colors.success,
+    fontWeight: '700',
+    fontSize: 13,
+  },
   scratchBtn: {
     alignSelf: 'flex-start',
     paddingVertical: 8,
@@ -819,6 +875,17 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
+  },
+  previewBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+  },
+  previewBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
   },
   columnsBtn: {
     flexGrow: 1,
@@ -909,15 +976,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  colName: { flex: 1.6, minWidth: 140, paddingRight: 4 },
+  colName: { flex: 1.6, minWidth: 160, paddingRight: 4 },
   colUnit: { width: 64, textAlign: 'center', paddingTop: 1 },
   colQty: { width: 48, alignItems: 'flex-end', paddingTop: 1 },
   colPrice: { width: 52, textAlign: 'right', paddingTop: 1 },
   colTotal: { width: 52, textAlign: 'right', paddingTop: 1 },
   colDate: { width: 88, textAlign: 'left', paddingTop: 1, paddingRight: 4 },
-  colCode: { width: 100, textAlign: 'left', paddingTop: 1, paddingRight: 4 },
-  colMove: { width: 56, textAlign: 'right', paddingTop: 1 },
-  colTurnover: { width: 72, textAlign: 'right', paddingTop: 1 },
+  colCode: { width: 110, textAlign: 'left', paddingTop: 1, paddingRight: 4 },
+  colMove: { width: 88, textAlign: 'right', paddingTop: 1 },
+  colTurnover: { width: 120, textAlign: 'right', paddingTop: 1 },
   num: { fontVariant: ['tabular-nums'], textAlign: 'right' },
   qtyInput: {
     borderWidth: 1,

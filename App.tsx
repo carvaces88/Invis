@@ -23,6 +23,7 @@ import { FridgeReviewScreen } from './src/screens/FridgeReviewScreen';
 import { HavikkiLogScreen } from './src/screens/HavikkiLogScreen';
 import { HavikkiScanScreen } from './src/screens/HavikkiScanScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { ExportPreviewScreen } from './src/screens/ExportPreviewScreen';
 import { InventaarioScreen } from './src/screens/InventaarioScreen';
 import { KuormaScanScreen } from './src/screens/KuormaScanScreen';
 import { MoreScreen } from './src/screens/MoreScreen';
@@ -33,6 +34,7 @@ import { RecentActivityScreen } from './src/screens/RecentActivityScreen';
 import { ReportsChatScreen } from './src/screens/ReportsChatScreen';
 import { ScanScreen } from './src/screens/ScanScreen';
 import { UnitsGuideScreen } from './src/screens/UnitsGuideScreen';
+import { VerifyAmountsScreen } from './src/screens/VerifyAmountsScreen';
 import { VideoDemoScreen } from './src/screens/VideoDemoScreen';
 import { colors } from './src/theme/colors';
 
@@ -274,6 +276,24 @@ function RootNavigator() {
           component={RecentActivityScreen}
           options={{
             title: t('recentActivityTitle'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="VerifyAmounts"
+          component={VerifyAmountsScreen}
+          options={{
+            title: t('verifyAmountsTitle'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="ExportPreview"
+          component={ExportPreviewScreen}
+          options={{
+            title: t('exportPreviewTitle'),
             headerTintColor: colors.primary,
             headerStyle: { backgroundColor: colors.bg },
           }}

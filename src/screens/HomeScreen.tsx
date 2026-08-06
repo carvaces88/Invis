@@ -119,17 +119,34 @@ export function HomeScreen() {
 
       <Pressable
         onPress={() =>
-          withYesChef(() => navigation.navigate('RecordInventory'))
+          withYesChef(() =>
+            navigation.navigate('RecordInventory', { heroFridge: true }),
+          )
         }
         style={({ pressed }) => [
           styles.primaryCard,
           pressed && styles.pressed,
         ]}
         accessibilityRole="button"
+        accessibilityLabel={t('homeScanFridge')}
+      >
+        <Text style={styles.primaryTitle}>{t('homeScanFridge')}</Text>
+        <Text style={styles.primarySub}>{t('homeScanFridgeSub')}</Text>
+      </Pressable>
+
+      <Pressable
+        onPress={() =>
+          withYesChef(() => navigation.navigate('RecordInventory'))
+        }
+        style={({ pressed }) => [
+          styles.secondaryHeroCard,
+          pressed && styles.pressed,
+        ]}
+        accessibilityRole="button"
         accessibilityLabel={t('homeRecordInventory')}
       >
-        <Text style={styles.primaryTitle}>{t('homeRecordInventory')}</Text>
-        <Text style={styles.primarySub}>{t('homeRecordInventorySub')}</Text>
+        <Text style={styles.secondaryHeroTitle}>{t('homeRecordInventory')}</Text>
+        <Text style={styles.secondaryHeroSub}>{t('homeRecordInventorySub')}</Text>
       </Pressable>
 
       <Pressable
@@ -145,6 +162,23 @@ export function HomeScreen() {
       >
         <Text style={styles.inventoryTitle}>{t('homeCurrentInventory')}</Text>
         <Text style={styles.inventorySub}>{t('homeCurrentInventorySub')}</Text>
+      </Pressable>
+
+      <Pressable
+        onPress={() =>
+          withYesChef(() =>
+            navigation.navigate('VerifyAmounts', { mode: 'pending' }),
+          )
+        }
+        style={({ pressed }) => [
+          styles.verifyCard,
+          pressed && styles.pressed,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={t('verifyAmountsOpen')}
+      >
+        <Text style={styles.verifyTitle}>{t('verifyAmountsOpen')}</Text>
+        <Text style={styles.verifySub}>{t('verifyAmountsOpenSub')}</Text>
       </Pressable>
 
       <View style={[styles.grid, { gap }]}>
@@ -236,6 +270,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255,255,255,0.85)',
   },
+  secondaryHeroCard: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.primaryMid,
+  },
+  secondaryHeroTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  secondaryHeroSub: {
+    marginTop: 4,
+    fontSize: 14,
+    color: colors.inkMuted,
+  },
   inventoryCard: {
     backgroundColor: colors.bgElevated,
     borderRadius: radius.lg,
@@ -251,6 +304,25 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   inventorySub: {
+    marginTop: 4,
+    fontSize: 14,
+    color: colors.inkMuted,
+  },
+  verifyCard: {
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.success,
+  },
+  verifyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.success,
+  },
+  verifySub: {
     marginTop: 4,
     fontSize: 14,
     color: colors.inkMuted,

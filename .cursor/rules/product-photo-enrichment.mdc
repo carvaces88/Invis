@@ -44,6 +44,7 @@ Do not treat a pack photo match as “done” if only local/stub data is used wh
   2. Direct `kr-api/v2/product-search` (when Cloudflare allows)
   3. Offline seed (`seedKruoka.ts`)
   4. Open Food Facts + Keskofiles image + K-Ruoka search URL
+- **Live label reading** via Gemini: client `EXPO_PUBLIC_GEMINI_API_KEY` or server `GEMINI_API_KEY` on `/api/vision`. Real phone photos must never fall back to the Figaro/capers offline demo — use `unrecognized` + Confirm “add to catalog” instead.
 - Wire through `matchExtractListingAsync` / `enrichFromExtractAsync` / `enrichProductFromPhotos` in `productEnrichment.ts`.
 - Prefer enriching existing `VisionExtract` / `AddProduct` prefill rather than a parallel flow.
 - Keep inventory prices at **0% ALV**; convert retail (14% food ALV) when importing from K-Ruoka. POS unit codes from `src/data/units.ts`.

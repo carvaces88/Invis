@@ -9,6 +9,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/vision"
+  to = "/.netlify/functions/vision"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

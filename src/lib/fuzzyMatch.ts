@@ -18,6 +18,15 @@ const SYNONYM_GROUPS: string[][] = [
   ['parsley', 'persilja'],
   ['yogurt', 'yoghurt', 'jogurtti', 'jugurtti'],
   ['capers', 'kapris', 'caper', 'kapriksia'],
+  [
+    'tuuti',
+    'tuuti2',
+    'tuuti 2',
+    'vieroitusvalmiste',
+    'follow-on formula',
+    'baby formula',
+    'infant formula',
+  ],
 ];
 
 /** Minimum score to treat as a “strong similar” merge candidate. */

@@ -41,8 +41,8 @@ export type ExportProfile = {
   /** Session qty + value footer (only when price columns present) */
   includeTotals: boolean;
   /**
-   * When true, file exports use Finnish Restolution POS headers
-   * regardless of UI language (import compatibility).
+   * When true, file exports and on-screen view use bilingual Restolution
+   * headers (FI / EN) for import compatibility — see RESTOLUTION_FI_HEADERS.
    */
   finnishExportHeaders?: boolean;
 };
@@ -56,6 +56,26 @@ export type ExportCellContext = {
 };
 
 export const EXPORT_PROFILES: ExportProfile[] = [
+  {
+    id: 'restolution',
+    /**
+     * Exact Restolution import column order (bilingual headers in files).
+     * Matches: Tuotekoodi → … → Varastonkiertonopeus / Inventory Turnover
+     */
+    columns: [
+      'productCode',
+      'name',
+      'openingStock',
+      'purchases',
+      'closingStock',
+      'usage',
+      'need',
+      'variance',
+      'turnover',
+    ],
+    includeTotals: false,
+    finnishExportHeaders: true,
+  },
   {
     id: 'amounts',
     columns: ['name', 'unit', 'qty'],
@@ -71,42 +91,25 @@ export const EXPORT_PROFILES: ExportProfile[] = [
     columns: ['name', 'qty'],
     includeTotals: false,
   },
-  {
-    id: 'restolution',
-    // Restolution / movement template (identifying + stock movement cols)
-    columns: [
-      'date',
-      'productCode',
-      'name',
-      'unit',
-      'openingStock',
-      'purchases',
-      'closingStock',
-      'usage',
-      'need',
-      'variance',
-      'turnover',
-    ],
-    includeTotals: false,
-    finnishExportHeaders: true,
-  },
 ];
 
-export const DEFAULT_EXPORT_PROFILE: ExportProfileId = 'amounts';
+/** Primary purpose of the app: Restolution-readable inventory sheets. */
+export const DEFAULT_EXPORT_PROFILE: ExportProfileId = 'restolution';
 
-/** Finnish Restolution sheet headers — used in Excel/PDF/Word for that profile. */
+/**
+ * Restolution sheet headers — bilingual FI / EN as Restolution templates use.
+ * Used in Excel/PDF/Word and on-screen Restolution view.
+ */
 export const RESTOLUTION_FI_HEADERS: Partial<Record<ExportColumnId, string>> = {
-  date: 'Päivämäärä',
-  productCode: 'Tuotekoodi',
-  name: 'Tuote',
-  unit: 'Yksikkö',
-  openingStock: 'Alkuvarasto',
-  purchases: 'Ostot',
-  closingStock: 'Loppuvarasto',
-  usage: 'Ainekäyttö',
-  need: 'Tarve',
-  variance: 'Ero',
-  turnover: 'Varastonkiertonopeus',
+  productCode: 'Tuotekoodi / Product Code',
+  name: 'Tuote / Product Name',
+  openingStock: 'Alkuvarasto / Beginning Inventory',
+  purchases: 'Ostot / Purchases',
+  closingStock: 'Loppuvarasto / Ending Inventory',
+  usage: 'Ainekäyttö / Actual Usage',
+  need: 'Tarve / Theoretical Need',
+  variance: 'Ero / Variance',
+  turnover: 'Varastonkiertonopeus / Inventory Turnover',
 };
 
 export function getExportProfile(id: ExportProfileId): ExportProfile {
@@ -247,6 +250,10 @@ export function cellDisplay(
   }
   if (typeof raw === 'number') {
     if (column === 'price' || column === 'total') {
+      return raw.toFixed(2).replace('.', ',');
+    }
+    // Restolution sheets show turnover with two decimals (e.g. 3.18)
+    if (column === 'turnover') {
       return raw.toFixed(2).replace('.', ',');
     }
     return String(raw).replace('.', ',');
