@@ -315,7 +315,15 @@ export const en = {
   addProductPhotosHint:
     'Add several angles (front label, barcode, weight). Library allows multi-select.',
   addProductAnalyze: 'Analyze photos & prefill',
-  addProductAnalyzeDemo: 'Run demo analysis (capers → Figaro)',
+  addProductAnalyzeDemo: 'Run offline stub analysis',
+  addProductAnalyzeNeedPhoto: 'Add close-up photos to analyze',
+  addProductNeedPhotoTitle: 'Photos needed',
+  addProductNeedPhotoBody:
+    'Live analysis needs at least one close-up of the label or pack.',
+  addProductAnalyzeFailedTitle: 'Analysis failed',
+  addProductAnalyzeFailedBody: 'Could not analyze photos. Try again.',
+  addProductAlreadyInCatalog:
+    '“{name}” is already in your catalog. Prefer confirming existing stock instead of adding a duplicate.',
   addProductEnrichNotes: 'Suggested from photos & public data',
   addProductBrand: 'Brand',
   addProductContainer: 'Container / pack type',
@@ -324,6 +332,25 @@ export const en = {
   addProductEan: 'EAN / barcode',
   addPhotoLimitTitle: 'Photo limit',
   addPhotoLimitBody: 'You can attach up to 8 close-up photos.',
+
+  confirmBeforeWrite: 'Confirm before write',
+  confirmModelSaid: 'Model said “{name}” ({pct}%). Match to catalog, then save.',
+  confirmAlreadyHaveTitle: 'You already have this product',
+  confirmStrongMatchTitle: 'Strong catalog match',
+  confirmAlreadyHaveBody:
+    '{name} · {pct}% identity · on hand: {qty} {unit}. Confirm to update stock — no need to add again.',
+  confirmSuggestedMatches: 'Suggested matches',
+  confirmNoCatalogHit: 'No catalog hit — add as a new product if needed.',
+  confirmSearchChange: 'Search / change match',
+  confirmAddDifferent: 'Not the same? Add as different product',
+  confirmUseExisting: 'Yes · use existing & update stock',
+  confirmStock: 'confirm stock',
+  confirmOnHand: 'on hand {qty}',
+  confirmExpiryOptional: 'Expiry (optional YYYY-MM-DD)',
+  confirmPickProductTitle: 'Pick a product',
+  confirmPickProductBody: 'Select a catalog match or add to database first.',
+  confirmInvalidQty: 'Enter a valid quantity.',
+
   reports: 'Reports',
   export: 'Export',
   exportFailed: 'Export failed',

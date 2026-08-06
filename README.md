@@ -2,9 +2,18 @@
 
 Minimal kitchen inventory app for Finnish restaurants. Digital inventory sheet (Name · Unit · Qty · Price excl. VAT · Total) with **photo → AI extract → catalog match → confirm**.
 
-Local-first demo — no Supabase required. Vision uses stubs so alias matching and demos work offline (no API keys).
+Local-first demo — no Supabase required. **Product photo analysis** uses **Gemini** when `EXPO_PUBLIC_GEMINI_API_KEY` is set (see `env.example`); otherwise a DEV stub keeps alias demos working offline.
 
 UI is English throughout. Catalog product official names may stay Finnish when they mirror real POS / distributor names.
+
+## Live vision (Gemini)
+
+1. Copy `env.example` → `.env.local`
+2. Set `EXPO_PUBLIC_GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/apikey)
+3. `npx expo start` (restart after changing env)
+4. Scan hub → Product photo → take a real label photo → Confirm shows name/price (0% ALV) and **inventory-first** match
+
+Without a key, Analyze falls back to the offline stub (not live OCR).
 
 ## Run
 
@@ -69,7 +78,8 @@ Tokens: `src/theme/colors.ts` · Seeds: `src/data/seedCatalog.ts`, `seedDocument
 
 ## Later
 
-- Real vision LLM behind paid flag (`src/lib/visionStub.ts`)
+- Edge Function proxy for Gemini (avoid shipping `EXPO_PUBLIC_` keys in production)
 - Live camera / video (`VideoDemoScreen`)
 - Pro LLM chat flag
+- Live www.k-ruoka.fi fetch (seed + vision today; Cloudflare often blocks)
 - Supabase sync, Restolution POS, barcode

@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createInitialSessionLines,
   SEED_PRODUCTS,
+  SEED_QTY,
 } from '../data/seedCatalog';
 import {
   DEFAULT_PLACE_ID,
@@ -52,7 +53,8 @@ function isInventorySession(v: unknown): v is InventorySession {
   );
 }
 
-/** Keep saved counts; ensure every catalog product has a line on the default place. */
+/** Keep saved counts; ensure every catalog product has a line on the default place.
+ * New catalog SKUs (not yet in the saved sheet) pick up SEED_QTY when defined. */
 function reconcileSessionLines(
   saved: InventoryLine[],
   products: Product[],
@@ -69,7 +71,7 @@ function reconcileSessionLines(
       id: `line-${p.id}-${defaultPlaceId}`,
       productId: p.id,
       placeId: defaultPlaceId,
-      quantity: null as number | null,
+      quantity: (SEED_QTY[p.id] ?? null) as number | null,
       officialName: p.officialName,
       unit: p.unit,
       unitPriceAlv0: p.unitPriceAlv0,

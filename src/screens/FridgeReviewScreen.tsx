@@ -25,7 +25,7 @@ import type {
 import { useI18n } from '../i18n';
 import { alertAck, alertInfo } from '../lib/alertAck';
 import { confirmIfRecentAdd } from '../lib/confirmIfRecentAdd';
-import { bestMatch } from '../lib/fuzzyMatch';
+import { bestExtractMatch, isIdentityCatalogMatch } from '../lib/fuzzyMatch';
 import {
   shouldShowPackCheck,
   type PackCheckInfo,
@@ -74,7 +74,7 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
       document.lines.map((extract, i) => {
         const match = extract.unrecognized
           ? null
-          : bestMatch(products, extract.suggestedName);
+          : bestExtractMatch(products, extract);
         const suggested = isSuggestedLine(extract, match);
         return {
           key: `f-${i}-${extract.suggestedName}`,
@@ -332,6 +332,9 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
             {' · '}
             {Math.round(line.match.score * 100)}%
           </Text>
+        ) : null}
+        {line.match && isIdentityCatalogMatch(line.match) ? (
+          <Text style={styles.alreadyHave}>{t('confirmAlreadyHaveTitle')}</Text>
         ) : null}
         {line.status === 'confirmed' ? (
           <Text style={styles.statusOk}>{t('fridgeConfirmed')}</Text>
@@ -671,6 +674,12 @@ const styles = StyleSheet.create({
   aiName: { fontSize: 12, color: colors.inkMuted },
   matchName: { fontSize: 15, fontWeight: '700', color: colors.ink, marginTop: 2 },
   meta: { fontSize: 12, color: colors.accent, marginTop: 4 },
+  alreadyHave: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+  },
   desc: { fontSize: 13, color: colors.inkMuted, marginTop: 6, lineHeight: 18 },
   ask: {
     marginTop: 4,

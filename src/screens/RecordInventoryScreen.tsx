@@ -53,7 +53,9 @@ import { useUnitSystem } from '../lib/unitSystem';
 import {
   analyzeFridgePanoramaImage,
   analyzeInventoryImage,
-} from '../lib/visionStub';
+  isLiveVisionEnabled,
+  isRealImageUri,
+} from '../lib/vision';
 import { resolveDemoShelfUri } from '../data/seedKruoka';
 import { colors, radius, spacing } from '../theme/colors';
 
@@ -133,6 +135,17 @@ export function RecordInventoryScreen({ navigation }: Props) {
   }
 
   async function analyzePhoto(demoKind: 'default' | 'fresh' = 'default') {
+    if (
+      photoMode !== 'fridge' &&
+      isLiveVisionEnabled() &&
+      !isRealImageUri(uri)
+    ) {
+      alertInfo(
+        t('addProductNeedPhotoTitle'),
+        t('addProductNeedPhotoBody'),
+      );
+      return;
+    }
     setBusy(true);
     thinkingChef(true);
     try {
@@ -160,6 +173,12 @@ export function RecordInventoryScreen({ navigation }: Props) {
         extract,
         imageUri: uri ?? undefined,
       });
+    } catch (e) {
+      thinkingChef(false);
+      alertInfo(
+        t('addProductAnalyzeFailedTitle'),
+        e instanceof Error ? e.message : t('addProductAnalyzeFailedBody'),
+      );
     } finally {
       thinkingChef(false);
       setBusy(false);

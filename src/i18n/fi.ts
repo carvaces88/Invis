@@ -306,7 +306,15 @@ export const fi: Messages = {
   addProductPhotosHint:
     'Lisää useita kulmia (etuetiketti, viivakoodi, paino). Kirjastosta voi valita useita.',
   addProductAnalyze: 'Analysoi kuvat ja täytä',
-  addProductAnalyzeDemo: 'Aja demoanalyysi (capers → Figaro)',
+  addProductAnalyzeDemo: 'Aja offline-stub-analyysi',
+  addProductAnalyzeNeedPhoto: 'Lisää lähikuvia analysoitavaksi',
+  addProductNeedPhotoTitle: 'Kuvat tarvitaan',
+  addProductNeedPhotoBody:
+    'Live-analyysi tarvitsee vähintään yhden lähikuvan etiketistä tai pakkauksesta.',
+  addProductAnalyzeFailedTitle: 'Analyysi epäonnistui',
+  addProductAnalyzeFailedBody: 'Kuvia ei voitu analysoida. Yritä uudelleen.',
+  addProductAlreadyInCatalog:
+    '“{name}” on jo katalogissa. Vahvista mieluummin olemassa oleva varasto kuin lisää kaksoiskappale.',
   addProductEnrichNotes: 'Ehdotus kuvista ja julkisesta datasta',
   addProductBrand: 'Brändi',
   addProductContainer: 'Pakkaus / astiatyyppi',
@@ -315,6 +323,25 @@ export const fi: Messages = {
   addProductEan: 'EAN / viivakoodi',
   addPhotoLimitTitle: 'Kuvien raja',
   addPhotoLimitBody: 'Voit liittää enintään 8 lähikuvaa.',
+
+  confirmBeforeWrite: 'Vahvista ennen kirjausta',
+  confirmModelSaid: 'Malli sanoi “{name}” ({pct} %). Kohdista katalogiin ja tallenna.',
+  confirmAlreadyHaveTitle: 'Tuote on jo inventaariossa',
+  confirmStrongMatchTitle: 'Vahva katalogiosuma',
+  confirmAlreadyHaveBody:
+    '{name} · {pct} % sama tuote · varastossa: {qty} {unit}. Vahvista päivittääksesi määrän — ei tarvitse lisätä uudelleen.',
+  confirmSuggestedMatches: 'Ehdotetut osumat',
+  confirmNoCatalogHit: 'Ei katalogiosumaa — lisää uutena tuotteena tarvittaessa.',
+  confirmSearchChange: 'Hae / vaihda osuma',
+  confirmAddDifferent: 'Ei sama? Lisää eri tuotteena',
+  confirmUseExisting: 'Kyllä · käytä olemassa olevaa ja päivitä',
+  confirmStock: 'vahvista varasto',
+  confirmOnHand: 'varastossa {qty}',
+  confirmExpiryOptional: 'Parasta ennen (valinnainen VVVV-KK-PP)',
+  confirmPickProductTitle: 'Valitse tuote',
+  confirmPickProductBody: 'Valitse katalogiosuma tai lisää tietokantaan ensin.',
+  confirmInvalidQty: 'Anna kelvollinen määrä.',
+
   reports: 'Raportit',
   export: 'Vie',
   exportFailed: 'Vienti epäonnistui',

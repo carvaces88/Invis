@@ -14,7 +14,7 @@ import type { ProductMatch, RootStackParamList, VisionExtract } from '../data/ty
 import { useI18n } from '../i18n';
 import { alertAck, alertInfo } from '../lib/alertAck';
 import { confirmIfRecentAdd } from '../lib/confirmIfRecentAdd';
-import { bestMatch } from '../lib/fuzzyMatch';
+import { bestExtractMatch } from '../lib/fuzzyMatch';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'BatchConfirm'>;
@@ -47,7 +47,7 @@ export function BatchConfirmScreen({ route, navigation }: Props) {
       document.lines.map((extract, i) => ({
         key: `d-${i}-${extract.suggestedName}`,
         extract,
-        match: bestMatch(products, extract.suggestedName),
+        match: bestExtractMatch(products, extract),
         qty:
           extract.quantity != null
             ? String(extract.quantity)

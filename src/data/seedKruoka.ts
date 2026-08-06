@@ -15,6 +15,7 @@ import type { Product } from './types';
 /** Bundled packshot (from public K-Ruoka product page screenshot, cropped). */
 export const KRUOKA_PACK_IMAGES: Record<string, number> = {
   'kruoka-herkkumaa-taysmajoneesi-5kg': require('../../assets/demo/herkkumaa-taysmajoneesi-5kg-pack.png'),
+  'kruoka-atria-rahkaohukainen-kaakao-vadelma-380g': require('../../assets/demo/atria-rahkaohukainen-kaakao-vadelma-380g-pack.png'),
 };
 
 /** Demo walk-in / shelf photos used by fridge panorama stub. */
@@ -317,6 +318,33 @@ export const SEED_KRUOKA_PRODUCTS: Product[] = [
       'feta 150g',
       'fetajuusto vähälaktoosinen',
       'low lactose feta',
+    ],
+  },
+  {
+    id: 'kruoka-atria-rahkaohukainen-kaakao-vadelma-380g',
+    officialName: 'Atria kaakao-vadelma rahkaohukainen 380 g',
+    unit: 'KPL',
+    packSize: '380 g',
+    unitPriceAlv0: 2.36, // 2.69 € shelf ÷ 1.14 food ALV
+    ingredientType: 'dairy',
+    section: 'K-Ruoka · dairy',
+    isTop: true,
+    lowStockThreshold: 1,
+    ean: '6407800019265',
+    sourceUrl:
+      'https://www.k-ruoka.fi/haku?q=atria%20kaakao&tuote=atria-rahkaohukainen-kaakao-vadelma-380g-6407800019265',
+    imageUrl:
+      'https://www.k-ruoka.fi/haku?q=atria%20kaakao&tuote=atria-rahkaohukainen-kaakao-vadelma-380g-6407800019265',
+    aliases: [
+      'atria rahkaohukainen',
+      'atria kaakao-vadelma',
+      'kaakao-vadelma rahkaohukainen',
+      'kaakao vadelma rahkaohukainen',
+      'kvargplättar kakao-hallon',
+      'quark pancake cocoa raspberry',
+      'atria quark pancake',
+      'rahkaohukainen kaakao',
+      '6407800019265',
     ],
   },
 
@@ -697,6 +725,7 @@ export const KRUOKA_SEED_QTY: Record<string, number> = {
   'kruoka-bataatti-luomu': 3,
   // Dairy
   'kruoka-pirkka-parhaat-fetajuusto-150g': 4,
+  'kruoka-atria-rahkaohukainen-kaakao-vadelma-380g': 1,
   // Spices & salt
   'kruoka-pirkka-juustokumina-25g': 2,
   'kruoka-pirkka-luomu-juustokumina-27g': 1,

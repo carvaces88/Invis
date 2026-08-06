@@ -268,7 +268,7 @@ export const SEED_PRODUCTS: Product[] = [
 ];
 
 /** Seed quantities so inventaario totals + recipe yield demos work offline */
-const SEED_QTY: Record<string, number> = {
+export const SEED_QTY: Record<string, number> = {
   'mustah-bonne': 3,
   vaahterasiirappi: 1,
   kikherne: 5,

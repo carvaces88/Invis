@@ -13,7 +13,12 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RootStackParamList } from '../data/types';
-import { analyzeInventoryImage } from '../lib/visionStub';
+import { alertInfo } from '../lib/alertAck';
+import {
+  analyzeInventoryImage,
+  isLiveVisionEnabled,
+  isRealImageUri,
+} from '../lib/vision';
 import { colors, radius, spacing } from '../theme/colors';
 
 /** Single-product photo scan (previous Scan tab body) */
@@ -46,6 +51,13 @@ export function ProductScanScreen() {
   }
 
   async function analyze() {
+    if (isLiveVisionEnabled() && !isRealImageUri(uri)) {
+      alertInfo(
+        'Photo required',
+        'Take or choose a product photo for live AI analysis.',
+      );
+      return;
+    }
     setBusy(true);
     try {
       const extract = await analyzeInventoryImage(
@@ -56,6 +68,11 @@ export function ProductScanScreen() {
         extract,
         imageUri: uri ?? undefined,
       });
+    } catch (e) {
+      alertInfo(
+        'Analysis failed',
+        e instanceof Error ? e.message : 'Could not analyze photo',
+      );
     } finally {
       setBusy(false);
     }
@@ -108,7 +125,11 @@ export function ProductScanScreen() {
           <ActivityIndicator color="#fff" />
         ) : (
           <Text style={styles.analyzeText}>
-            {uri ? 'Analyze photo' : 'Run demo (AI → “capers”)'}
+            {uri
+              ? 'Analyze photo'
+              : isLiveVisionEnabled()
+                ? 'Add a photo to analyze'
+                : 'Run demo (offline stub)'}
           </Text>
         )}
       </Pressable>

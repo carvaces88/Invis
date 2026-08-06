@@ -1,24 +1,45 @@
 ---
-description: Required product photo → label analyze → Finnish supplier lookup → inventory suggest/prefill flow
+description: Required product photo → label analyze → live Finnish supplier lookup → inventory suggest/prefill flow
 alwaysApply: true
 ---
 
 # Product photo enrichment (core requirement)
 
-Users must be able to:
+Whenever the user adds a product **from a phone photo** (label, pack, shelf), the flow must:
 
-1. **Take / pick a photo** of a product (label, pack, shelf item).
-2. **Analyze & read the label** (vision/OCR — not heuristics-only stubs in production).
-3. **Search the internet for product info**, prioritizing:
-   - First: [https://www.k-ruoka.fi](https://www.k-ruoka.fi)
+1. **Take / pick a photo** of the product.
+2. **Analyze & read the label** (vision/OCR — not heuristics-only stubs in production). Extract at least:
+   - Product **name** (brand + Finnish title when visible)
+   - **Size / pack weight** (e.g. 380 g)
+   - **Barcode / EAN** when visible on pack
+   - Any printed **price** if on shelf tags (optional; prefer distributor price)
+3. **Search live distributors** for product info (not offline-only seed in production), prioritizing:
+   - First: [https://www.k-ruoka.fi](https://www.k-ruoka.fi) (search by name and/or EAN)
    - Then other Finnish suppliers / food wholesale sources
-4. **Match against current inventory/catalog**.
-5. If **not already in inventory**, **suggest inserting** it.
-6. **Prefill Add Product** with optimized text and fields from the extract + web match (name, unit/YKSIKKÖ, pack size, EAN, price at 0% ALV when known, image/`sourceUrl`, aliases) — not name+unit only.
+4. From the live match, pull **name, size, retail price, EAN, image, product URL**.
+5. **Match against current inventory/catalog**.
+6. If **not already in inventory**, **suggest inserting** it.
+7. **Prefill Add Product** with optimized fields from extract + web match (name, unit/YKSIKKÖ, pack size, EAN, price at **0% ALV**, image/`sourceUrl`, aliases) — not name+unit only.
+
+## Reference example (phone pack → K-Ruoka)
+
+Pack photo of **Atria Kaakao-vadelma rahkaohukainen 380 g** should resolve via live K-Ruoka to:
+
+| Field | Value |
+|---|---|
+| Brand / name | Atria · Kaakao-vadelma rahkaohukainen |
+| Size | 380 g (unit `KPL` or weight-aware display; pack size 380 g) |
+| EAN | `6407800019265` |
+| Retail price (K-Ruoka) | ~2.69 € (incl. food ALV) → store inventory at **0% ALV** |
+| sourceUrl | `https://www.k-ruoka.fi/haku?q=atria%20kaakao&tuote=atria-rahkaohukainen-kaakao-vadelma-380g-6407800019265` |
+
+Do not treat a pack photo match as “done” if only local/stub data is used when a live K-Ruoka listing exists for that EAN/name.
 
 ## Implementation notes
 
-- Scaffolding lives in `ProductScanScreen`, `RecordInventoryScreen`, `ConfirmScreen`, `FridgeReviewScreen`, `AddProductScreen`; vision is currently stubbed in `src/lib/visionStub.ts`; K-Ruoka data is offline seed (`seedKruoka.ts`), not live lookup.
-- Prefer enriching existing `VisionExtract` / `AddProduct` prefill rather than a parallel flow.
-- Keep inventory prices at **0% ALV**; use POS unit codes from `src/data/units.ts`.
+- Scaffolding: `ProductScanScreen`, `RecordInventoryScreen`, `ConfirmScreen`, `FridgeReviewScreen`, `AddProductScreen`.
+- Vision may still be stubbed in `src/lib/visionStub.ts`; Gemini path in `src/lib/geminiVision.ts`.
+- K-Ruoka today may still use offline seed (`seedKruoka.ts`) — **target is live lookup** by EAN/name against k-ruoka.fi (and peers).
+- Prefer enriching existing `VisionExtract` / `AddProduct` prefill (`src/lib/productEnrichment.ts`) rather than a parallel flow.
+- Keep inventory prices at **0% ALV**; convert retail (14% food ALV) when importing from K-Ruoka. POS unit codes from `src/data/units.ts`.
 - Do not drop this flow when refining logos, demos, or unrelated UI.

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RootStackParamList } from '../data/types';
-import { isVideoAnalysisEnabled } from '../lib/visionStub';
+import { isVideoAnalysisEnabled } from '../lib/vision';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'VideoDemo'>;

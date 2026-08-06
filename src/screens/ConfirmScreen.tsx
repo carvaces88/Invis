@@ -14,12 +14,17 @@ import { ProductSearchInput } from '../components/ProductSearchInput';
 import { PackCheckModal } from '../components/PackCheckModal';
 import { PlaceChips } from '../components/PlaceChips';
 import { ProductThumb } from '../components/ProductThumb';
-import { useInventory } from '../data/store';
+import { getStockQty, useInventory } from '../data/store';
 import type { ProductMatch, RootStackParamList } from '../data/types';
 import { useI18n } from '../i18n';
 import { alertAck, alertInfo } from '../lib/alertAck';
 import { confirmIfRecentAdd } from '../lib/confirmIfRecentAdd';
-import { bestMatch, searchProducts } from '../lib/fuzzyMatch';
+import {
+  bestExtractMatch,
+  isIdentityCatalogMatch,
+  isStrongCatalogMatch,
+  matchExtractToCatalog,
+} from '../lib/fuzzyMatch';
 import {
   shouldShowPackCheck,
   type PackCheckInfo,
@@ -36,6 +41,7 @@ export function ConfirmScreen({ route, navigation }: Props) {
   const { t } = useI18n();
   const {
     products,
+    session,
     addQuantity,
     getRecentAddWarning,
     places,
@@ -46,12 +52,12 @@ export function ConfirmScreen({ route, navigation }: Props) {
   } = useInventory();
 
   const initialMatch = useMemo(
-    () => bestMatch(products, extract.suggestedName),
-    [products, extract.suggestedName],
+    () => bestExtractMatch(products, extract),
+    [products, extract],
   );
   const suggestions = useMemo(
-    () => searchProducts(products, extract.suggestedName, 5),
-    [products, extract.suggestedName],
+    () => matchExtractToCatalog(products, extract, 5),
+    [products, extract],
   );
 
   const [selected, setSelected] = useState<ProductMatch | null>(initialMatch);
@@ -60,6 +66,12 @@ export function ConfirmScreen({ route, navigation }: Props) {
   );
   const [expiry, setExpiry] = useState(extract.expiryDate ?? '');
   const [packCheck, setPackCheck] = useState<PackCheckInfo | null>(null);
+
+  const strongMatch = isStrongCatalogMatch(selected);
+  const identityMatch = isIdentityCatalogMatch(selected);
+  const onHand = selected
+    ? getStockQty(session, selected.product.id, activePlaceId)
+    : 0;
 
   function commitSave(n: number) {
     if (!selected) return;
@@ -88,15 +100,12 @@ export function ConfirmScreen({ route, navigation }: Props) {
 
   function confirm() {
     if (!selected) {
-      alertInfo(
-        'Pick a product',
-        'Select a catalog match or add to database first.',
-      );
+      alertInfo(t('confirmPickProductTitle'), t('confirmPickProductBody'));
       return;
     }
     const n = Number(qty.replace(',', '.'));
     if (Number.isNaN(n) || n < 0) {
-      alertInfo('Quantity', 'Enter a valid quantity.');
+      alertInfo(t('qty'), t('confirmInvalidQty'));
       return;
     }
     const check = shouldShowPackCheck(
@@ -143,6 +152,26 @@ export function ConfirmScreen({ route, navigation }: Props) {
     commitSave(n);
   }
 
+  function openAddProduct() {
+    navigation.navigate('AddProduct', {
+      prefillName: extract.suggestedName,
+      unit: extract.unit ?? undefined,
+      packSize: extract.packSize ?? undefined,
+      unitPriceAlv0: extract.unitPriceAlv0 ?? undefined,
+      aliases: extract.aliases,
+      ean: extract.ean ?? undefined,
+      sourceUrl: extract.sourceUrl ?? undefined,
+      imageUrl: extract.imageUrl ?? undefined,
+      ingredientType: extract.ingredientType ?? undefined,
+      brand: extract.brand ?? undefined,
+      containerHint: extract.containerHint ?? undefined,
+      photoUris: imageUri ? [imageUri] : undefined,
+      returnToConfirm: true,
+      extract,
+      imageUri,
+    });
+  }
+
   return (
     <ScrollView
       style={styles.root}
@@ -153,11 +182,12 @@ export function ConfirmScreen({ route, navigation }: Props) {
       }}
       keyboardShouldPersistTaps="handled"
     >
-      <Text style={styles.kicker}>Confirm before write</Text>
+      <Text style={styles.kicker}>{t('confirmBeforeWrite')}</Text>
       <Text style={styles.title}>{t('fridgeIsThisProduct')}</Text>
       <Text style={styles.sub}>
-        Model said “{extract.suggestedName}” (
-        {Math.round(extract.confidence * 100)}%). Match to catalog, then save.
+        {t('confirmModelSaid')
+          .replace('{name}', extract.suggestedName)
+          .replace('{pct}', String(Math.round(extract.confidence * 100)))}
       </Text>
 
       {places.length > 0 ? (
@@ -198,18 +228,36 @@ export function ConfirmScreen({ route, navigation }: Props) {
         </View>
       </View>
 
+      {strongMatch && selected ? (
+        <View style={styles.alreadyBox}>
+          <Text style={styles.alreadyTitle}>
+            {identityMatch
+              ? t('confirmAlreadyHaveTitle')
+              : t('confirmStrongMatchTitle')}
+          </Text>
+          <Text style={styles.alreadyBody}>
+            {t('confirmAlreadyHaveBody')
+              .replace('{name}', selected.product.officialName)
+              .replace('{pct}', String(Math.round(selected.score * 100)))
+              .replace('{qty}', String(onHand))
+              .replace('{unit}', selected.product.unit)}
+          </Text>
+        </View>
+      ) : null}
+
       {extract.rawNotes ? (
         <View style={styles.note}>
           <Text style={styles.noteText}>{extract.rawNotes}</Text>
         </View>
       ) : null}
 
-      <Text style={styles.label}>Suggested matches</Text>
+      <Text style={styles.label}>{t('confirmSuggestedMatches')}</Text>
       {suggestions.length === 0 ? (
-        <Text style={styles.empty}>No catalog hit for that name.</Text>
+        <Text style={styles.empty}>{t('confirmNoCatalogHit')}</Text>
       ) : (
         suggestions.map((m) => {
           const on = selected?.product.id === m.product.id;
+          const stock = getStockQty(session, m.product.id, activePlaceId);
           return (
             <Pressable
               key={m.product.id}
@@ -223,6 +271,9 @@ export function ConfirmScreen({ route, navigation }: Props) {
                   {m.product.unit}
                   {m.product.packSize ? ` · ${m.product.packSize}` : ''} · via “
                   {m.matchedTerm}” ({Math.round(m.score * 100)}%)
+                  {stock > 0
+                    ? ` · ${t('confirmOnHand').replace('{qty}', String(stock))}`
+                    : ''}
                 </Text>
               </View>
             </Pressable>
@@ -231,7 +282,7 @@ export function ConfirmScreen({ route, navigation }: Props) {
       )}
 
       <Text style={[styles.label, { marginTop: spacing.lg }]}>
-        Search / change match
+        {t('confirmSearchChange')}
       </Text>
       <ProductSearchInput
         products={products}
@@ -239,32 +290,17 @@ export function ConfirmScreen({ route, navigation }: Props) {
         onSelect={(m) => setSelected(m)}
       />
 
-      <Pressable
-        style={styles.addBtn}
-        onPress={() =>
-          navigation.navigate('AddProduct', {
-            prefillName: extract.suggestedName,
-            unit: extract.unit ?? undefined,
-            packSize: extract.packSize ?? undefined,
-            unitPriceAlv0: extract.unitPriceAlv0 ?? undefined,
-            aliases: extract.aliases,
-            ean: extract.ean ?? undefined,
-            sourceUrl: extract.sourceUrl ?? undefined,
-            imageUrl: extract.imageUrl ?? undefined,
-            ingredientType: extract.ingredientType ?? undefined,
-            brand: extract.brand ?? undefined,
-            containerHint: extract.containerHint ?? undefined,
-            photoUris: imageUri ? [imageUri] : undefined,
-            returnToConfirm: true,
-            extract,
-            imageUri,
-          })
-        }
-      >
-        <Text style={styles.addBtnText}>Add to database</Text>
-      </Pressable>
+      {!strongMatch ? (
+        <Pressable style={styles.addBtn} onPress={openAddProduct}>
+          <Text style={styles.addBtnText}>{t('addToDb')}</Text>
+        </Pressable>
+      ) : (
+        <Pressable style={styles.addBtnGhost} onPress={openAddProduct}>
+          <Text style={styles.addBtnGhostText}>{t('confirmAddDifferent')}</Text>
+        </Pressable>
+      )}
 
-      <Text style={styles.label}>Quantity</Text>
+      <Text style={styles.label}>{t('qty')}</Text>
       <TextInput
         value={qty}
         onChangeText={setQty}
@@ -272,7 +308,7 @@ export function ConfirmScreen({ route, navigation }: Props) {
         style={styles.input}
       />
 
-      <Text style={styles.label}>Expiry (optional YYYY-MM-DD)</Text>
+      <Text style={styles.label}>{t('confirmExpiryOptional')}</Text>
       <TextInput
         value={expiry}
         onChangeText={setExpiry}
@@ -283,7 +319,11 @@ export function ConfirmScreen({ route, navigation }: Props) {
       />
 
       <Pressable style={styles.save} onPress={confirm}>
-        <Text style={styles.saveText}>{t('fridgeYes')} · confirm stock</Text>
+        <Text style={styles.saveText}>
+          {strongMatch
+            ? t('confirmUseExisting')
+            : `${t('fridgeYes')} · ${t('confirmStock')}`}
+        </Text>
       </Pressable>
 
       <PackCheckModal
@@ -331,6 +371,25 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     backgroundColor: colors.primarySoft,
   },
+  alreadyBox: {
+    marginTop: spacing.md,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    padding: spacing.md,
+    borderRadius: radius.md,
+  },
+  alreadyTitle: {
+    color: colors.primary,
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  alreadyBody: {
+    color: colors.ink,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+  },
   note: {
     marginTop: spacing.md,
     backgroundColor: colors.warningSoft,
@@ -372,6 +431,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addBtnText: { color: colors.primary, fontWeight: '700' },
+  addBtnGhost: {
+    marginTop: spacing.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  addBtnGhostText: {
+    color: colors.inkMuted,
+    fontWeight: '600',
+    fontSize: 13,
+  },
   input: {
     backgroundColor: colors.bgElevated,
     borderWidth: 1,

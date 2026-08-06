@@ -1,5 +1,6 @@
 /**
- * Local vision stubs — no API keys. Swap for paid vision Edge Function later.
+ * DEV / offline vision stubs — used only when EXPO_PUBLIC_GEMINI_API_KEY is unset.
+ * Live path: `src/lib/vision.ts` → `geminiVision.ts` (reads real image pixels).
  */
 import {
   DEMO_FRIDGE_FRESH,
@@ -137,7 +138,7 @@ export async function analyzeInventoryImage(
     containerHint: 'Purkki (can / jar)',
     aliases: ['capers', 'kapris'],
     rawNotes:
-      'Demo stub: AI returned informal name "capers" — matcher should find Figaro Kapris…',
+      'DEV stub (no API key): informal name "capers" — set EXPO_PUBLIC_GEMINI_API_KEY for live vision',
   };
 }
 

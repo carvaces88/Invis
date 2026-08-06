@@ -1,6 +1,6 @@
 /**
- * Product close-up enrichment: vision stub → public listing / catalog match → Add Product prefill.
- * Prefer K-Ruoka seed (offline stand-in for www.k-ruoka.fi), then in-memory catalog.
+ * Product close-up enrichment: live/stub vision → catalog FIRST → K-Ruoka seed → Add Product prefill.
+ * Prefer existing inventory match; only suggest insert when unmatched.
  */
 import { SEED_KRUOKA_PRODUCTS } from '../data/seedKruoka';
 import type {
@@ -11,8 +11,12 @@ import type {
   VisionExtract,
 } from '../data/types';
 import { UNIT_LABELS } from '../data/units';
-import { bestMatch } from './fuzzyMatch';
-import { analyzeInventoryImage, analyzeProductCloseups } from './visionStub';
+import {
+  bestExtractMatch,
+  bestMatch,
+  isIdentityCatalogMatch,
+} from './fuzzyMatch';
+import { analyzeInventoryImage, analyzeProductCloseups } from './vision';
 
 const CONTAINER_BY_UNIT: Partial<Record<UnitCode, string>> = {
   PRK: 'Purkki (can / jar)',
@@ -101,20 +105,45 @@ function enrichmentFromExtract(
 }
 
 /**
- * Match informal vision name against K-Ruoka public seed first, then live catalog.
+ * Match vision extract against live catalog FIRST (EAN / name / alias / brand+pack),
+ * then K-Ruoka public seed.
  */
 export function matchPublicListing(
   suggestedName: string,
   catalog: Product[],
 ): { product: Product; fromKruoka: boolean } | null {
-  const kruokaHit = bestMatch(SEED_KRUOKA_PRODUCTS, suggestedName);
-  if (kruokaHit && kruokaHit.score >= 0.45) {
-    return { product: kruokaHit.product, fromKruoka: true };
-  }
   const catalogHit = bestMatch(catalog, suggestedName);
   if (catalogHit && catalogHit.score >= 0.45) {
     const fromKruoka = catalogHit.product.id.startsWith('kruoka-');
     return { product: catalogHit.product, fromKruoka };
+  }
+  const kruokaHit = bestMatch(SEED_KRUOKA_PRODUCTS, suggestedName);
+  if (kruokaHit && kruokaHit.score >= 0.45) {
+    return { product: kruokaHit.product, fromKruoka: true };
+  }
+  return null;
+}
+
+/** Inventory-first match using full VisionExtract identity signals. */
+export function matchExtractListing(
+  extract: VisionExtract,
+  catalog: Product[],
+): { product: Product; fromKruoka: boolean; score: number } | null {
+  const catalogHit = bestExtractMatch(catalog, extract);
+  if (catalogHit && catalogHit.score >= 0.45) {
+    return {
+      product: catalogHit.product,
+      fromKruoka: catalogHit.product.id.startsWith('kruoka-'),
+      score: catalogHit.score,
+    };
+  }
+  const kruokaHit = bestExtractMatch(SEED_KRUOKA_PRODUCTS, extract);
+  if (kruokaHit && kruokaHit.score >= 0.45) {
+    return {
+      product: kruokaHit.product,
+      fromKruoka: true,
+      score: kruokaHit.score,
+    };
   }
   return null;
 }
@@ -133,17 +162,28 @@ export async function enrichProductFromPhotos(
       ? await analyzeProductCloseups(photoUris, hint)
       : await analyzeInventoryImage(photoUris[0] ?? 'demo', hint);
 
-  const listing = matchPublicListing(extract.suggestedName, catalog);
+  const listing = matchExtractListing(extract, catalog);
   if (listing) {
-    const { product, fromKruoka } = listing;
-    const source = fromKruoka
-      ? 'Matched public K-Ruoka listing'
-      : 'Matched inventory / supplier catalog';
+    const { product, fromKruoka, score } = listing;
+    const alreadyInStock = !fromKruoka || catalog.some((p) => p.id === product.id);
+    const source = isIdentityCatalogMatch({
+      product,
+      score,
+      matchedOn: 'vision',
+      matchedTerm: extract.suggestedName,
+    })
+      ? alreadyInStock
+        ? 'Already in catalog / inventory'
+        : 'Matched public K-Ruoka listing'
+      : fromKruoka
+        ? 'Matched public K-Ruoka listing'
+        : 'Matched inventory / supplier catalog';
     const brand = inferBrand(product.officialName, product.aliases);
     const container =
       extract.containerHint ?? containerFor(product.unit);
     const notes = [
       source,
+      `${Math.round(score * 100)}% match`,
       brand ? `Brand: ${brand}` : null,
       container ? `Container: ${container}` : null,
       product.packSize ? `Size: ${product.packSize}` : null,
@@ -158,7 +198,7 @@ export async function enrichProductFromPhotos(
 
     return enrichmentFromProduct(
       product,
-      Math.max(extract.confidence, listing.fromKruoka ? 0.9 : 0.82),
+      Math.max(extract.confidence, score),
       notes,
       true,
     );
@@ -172,7 +212,7 @@ export async function enrichProductFromPhotos(
       base.brand ? `Brand: ${base.brand}` : null,
       base.containerHint ? `Container: ${base.containerHint}` : null,
       `Unit: ${UNIT_LABELS[base.unit]}`,
-      'No public listing match — review suggested fields',
+      'No inventory match — review suggested fields to add as new',
     ]
       .filter(Boolean)
       .join(' · '),
@@ -184,9 +224,9 @@ export function enrichFromExtract(
   extract: VisionExtract,
   catalog: Product[],
 ): ProductEnrichment {
-  const listing = matchPublicListing(extract.suggestedName, catalog);
+  const listing = matchExtractListing(extract, catalog);
   if (listing) {
-    const { product, fromKruoka } = listing;
+    const { product, fromKruoka, score } = listing;
     return enrichmentFromProduct(
       {
         ...product,
@@ -200,10 +240,17 @@ export function enrichFromExtract(
         sourceUrl: extract.sourceUrl ?? product.sourceUrl,
         imageUrl: extract.imageUrl ?? product.imageUrl,
       },
-      Math.max(extract.confidence, 0.85),
-      fromKruoka
-        ? 'Prefill from scan + K-Ruoka public data'
-        : 'Prefill from scan + catalog match',
+      Math.max(extract.confidence, score),
+      isIdentityCatalogMatch({
+        product,
+        score,
+        matchedOn: 'vision',
+        matchedTerm: extract.suggestedName,
+      })
+        ? 'Already in catalog — confirm existing product'
+        : fromKruoka
+          ? 'Prefill from scan + K-Ruoka public data'
+          : 'Prefill from scan + catalog match',
       true,
     );
   }

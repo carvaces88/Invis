@@ -12,7 +12,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RootStackParamList } from '../data/types';
-import { analyzeKuormaImage } from '../lib/visionStub';
+import { analyzeKuormaImage } from '../lib/vision';
 import { colors, radius, spacing } from '../theme/colors';
 
 export function KuormaScanScreen() {

@@ -32,6 +32,8 @@ import {
   enrichFromExtract,
   enrichProductFromPhotos,
 } from '../lib/productEnrichment';
+import { IDENTITY_MATCH_MIN } from '../lib/fuzzyMatch';
+import { isLiveVisionEnabled } from '../lib/vision';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddProduct'>;
@@ -192,6 +194,10 @@ export function AddProductScreen({ route, navigation }: Props) {
   }
 
   async function analyzePhotos() {
+    if (isLiveVisionEnabled() && photoUris.length === 0) {
+      alertInfo(t('addProductNeedPhotoTitle'), t('addProductNeedPhotoBody'));
+      return;
+    }
     setAnalyzing(true);
     try {
       const enrichment = await enrichProductFromPhotos(
@@ -200,6 +206,23 @@ export function AddProductScreen({ route, navigation }: Props) {
         officialName.trim() || undefined,
       );
       applyEnrichment(enrichment);
+      if (
+        enrichment.matchedPublicListing &&
+        enrichment.confidence >= IDENTITY_MATCH_MIN
+      ) {
+        alertInfo(
+          t('confirmAlreadyHaveTitle'),
+          t('addProductAlreadyInCatalog').replace(
+            '{name}',
+            enrichment.officialName,
+          ),
+        );
+      }
+    } catch (e) {
+      alertInfo(
+        t('addProductAnalyzeFailedTitle'),
+        e instanceof Error ? e.message : t('addProductAnalyzeFailedBody'),
+      );
     } finally {
       setAnalyzing(false);
     }
@@ -333,7 +356,9 @@ export function AddProductScreen({ route, navigation }: Props) {
           <Text style={styles.analyzeText}>
             {photoUris.length
               ? t('addProductAnalyze')
-              : t('addProductAnalyzeDemo')}
+              : isLiveVisionEnabled()
+                ? t('addProductAnalyzeNeedPhoto')
+                : t('addProductAnalyzeDemo')}
           </Text>
         )}
       </Pressable>
