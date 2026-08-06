@@ -762,6 +762,7 @@ export const KRUOKA_SEED_QTY: Record<string, number> = {
   // Dairy
   'kruoka-pirkka-parhaat-fetajuusto-150g': 4,
   'kruoka-atria-rahkaohukainen-kaakao-vadelma-380g': 1,
+  'kruoka-valio-tuuti2-vieroitusvalmiste-1l': 50,
   // Spices & salt
   'kruoka-pirkka-juustokumina-25g': 2,
   'kruoka-pirkka-luomu-juustokumina-27g': 1,
