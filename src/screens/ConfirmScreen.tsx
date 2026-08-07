@@ -151,11 +151,15 @@ export function ConfirmScreen({ route, navigation }: Props) {
     ? getStockQty(session, selected.product.id, activePlaceId)
     : 0;
 
+  const visionSetupNote =
+    Boolean(extract.rawNotes) &&
+    /live label reading|GEMINI_API_KEY|API key|blocked by the Google/i.test(
+      extract.rawNotes ?? '',
+    );
   const showRawNotes =
     Boolean(extract.rawNotes) &&
-    !extract.unrecognized &&
-    !unmatched &&
-    !isDevOrStubNote(extract.rawNotes ?? '');
+    !isDevOrStubNote(extract.rawNotes ?? '') &&
+    (visionSetupNote || (!extract.unrecognized && !unmatched));
 
   const extractMeta = [
     extract.brand ? `${t('addProductBrand')}: ${extract.brand}` : null,

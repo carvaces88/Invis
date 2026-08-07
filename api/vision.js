@@ -251,10 +251,16 @@ module.exports = async function handler(req, res) {
 
     const geminiJson = await geminiRes.json();
     if (!geminiRes.ok) {
+      const raw =
+        geminiJson?.error?.message || `Gemini failed (${geminiRes.status})`;
+      const blocked =
+        /are blocked|has not been used|is disabled|API key not valid|PERMISSION_DENIED/i.test(
+          raw,
+        );
       res.status(geminiRes.status).json({
-        error:
-          geminiJson?.error?.message ||
-          `Gemini failed (${geminiRes.status})`,
+        error: blocked
+          ? `${raw} Fix: Google Cloud Console → APIs & Services → Credentials → edit this API key → Application restrictions: None (Vercel serverless) → API restrictions: allow Generative Language API (or Don't restrict key). Project API must also be Enabled. Wait 1–5 min, then retry.`
+          : raw,
       });
       return;
     }

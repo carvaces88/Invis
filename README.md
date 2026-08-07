@@ -28,6 +28,16 @@ Set **server-only** env (Production + Preview), then redeploy:
 
 Without `GEMINI_API_KEY`, Analyze shows that live label reading is not configured and **does not** claim a K-Ruoka match.
 
+If Analyze returns **“are blocked”** / Generative Language disabled:
+
+1. Enable the API for the GCP project: [Generative Language API](https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview) (Status must be **Enabled**).
+2. Open [Credentials](https://console.cloud.google.com/apis/credentials) → click the **same API key** stored in Vercel `GEMINI_API_KEY`.
+3. **Application restrictions:** set to **None** (HTTP referrers / IPs break Vercel serverless).
+4. **API restrictions:** either **Don't restrict key**, or **Restrict key** and include **Generative Language API**.
+5. Save → wait **1–5 minutes** → hard-refresh the app and retry Analyze. No redeploy needed if only key restrictions changed.
+
+Do not put a browser-restricted key in `GEMINI_API_KEY`; keep that server-only.
+
 ## Run
 
 ```bash
