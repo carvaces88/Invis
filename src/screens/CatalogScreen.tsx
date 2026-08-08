@@ -65,101 +65,128 @@ export function CatalogScreen() {
         />
       </View>
 
-      <View style={styles.modeRow}>
-        <Pressable
-          onPress={() => setBrowseMode('type')}
-          style={[styles.chip, browseMode === 'type' && styles.chipOn]}
-        >
-          <Text
-            style={[styles.chipText, browseMode === 'type' && styles.chipTextOn]}
-          >
-            {t('byIngredient')}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setBrowseMode('az')}
-          style={[styles.chip, browseMode === 'az' && styles.chipOn]}
-        >
-          <Text
-            style={[styles.chipText, browseMode === 'az' && styles.chipTextOn]}
-          >
-            {t('azName')}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() =>
-            navigation.navigate('AddProduct', { prefillName: '' })
-          }
-          style={[styles.chip, styles.addChip]}
-        >
-          <Text style={[styles.chipText, styles.addChipText]}>
-            {t('addToDb')}
-          </Text>
-        </Pressable>
-      </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.typeRow}
-      >
-        <Pressable
-          onPress={() => setTypeFilter('all')}
-          style={[styles.typePill, typeFilter === 'all' && styles.typePillOn]}
-        >
-          <Text
-            style={[
-              styles.typePillText,
-              typeFilter === 'all' && styles.typePillTextOn,
-            ]}
-          >
-            {t('all')}
-          </Text>
-        </Pressable>
-        {TYPES.map((t) => (
+      <View style={styles.filtersBlock}>
+        <View style={styles.modeRow}>
           <Pressable
-            key={t}
-            onPress={() => setTypeFilter(t)}
-            style={[styles.typePill, typeFilter === t && styles.typePillOn]}
+            onPress={() => setBrowseMode('type')}
+            style={[styles.chip, browseMode === 'type' && styles.chipOn]}
+          >
+            <Text
+              style={[
+                styles.chipText,
+                browseMode === 'type' && styles.chipTextOn,
+              ]}
+            >
+              {t('byIngredient')}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setBrowseMode('az')}
+            style={[styles.chip, browseMode === 'az' && styles.chipOn]}
+          >
+            <Text
+              style={[
+                styles.chipText,
+                browseMode === 'az' && styles.chipTextOn,
+              ]}
+            >
+              {t('azName')}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() =>
+              navigation.navigate('AddProduct', { prefillName: '' })
+            }
+            style={[styles.chip, styles.addChip]}
+            accessibilityRole="button"
+            accessibilityLabel={t('addToDb')}
+          >
+            <Text style={[styles.chipText, styles.addChipText]}>
+              {t('addToDb')}
+            </Text>
+          </Pressable>
+        </View>
+
+        {/*
+          Keep chips in a non-flex sibling above the list. On web, FlatList
+          (VirtualizedList) absolutely fills its parent and would cover this
+          row if it shared the root without a dedicated listWrap below.
+        */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.typeScroll}
+          contentContainerStyle={styles.typeRow}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Pressable
+            onPress={() => setTypeFilter('all')}
+            style={[styles.typePill, typeFilter === 'all' && styles.typePillOn]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: typeFilter === 'all' }}
           >
             <Text
               style={[
                 styles.typePillText,
-                typeFilter === t && styles.typePillTextOn,
+                typeFilter === 'all' && styles.typePillTextOn,
               ]}
             >
-              {INGREDIENT_TYPE_LABELS[t]}
+              {t('all')}
             </Text>
           </Pressable>
-        ))}
-      </ScrollView>
+          {TYPES.map((type) => (
+            <Pressable
+              key={type}
+              onPress={() => setTypeFilter(type)}
+              style={[
+                styles.typePill,
+                typeFilter === type && styles.typePillOn,
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: typeFilter === type }}
+            >
+              <Text
+                style={[
+                  styles.typePillText,
+                  typeFilter === type && styles.typePillTextOn,
+                ]}
+              >
+                {INGREDIENT_TYPE_LABELS[type]}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
 
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingBottom: insets.bottom + 100,
-        }}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.cardRow}>
-              <ProductThumb product={item} size={56} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.cardName}>{item.officialName}</Text>
-                <Text style={styles.cardMeta}>
-                  {INGREDIENT_TYPE_LABELS[item.ingredientType]} · {item.unit}
-                  {item.packSize ? ` · ${item.packSize}` : ''} ·{' '}
-                  {item.unitPriceAlv0.toFixed(2)} €
-                </Text>
-                <Text style={styles.aliases} numberOfLines={2}>
-                  Aliases: {item.aliases.join(', ')}
-                </Text>
+      <View style={styles.listWrap}>
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          style={styles.list}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingBottom: insets.bottom + 100,
+          }}
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={styles.cardRow}>
+                <ProductThumb product={item} size={56} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardName}>{item.officialName}</Text>
+                  <Text style={styles.cardMeta}>
+                    {INGREDIENT_TYPE_LABELS[item.ingredientType]} · {item.unit}
+                    {item.packSize ? ` · ${item.packSize}` : ''} ·{' '}
+                    {item.unitPriceAlv0.toFixed(2)} €
+                  </Text>
+                  <Text style={styles.aliases} numberOfLines={2}>
+                    Aliases: {item.aliases.join(', ')}
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
-        )}
-      />
+          )}
+        />
+      </View>
     </View>
   );
 }
@@ -170,8 +197,16 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', color: colors.ink },
   sub: { color: colors.inkMuted, marginTop: 4, fontSize: 13, lineHeight: 18 },
   credit: { color: colors.inkFaint, marginTop: 6, fontSize: 11 },
+  filtersBlock: {
+    flexGrow: 0,
+    flexShrink: 0,
+    zIndex: 2,
+    backgroundColor: colors.bg,
+    paddingBottom: spacing.xs,
+  },
   modeRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     marginTop: spacing.md,
@@ -190,20 +225,34 @@ const styles = StyleSheet.create({
   chipTextOn: { color: '#fff' },
   addChip: { marginLeft: 'auto', borderColor: colors.primarySoft },
   addChipText: { color: colors.primary },
+  typeScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   typeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,
+    paddingVertical: spacing.xs,
     paddingBottom: spacing.sm,
   },
   typePill: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: radius.pill,
     backgroundColor: colors.primarySoft,
   },
   typePillOn: { backgroundColor: colors.primaryMid },
   typePillText: { fontSize: 12, color: colors.primary, fontWeight: '600' },
   typePillTextOn: { color: '#fff' },
+  /** Scopes FlatList absolute-fill so it cannot cover filters above. */
+  listWrap: {
+    flex: 1,
+    minHeight: 0,
+    zIndex: 0,
+  },
+  list: { flex: 1 },
   card: {
     backgroundColor: colors.bgElevated,
     borderRadius: radius.md,

@@ -651,101 +651,115 @@ export function InventaarioScreen() {
         onConfirm={applyViewProfile}
       />
 
-      <ScrollView
-        horizontal={needsHScroll}
-        nestedScrollEnabled
-        showsHorizontalScrollIndicator={needsHScroll}
-        style={styles.tableScroll}
-        contentContainerStyle={
-          needsHScroll ? { minWidth: minTableWidth } : undefined
-        }
-      >
-        <View style={needsHScroll ? { minWidth: minTableWidth } : { flex: 1 }}>
-          <View style={styles.tableHead}>
-            {columns.map((col) =>
-              col === 'unit' ? (
-                <UnitColumnLegend key={col} />
-              ) : (
-                <Text
-                  key={col}
-                  style={[styles.th, colStyle(col)]}
-                  numberOfLines={viewProfile.finnishExportHeaders ? 3 : 1}
-                >
-                  {columnHeader(col, strings, {
-                    finnishRestolution: Boolean(
-                      viewProfile.finnishExportHeaders,
-                    ),
-                  })}
-                </Text>
-              ),
-            )}
-          </View>
+      {/*
+        listWrap scopes FlatList absolute-fill on web so filters/header above
+        stay visible; flexGrow on the h-scroll content keeps vertical height.
+      */}
+      <View style={styles.listWrap}>
+        <ScrollView
+          horizontal={needsHScroll}
+          nestedScrollEnabled
+          showsHorizontalScrollIndicator={needsHScroll}
+          style={styles.tableScroll}
+          contentContainerStyle={[
+            styles.tableScrollContent,
+            needsHScroll ? { minWidth: minTableWidth } : null,
+          ]}
+        >
+          <View
+            style={[
+              styles.tableInner,
+              needsHScroll ? { minWidth: minTableWidth } : null,
+            ]}
+          >
+            <View style={styles.tableHead}>
+              {columns.map((col) =>
+                col === 'unit' ? (
+                  <UnitColumnLegend key={col} />
+                ) : (
+                  <Text
+                    key={col}
+                    style={[styles.th, colStyle(col)]}
+                    numberOfLines={viewProfile.finnishExportHeaders ? 3 : 1}
+                  >
+                    {columnHeader(col, strings, {
+                      finnishRestolution: Boolean(
+                        viewProfile.finnishExportHeaders,
+                      ),
+                    })}
+                  </Text>
+                ),
+              )}
+            </View>
 
-          <FlatList
-            data={visibleLines}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
-            ListEmptyComponent={
-              <Text style={styles.empty}>
-                {searchActive
-                  ? t('inventorySearchEmpty')
-                  : t('currentInventoryEmpty')}
-              </Text>
-            }
-            renderItem={({ item }) => {
-              const editing = editingId === item.id;
-              const uncounted = item.quantity == null;
-              return (
-                <Pressable
-                  style={[styles.row, uncounted && styles.rowMuted]}
-                  onPress={() => {
-                    setEditingId(item.id);
-                    setDraftQty(
-                      item.quantity == null
-                        ? ''
-                        : formatQty(toDisplayQty(item.unit, item.quantity)),
-                    );
-                  }}
-                >
-                  {columns.map((col) => renderCell(col, item, editing))}
-                </Pressable>
-              );
-            }}
-            ListFooterComponent={
-              visibleLines.length > 0 && viewProfile.includeTotals ? (
-                <View style={styles.footer}>
-                  {columns.map((col) => {
-                    switch (col) {
-                      case 'name':
-                        return (
-                          <Text key={col} style={styles.footerLabel}>
-                            {t('foodTotal')}
-                          </Text>
-                        );
-                      case 'qty':
-                        return (
-                          <Text key={col} style={styles.footerQty}>
-                            {String(totals.quantity).replace('.', ',')}
-                          </Text>
-                        );
-                      case 'total':
-                        return (
-                          <Text key={col} style={styles.footerValue}>
-                            {money(totals.value * alvFactor)}
-                          </Text>
-                        );
-                      default:
-                        return (
-                          <View key={col} style={colStyle(col)} />
-                        );
-                    }
-                  })}
-                </View>
-              ) : null
-            }
-          />
-        </View>
-      </ScrollView>
+            <FlatList
+              data={visibleLines}
+              keyExtractor={(item) => item.id}
+              style={styles.tableList}
+              nestedScrollEnabled
+              contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+              ListEmptyComponent={
+                <Text style={styles.empty}>
+                  {searchActive
+                    ? t('inventorySearchEmpty')
+                    : t('currentInventoryEmpty')}
+                </Text>
+              }
+              renderItem={({ item }) => {
+                const editing = editingId === item.id;
+                const uncounted = item.quantity == null;
+                return (
+                  <Pressable
+                    style={[styles.row, uncounted && styles.rowMuted]}
+                    onPress={() => {
+                      setEditingId(item.id);
+                      setDraftQty(
+                        item.quantity == null
+                          ? ''
+                          : formatQty(toDisplayQty(item.unit, item.quantity)),
+                      );
+                    }}
+                  >
+                    {columns.map((col) => renderCell(col, item, editing))}
+                  </Pressable>
+                );
+              }}
+              ListFooterComponent={
+                visibleLines.length > 0 && viewProfile.includeTotals ? (
+                  <View style={styles.footer}>
+                    {columns.map((col) => {
+                      switch (col) {
+                        case 'name':
+                          return (
+                            <Text key={col} style={styles.footerLabel}>
+                              {t('foodTotal')}
+                            </Text>
+                          );
+                        case 'qty':
+                          return (
+                            <Text key={col} style={styles.footerQty}>
+                              {String(totals.quantity).replace('.', ',')}
+                            </Text>
+                          );
+                        case 'total':
+                          return (
+                            <Text key={col} style={styles.footerValue}>
+                              {money(totals.value * alvFactor)}
+                            </Text>
+                          );
+                        default:
+                          return (
+                            <View key={col} style={colStyle(col)} />
+                          );
+                      }
+                    })}
+                  </View>
+                ) : null
+              }
+            />
+          </View>
+        </ScrollView>
+      </View>
     </View>
   );
 }
@@ -916,7 +930,21 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   exportBtnText: { color: colors.primary, fontWeight: '600', fontSize: 13 },
+  listWrap: {
+    flex: 1,
+    minHeight: 0,
+    zIndex: 0,
+  },
   tableScroll: { flex: 1 },
+  tableScrollContent: {
+    flexGrow: 1,
+  },
+  tableInner: {
+    flex: 1,
+  },
+  tableList: {
+    flex: 1,
+  },
   tableHead: {
     flexDirection: 'row',
     alignItems: 'center',
