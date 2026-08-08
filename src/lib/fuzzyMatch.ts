@@ -166,6 +166,81 @@ function tokenJaccard(a: string, b: string): number {
   return inter / (ta.size + tb.size - inter);
 }
 
+/**
+ * True when query and catalog term describe the same SKU identity-wise.
+ * Blocks "Arla Pro Crème Fraîche 28% 1,8 kg" ≡ alias "crème fraîche" /
+ * official "Smetana" — short category words must not identity-match a
+ * longer branded label.
+ */
+export function namesIdentityCompatible(
+  query: string,
+  matchedTerm: string,
+): boolean {
+  const qTokens = significantTokens(query);
+  const tTokens = significantTokens(matchedTerm);
+  if (!qTokens.length || !tTokens.length) return false;
+
+  // Every catalog-term token should appear in the query (or vice versa when
+  // query is the shorter informal name).
+  const qSet = new Set(qTokens);
+  const tSet = new Set(tTokens);
+  const termCovered = tTokens.filter((t) => qSet.has(t)).length;
+  const queryCovered = qTokens.filter((t) => tSet.has(t)).length;
+
+  if (termCovered < tTokens.length && queryCovered < qTokens.length) {
+    return false;
+  }
+
+  // Branded / pack-rich query vs short category alias → not the same SKU.
+  if (qTokens.length >= tTokens.length + 2) return false;
+  if (tTokens.length >= qTokens.length + 2) return false;
+
+  return true;
+}
+
+/** Cap for suggestion-band scores (below “already have” identity). */
+const SUGGESTION_SCORE_CAP = IDENTITY_MATCH_MIN - 0.01;
+
+/**
+ * Cap when a distinct SKU label is parked on the wrong catalog row —
+ * below STRONG_MATCH_MIN so Confirm/Fridge do not auto-select it.
+ */
+const WRONG_ALIAS_SCORE_CAP = STRONG_MATCH_MIN - 0.15;
+
+/**
+ * Labels that name a distinct retail SKU and must never identity-match a
+ * different official catalog name (persisted bad seed aliases, etc.).
+ */
+const DISTINCT_SKU_LABELS = new Set(
+  [
+    'creme fraiche',
+    'crème fraîche',
+    'creme fraîche',
+    'créme fraiche',
+    'cremefraiche',
+    'crème fraiche',
+  ].flatMap((s) => {
+    const loose = normalizeLoose(s);
+    return [loose, loose.replace(/\s/g, '')];
+  }),
+);
+
+function aliasAllowedForIdentity(product: Product, alias: string): boolean {
+  const a = normalizeLoose(alias);
+  const aCompact = a.replace(/\s/g, '');
+  if (!DISTINCT_SKU_LABELS.has(a) && !DISTINCT_SKU_LABELS.has(aCompact)) {
+    return true;
+  }
+  const off = normalizeLoose(product.officialName);
+  const offCompact = off.replace(/\s/g, '');
+  return (
+    DISTINCT_SKU_LABELS.has(off) ||
+    DISTINCT_SKU_LABELS.has(offCompact) ||
+    offCompact.includes('cremefraiche') ||
+    off.includes('creme fraiche')
+  );
+}
+
 function consider(
   map: Map<string, ProductMatch>,
   product: Product,
@@ -177,6 +252,53 @@ function consider(
   const existing = map.get(product.id);
   if (!existing || score > existing.score) {
     map.set(product.id, { product, score, matchedOn, matchedTerm });
+  }
+}
+
+/** Force-demote a match (unlike consider, may lower the stored score). */
+function demote(
+  map: Map<string, ProductMatch>,
+  productId: string,
+  maxScore: number,
+) {
+  const existing = map.get(productId);
+  if (!existing || existing.score <= maxScore) return;
+  map.set(productId, { ...existing, score: maxScore });
+}
+
+/**
+ * Strip identity-band scores from distinct-SKU aliases parked on the wrong
+ * product (e.g. persisted "crème fraîche" on Smetana) and from branded labels
+ * that only share a short category word.
+ */
+function sanitizeIdentityScores(
+  map: Map<string, ProductMatch>,
+  primaryQuery?: string,
+) {
+  for (const [id, m] of map) {
+    if (m.score < IDENTITY_MATCH_MIN) continue;
+    if (m.matchedOn === 'ean') continue;
+    if (m.matchedOn === 'brand_pack' && m.score >= 0.95) continue;
+
+    if (
+      m.matchedOn === 'alias' &&
+      !aliasAllowedForIdentity(m.product, m.matchedTerm)
+    ) {
+      demote(map, id, WRONG_ALIAS_SCORE_CAP);
+      continue;
+    }
+
+    const q = primaryQuery?.trim() || m.matchedTerm;
+    if (
+      (m.matchedOn === 'alias' ||
+        m.matchedOn === 'official' ||
+        m.matchedOn === 'vision') &&
+      !namesIdentityCompatible(q, m.matchedTerm) &&
+      !namesIdentityCompatible(q, m.product.officialName)
+    ) {
+      // Keep as weak suggestion — never auto-select / “already have”
+      demote(map, id, Math.min(SUGGESTION_SCORE_CAP, STRONG_MATCH_MIN - 0.01));
+    }
   }
 }
 
@@ -288,8 +410,9 @@ function applyIdentitySignals(
     consider(map, product, 1, 'ean', product.ean!);
   }
 
+  const primaryName = extract.suggestedName?.trim() || '';
   const names = [
-    extract.suggestedName,
+    primaryName,
     ...(extract.aliases ?? []),
     extract.brand ?? '',
   ].filter(Boolean);
@@ -299,20 +422,57 @@ function applyIdentitySignals(
     const qLoose = normalizeLoose(name);
     if (!q) continue;
 
+    // Secondary extract aliases may suggest, but must not alone claim identity
+    // (AI often adds "Crème Fraîche" while primary is a full branded SKU).
+    const isPrimary =
+      normalizeTerm(name) === normalizeTerm(primaryName) ||
+      (!primaryName && name === names[0]);
+    const identityOk = (term: string) =>
+      isPrimary && namesIdentityCompatible(name, term);
+    const cap = (score: number, term: string) =>
+      identityOk(term) ? score : Math.min(score, SUGGESTION_SCORE_CAP);
+
     if (normalizeTerm(product.officialName) === q) {
-      consider(map, product, 1, 'official', product.officialName);
+      consider(
+        map,
+        product,
+        cap(1, product.officialName),
+        'official',
+        product.officialName,
+      );
     } else if (normalizeLoose(product.officialName) === qLoose) {
-      consider(map, product, 0.99, 'official', product.officialName);
+      consider(
+        map,
+        product,
+        cap(0.99, product.officialName),
+        'official',
+        product.officialName,
+      );
     }
 
     for (const alias of product.aliases) {
       const a = normalizeTerm(alias);
       const aLoose = normalizeLoose(alias);
       if (isGarbageProductName(alias) || isGarbageProductName(name)) continue;
+      const allowIdentity = aliasAllowedForIdentity(product, alias);
       if (a === q) {
-        consider(map, product, 1, 'alias', alias);
+        consider(
+          map,
+          product,
+          allowIdentity ? cap(1, alias) : Math.min(1, WRONG_ALIAS_SCORE_CAP),
+          'alias',
+          alias,
+        );
       } else if (aLoose === qLoose) {
-        consider(map, product, 0.99, 'alias', alias);
+        consider(
+          map,
+          product,
+          allowIdentity
+            ? cap(0.99, alias)
+            : Math.min(0.99, WRONG_ALIAS_SCORE_CAP),
+          'alias',
+          alias,
+        );
       } else if (
         aLoose.length >= 5 &&
         !isGenericMatchToken(aLoose) &&
@@ -320,6 +480,7 @@ function applyIdentitySignals(
       ) {
         // Informal vision name contained in alias (or reverse).
         // Require strong length ratio so "unknown" ≠ "unknown product".
+        // Always suggestion-band — containment is never SKU identity.
         const ratio =
           Math.min(aLoose.length, qLoose.length) /
           Math.max(aLoose.length, qLoose.length);
@@ -327,7 +488,7 @@ function applyIdentitySignals(
         consider(
           map,
           product,
-          ratio >= 0.85 ? 0.96 : 0.88,
+          Math.min(0.88, SUGGESTION_SCORE_CAP),
           'alias',
           alias,
         );
@@ -338,27 +499,71 @@ function applyIdentitySignals(
       // Placeholders never create official-name identity (Aldi Unknown trap)
     } else {
       const off = normalizeLoose(product.officialName);
+      const offTerm = product.officialName;
       if (off.startsWith(qLoose) || qLoose.startsWith(off)) {
-        consider(map, product, 0.97, 'official', product.officialName);
+        consider(
+          map,
+          product,
+          cap(0.97, offTerm),
+          'official',
+          offTerm,
+        );
       } else if (off.includes(qLoose) && qLoose.length >= 5) {
-        consider(map, product, 0.93, 'official', product.officialName);
+        consider(
+          map,
+          product,
+          Math.min(0.93, SUGGESTION_SCORE_CAP),
+          'official',
+          offTerm,
+        );
       } else if (qLoose.includes(off) && off.length >= 6) {
-        consider(map, product, 0.94, 'official', product.officialName);
+        // "… smetana …" inside a longer label is weak — never identity
+        consider(
+          map,
+          product,
+          Math.min(0.88, SUGGESTION_SCORE_CAP),
+          'official',
+          offTerm,
+        );
       }
     }
 
     const j = tokenJaccard(name, product.officialName);
-    if (j >= 0.7) {
+    if (j >= 0.7 && identityOk(product.officialName)) {
       consider(map, product, Math.min(0.98, 0.8 + j * 0.2), 'vision', name);
+    } else if (j >= 0.7) {
+      consider(
+        map,
+        product,
+        Math.min(0.8 + j * 0.2, SUGGESTION_SCORE_CAP),
+        'vision',
+        name,
+      );
     } else if (j >= 0.45) {
       consider(map, product, 0.75 + j * 0.2, 'vision', name);
     }
 
     for (const { term, kind } of productTerms(product)) {
       const jAlias = tokenJaccard(name, term);
-      if (jAlias >= 0.65) {
-        consider(map, product, Math.min(0.97, 0.82 + jAlias * 0.15), kind, term);
-      }
+      if (jAlias < 0.65) continue;
+      const raw = Math.min(0.97, 0.82 + jAlias * 0.15);
+      const ok =
+        identityOk(term) &&
+        (kind !== 'alias' || aliasAllowedForIdentity(product, term));
+      consider(
+        map,
+        product,
+        ok
+          ? raw
+          : Math.min(
+              raw,
+              kind === 'alias' && !aliasAllowedForIdentity(product, term)
+                ? WRONG_ALIAS_SCORE_CAP
+                : SUGGESTION_SCORE_CAP,
+            ),
+        kind,
+        term,
+      );
     }
   }
 
@@ -382,18 +587,26 @@ function applyIdentitySignals(
       );
     }
   } else if (brandQ && brandInOfficial && extract.confidence >= 0.8) {
+    // Brand alone is suggestion-band, not identity
     consider(map, product, 0.88, 'brand_pack', extract.brand!);
   }
 
-  // High-confidence vision naming a known alias/official → near-certain
+  // High-confidence vision may bump a strong hit — never into identity unless
+  // evidence is already EAN / brand+pack / compatible exact name.
   if (extract.confidence >= 0.85) {
     const existing = map.get(product.id);
     if (existing && existing.score >= 0.75 && existing.score < 0.98) {
+      const hard =
+        existing.matchedOn === 'ean' ||
+        existing.matchedOn === 'brand_pack' ||
+        ((existing.matchedOn === 'official' || existing.matchedOn === 'alias') &&
+          namesIdentityCompatible(primaryName || existing.matchedTerm, existing.matchedTerm));
+      const bumped = Math.min(0.99, existing.score + 0.12);
       consider(
         map,
         product,
-        Math.min(0.99, existing.score + 0.12),
-        'vision',
+        hard ? bumped : Math.min(bumped, SUGGESTION_SCORE_CAP),
+        existing.matchedOn === 'vision' ? 'vision' : existing.matchedOn,
         existing.matchedTerm,
       );
     }
@@ -444,6 +657,8 @@ export function matchExtractToCatalog(
     }
   }
 
+  sanitizeIdentityScores(bestByProduct, extract.suggestedName);
+
   return [...bestByProduct.values()]
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
@@ -462,8 +677,16 @@ export function isStrongCatalogMatch(match: ProductMatch | null): boolean {
   return Boolean(match && match.score >= STRONG_MATCH_MIN);
 }
 
+/**
+ * ≥90% “already have” only for EAN, strong brand+pack, or exact/near-exact
+ * official/alias scores — not vision/fuzzy dairy word overlap.
+ */
 export function isIdentityCatalogMatch(match: ProductMatch | null): boolean {
-  return Boolean(match && match.score >= IDENTITY_MATCH_MIN);
+  if (!match || match.score < IDENTITY_MATCH_MIN) return false;
+  if (match.matchedOn === 'ean') return true;
+  if (match.matchedOn === 'brand_pack') return match.score >= 0.95;
+  if (match.matchedOn === 'vision') return false;
+  return match.matchedOn === 'official' || match.matchedOn === 'alias';
 }
 
 /**
@@ -495,29 +718,50 @@ export function searchProducts(
   for (const hit of hits) {
     const { product, term, kind } = hit.item;
     // Fuse score is 0 = perfect … 1 = miss. ~0.33 → ~67% without identity boosts.
-    const score = 1 - (hit.score ?? 1);
+    let score = 1 - (hit.score ?? 1);
+    if (kind === 'alias' && !aliasAllowedForIdentity(product, term)) {
+      score = Math.min(score, WRONG_ALIAS_SCORE_CAP);
+    } else if (!namesIdentityCompatible(q, term) && score >= IDENTITY_MATCH_MIN) {
+      score = Math.min(score, SUGGESTION_SCORE_CAP);
+    }
     consider(bestByProduct, product, score, kind, term);
   }
 
-  // Boost exact / prefix / containment hits (staff informal names)
+      // Boost exact / prefix / containment hits (staff informal names)
   const lower = normalizeTerm(q);
   const loose = normalizeLoose(q);
   for (const product of products) {
     for (const { term, kind } of productTerms(product)) {
+      if (kind === 'alias' && !aliasAllowedForIdentity(product, term)) {
+        // Distinct SKU label parked on the wrong product — suggestion only
+        const tl = normalizeLoose(term);
+        if (tl === loose || loose.includes(tl) || tl.includes(loose)) {
+          consider(bestByProduct, product, WRONG_ALIAS_SCORE_CAP, kind, term);
+        }
+        continue;
+      }
       const t = normalizeTerm(term);
       const tl = normalizeLoose(term);
       let boost = 0;
-      if (t === lower || tl === loose) boost = 1;
-      else if (t.startsWith(lower) || lower.startsWith(t)) boost = 0.95;
-      else if (tl.startsWith(loose) || loose.startsWith(tl)) boost = 0.94;
-      else if (t.includes(lower) && lower.length >= 3) boost = 0.9;
-      else if (tl.includes(loose) && loose.length >= 3) boost = 0.88;
-      else if (lower.includes(t) && t.length >= 3) boost = 0.9;
-      else if (loose.includes(tl) && tl.length >= 3) boost = 0.88;
-      else {
+      if (t === lower || tl === loose) {
+        boost = namesIdentityCompatible(q, term) ? 1 : SUGGESTION_SCORE_CAP;
+      } else if (t.startsWith(lower) || lower.startsWith(t)) {
+        boost = namesIdentityCompatible(q, term) ? 0.95 : SUGGESTION_SCORE_CAP;
+      } else if (tl.startsWith(loose) || loose.startsWith(tl)) {
+        boost = namesIdentityCompatible(q, term) ? 0.94 : SUGGESTION_SCORE_CAP;
+      } else if (t.includes(lower) && lower.length >= 3) {
+        boost = SUGGESTION_SCORE_CAP;
+      } else if (tl.includes(loose) && loose.length >= 3) {
+        boost = SUGGESTION_SCORE_CAP;
+      } else if (lower.includes(t) && t.length >= 3) {
+        boost = SUGGESTION_SCORE_CAP;
+      } else if (loose.includes(tl) && tl.length >= 3) {
+        boost = SUGGESTION_SCORE_CAP;
+      } else {
         const j = tokenJaccard(q, term);
-        if (j >= 0.7) boost = 0.92;
-        else if (j >= 0.5) boost = 0.8;
+        if (j >= 0.7) {
+          boost = namesIdentityCompatible(q, term) ? 0.92 : SUGGESTION_SCORE_CAP;
+        } else if (j >= 0.5) boost = 0.8;
       }
       if (boost === 0) continue;
       consider(bestByProduct, product, boost, kind, term);
@@ -533,6 +777,8 @@ export function searchProducts(
   }
 
   applySynonymBoosts(products, q, bestByProduct);
+
+  sanitizeIdentityScores(bestByProduct, q);
 
   return [...bestByProduct.values()]
     .sort((a, b) => b.score - a.score)

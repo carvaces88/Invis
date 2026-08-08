@@ -25,7 +25,7 @@ import type {
 import { useI18n } from '../i18n';
 import { alertAck, alertInfo } from '../lib/alertAck';
 import { confirmIfRecentAdd } from '../lib/confirmIfRecentAdd';
-import { bestExtractMatch, isIdentityCatalogMatch } from '../lib/fuzzyMatch';
+import { bestExtractMatch, isIdentityCatalogMatch, isGarbageProductName } from '../lib/fuzzyMatch';
 import {
   shouldShowPackCheck,
   type PackCheckInfo,
@@ -50,6 +50,14 @@ function isSuggestedLine(extract: VisionExtract, match: ProductMatch | null) {
   if (extract.unrecognized) return true;
   if (extract.confidence < 0.45) return true;
   if (!match || match.score < 0.45) return true;
+  // Clear AI label that is not the same catalog SKU → Add product, not
+  // “already have” / Yes-confirm on a different dairy synonym.
+  if (
+    !isIdentityCatalogMatch(match) &&
+    !isGarbageProductName(extract.suggestedName)
+  ) {
+    return true;
+  }
   return false;
 }
 

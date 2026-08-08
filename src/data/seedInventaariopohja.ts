@@ -462,7 +462,8 @@ const ROWS: Row[] = [
     unit: 'RAS',
     unitPriceAlv0: 2.4,
     ingredientType: 'dairy',
-    aliases: ['smetana', 'sour cream', 'crème fraîche'],
+    // Do NOT alias crème fraîche / creme fraiche — distinct dairy SKU (e.g. Arla Pro).
+    aliases: ['smetana', 'sour cream'],
     qty: demoQty('rr-smetana', 2, 8),
   },
   {
