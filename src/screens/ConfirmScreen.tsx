@@ -371,6 +371,21 @@ export function ConfirmScreen({ route, navigation }: Props) {
           >
             <Text style={styles.addPrimaryText}>{t('confirmAddToCatalog')}</Text>
           </Pressable>
+          <Pressable
+            style={styles.barcodeGhost}
+            onPress={() =>
+              navigation.navigate('BarcodeScan', {
+                purpose: 'confirm',
+                imageUri,
+                quantity: routeExtract.quantity,
+                expiryDate: expiry.trim() || routeExtract.expiryDate,
+              })
+            }
+            accessibilityRole="button"
+            accessibilityLabel={t('barcodeScanForMatch')}
+          >
+            <Text style={styles.barcodeGhostText}>{t('barcodeScanForMatch')}</Text>
+          </Pressable>
         </View>
       )}
 
@@ -578,6 +593,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addPrimaryText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  barcodeGhost: {
+    marginTop: spacing.sm,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.accent,
+    backgroundColor: colors.bgElevated,
+  },
+  barcodeGhostText: { color: colors.accent, fontWeight: '700', fontSize: 14 },
   metaBox: {
     marginTop: spacing.md,
     backgroundColor: colors.bgElevated,

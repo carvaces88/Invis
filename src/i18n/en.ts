@@ -249,7 +249,7 @@ export const en = {
   recordItemPlaceholder: 'Try “coriander”, “cilantro”, or “yogurt”…',
   voiceDictateLabel: 'Dictate fridge walk-through',
   voiceDictateSub:
-    'Speak what you see (e.g. “two mayo, three milk”). Edit the transcript, then apply to the name field.',
+    'Speak what you see (e.g. “two mayo, three milk, one jar of capers”). Edit the transcript, then review lines or use as a single name.',
   voiceMic: 'Mic',
   voiceStop: 'Stop',
   voiceStartA11y: 'Start voice dictation',
@@ -259,9 +259,15 @@ export const en = {
   voiceRecording: 'Recording audio…',
   voiceTranscribing: 'Transcribing…',
   voiceTranscriptPlaceholder: 'Transcript appears here — you can edit it',
+  voiceReviewLines: 'Review inventory lines',
+  voiceReviewLinesN: 'Review {n} lines',
+  voiceWalkthroughTitle: 'Voice walk-through',
+  voiceReviewOpened: 'Opening {n} line(s) to confirm…',
+  voiceParseFailed:
+    'Could not parse products from that text — edit and try again',
   voiceApplyToName: 'Use as item name',
   voiceClear: 'Clear',
-  voiceReadyHint: 'Edit if needed, then use as item name',
+  voiceReadyHint: 'Edit if needed, then review lines or use as item name',
   voiceApplied: 'Filled item name — pick qty and save',
   voiceEmpty: 'Nothing transcribed yet — try again',
   voiceFailed: 'Dictation failed',
@@ -400,7 +406,7 @@ export const en = {
 
   productScanTitle: 'Product photo',
   productScanSub:
-    'Photo of the carton or barcode → AI read → catalog match → confirm.',
+    'Scan the barcode for an exact EAN match, or photo the carton → AI read → confirm.',
   productScanPlaceholder: 'Take or choose a photo of the product label or barcode',
   productScanHintLabel: 'Optional hint',
   productScanHintPlaceholder: 'e.g. “tuuti 2” or EAN digits',
@@ -459,6 +465,23 @@ export const en = {
   exporting: 'Exporting…',
   camera: 'Camera',
   library: 'Library',
+  scanBarcode: 'Scan barcode',
+  barcodeScanTitle: 'Scan barcode',
+  barcodeScanHint:
+    'Center the EAN / UPC on the pack in the frame. We look up the product by code — no AI photo needed.',
+  barcodeScanWebFallback: 'Using browser decoder (Safari/Firefox fallback).',
+  barcodeUseZxing: 'Scanner not working? Try alternate web decoder',
+  barcodePermissionTitle: 'Camera permission',
+  barcodePermissionBody:
+    'Allow camera access to scan product barcodes for inventory.',
+  barcodePermissionGrant: 'Allow camera',
+  barcodeInvalidTitle: 'Not a product barcode',
+  barcodeInvalidBody:
+    'Point at an EAN-13, EAN-8, or UPC barcode on the pack (not a QR code).',
+  barcodeLookupFailedTitle: 'Barcode lookup failed',
+  barcodeLookupFailedBody: 'Could not look up that EAN. Try again or add manually.',
+  barcodeLookingUp: 'Looking up product…',
+  barcodeScanForMatch: 'Scan barcode for exact match',
   all: 'All',
 } as const;
 

@@ -534,6 +534,18 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
           <Text style={styles.btnGhostText}>{t('library')}</Text>
         </Pressable>
       </View>
+      {photoMode === 'single' ? (
+        <Pressable
+          style={styles.barcodeBtn}
+          onPress={() =>
+            navigation.navigate('BarcodeScan', { purpose: 'confirm' })
+          }
+          accessibilityRole="button"
+          accessibilityLabel={t('scanBarcode')}
+        >
+          <Text style={styles.barcodeBtnText}>{t('scanBarcode')}</Text>
+        </Pressable>
+      ) : null}
       <Pressable
         style={[styles.analyze, busy && { opacity: 0.7 }]}
         disabled={busy}
@@ -570,7 +582,12 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
 
       <View style={styles.divider} />
 
-      <VoiceDictationBar onApplyToName={onQueryChange} />
+      <VoiceDictationBar
+        onApplyToName={onQueryChange}
+        onReviewLines={(document) => {
+          navigation.navigate('FridgeReview', { document });
+        }}
+      />
 
       <Text style={styles.label}>{t('recordItemName')}</Text>
       <TextInput
@@ -893,6 +910,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   btnGhostText: { color: colors.ink, fontWeight: '600' },
+  barcodeBtn: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.accent,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    alignItems: 'center',
+  },
+  barcodeBtnText: { color: '#fff', fontWeight: '700' },
   analyze: {
     marginTop: spacing.sm,
     backgroundColor: colors.primaryMid,

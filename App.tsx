@@ -16,6 +16,7 @@ import type { MainTabParamList, RootStackParamList } from './src/data/types';
 import { LocaleProvider, useI18n } from './src/i18n';
 import { UnitSystemProvider } from './src/lib/unitSystem';
 import { AddProductScreen } from './src/screens/AddProductScreen';
+import { BarcodeScanScreen } from './src/screens/BarcodeScanScreen';
 import { BatchConfirmScreen } from './src/screens/BatchConfirmScreen';
 import { CatalogScreen } from './src/screens/CatalogScreen';
 import { ConfirmScreen } from './src/screens/ConfirmScreen';
@@ -224,6 +225,17 @@ function RootNavigator() {
             title: t('confirm'),
             headerTintColor: colors.primary,
             headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="BarcodeScan"
+          component={BarcodeScanScreen}
+          options={{
+            title: t('scanBarcode'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+            headerTransparent: Platform.OS !== 'web',
+            headerTitleStyle: { color: Platform.OS === 'web' ? colors.ink : '#fff' },
           }}
         />
         <Stack.Screen

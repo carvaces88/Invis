@@ -40,6 +40,14 @@
           "photosPermission": "Choose product photos for inventory analysis.",
           "cameraPermission": "Scan kitchen products for inventory counts."
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Scan product barcodes for inventory.",
+          "barcodeScannerEnabled": true,
+          "recordAudioAndroid": false
+        }
       ]
     ]
   }

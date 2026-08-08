@@ -72,6 +72,8 @@ export function AddProductScreen({ route, navigation }: Props) {
     document,
     returnToFridge,
     fridgeDocument,
+    scannedEan,
+    barcodeEnrichNotes,
   } = route.params ?? {};
 
   const [photoUris, setPhotoUris] = useState<string[]>(() =>
@@ -131,7 +133,7 @@ export function AddProductScreen({ route, navigation }: Props) {
 
   // Prefill from upstream scan extract + live K-Ruoka lookup once on mount
   useEffect(() => {
-    if (!extract) return;
+    if (!extract || scannedEan) return;
     let cancelled = false;
     (async () => {
       const enrichment = await enrichFromExtractAsync(extract, products);
@@ -142,6 +144,42 @@ export function AddProductScreen({ route, navigation }: Props) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot from route
   }, []);
+
+  // Apply fields after BarcodeScan returns (merge navigate)
+  useEffect(() => {
+    if (!scannedEan) return;
+    const eanDigits = scannedEan.replace(/\D/g, '');
+    applyEnrichment({
+      officialName: prefillName || scannedEan,
+      unit: prefUnit ?? lastRecordUnit ?? 'KPL',
+      packSize: prefPack,
+      unitPriceAlv0: prefPrice,
+      brand: prefBrand,
+      containerHint: prefContainer,
+      ean: prefEan ?? scannedEan,
+      sourceUrl: prefSourceUrl,
+      imageUrl: prefImageUrl,
+      aliases: prefAliases ?? [],
+      ingredientType: prefIngredient,
+      confidence: 1,
+      notes: barcodeEnrichNotes ?? `EAN ${scannedEan}`,
+      matchedPublicListing: Boolean(prefSourceUrl),
+    });
+    const identity = products.find(
+      (p) => p.ean && p.ean.replace(/\D/g, '') === eanDigits,
+    );
+    if (identity) {
+      alertInfo(
+        t('confirmAlreadyHaveTitle'),
+        t('addProductAlreadyInCatalog').replace(
+          '{name}',
+          identity.officialName,
+        ),
+      );
+    }
+    navigation.setParams({ scannedEan: undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to barcode return only
+  }, [scannedEan]);
 
   function navigateAfterSave() {
     if (returnToFridge && fridgeDocument) {
@@ -348,6 +386,16 @@ export function AddProductScreen({ route, navigation }: Props) {
               onPress={() => pickPhotos(false)}
             >
               <Text style={styles.addPhotoGhostText}>{t('library')}</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.addPhotoBtn, styles.addPhotoBarcode]}
+              onPress={() =>
+                navigation.navigate('BarcodeScan', { purpose: 'addProduct' })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={t('scanBarcode')}
+            >
+              <Text style={styles.addPhotoBtnText}>{t('scanBarcode')}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -579,6 +627,10 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
   },
   addPhotoGhostText: { color: colors.inkMuted, fontWeight: '700', fontSize: 13 },
+  addPhotoBarcode: {
+    backgroundColor: colors.accent,
+    borderWidth: 0,
+  },
   analyze: {
     marginTop: spacing.md,
     backgroundColor: colors.primaryMid,

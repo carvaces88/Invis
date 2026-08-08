@@ -468,20 +468,36 @@ export async function enrichFromExtractAsync(
   const listing = await matchExtractListingAsync(extract, catalog);
   if (listing) {
     const { product, fromKruoka, score, liveSource } = listing;
-    const note =
-      isIdentityCatalogMatch({
-        product,
-        score,
-        matchedOn: 'vision',
-        matchedTerm: extract.suggestedName,
-      })
-        ? 'Already in catalog — confirm existing product'
-        : fromKruoka
-          ? liveSource === 'openfoodfacts'
-            ? 'Prefill from scan + Open Food Facts / K-Ruoka'
-            : liveSource === 'kruoka-seed'
-              ? 'Prefill from scan + K-Ruoka seed'
+    const eanIdentity =
+      Boolean(extract.ean) &&
+      normalizeEanDigits(extract.ean) === normalizeEanDigits(product.ean);
+    const identity = isIdentityCatalogMatch({
+      product,
+      score,
+      matchedOn: eanIdentity ? 'ean' : 'vision',
+      matchedTerm: extract.ean ?? extract.suggestedName,
+    });
+    const fromBarcode =
+      extract.rawNotes?.includes('Scanned barcode') ||
+      (eanIdentity && extract.confidence >= 0.99 && !extract.aiDescription);
+    const note = identity
+      ? eanIdentity
+        ? 'Already in catalog — exact EAN match (100%)'
+        : 'Already in catalog — confirm existing product'
+      : fromKruoka
+        ? liveSource === 'openfoodfacts'
+          ? fromBarcode
+            ? 'Prefill from barcode + Open Food Facts / K-Ruoka'
+            : 'Prefill from scan + Open Food Facts / K-Ruoka'
+          : liveSource === 'kruoka-seed'
+            ? fromBarcode
+              ? 'Prefill from barcode + K-Ruoka seed'
+              : 'Prefill from scan + K-Ruoka seed'
+            : fromBarcode
+              ? 'Prefill from barcode + live K-Ruoka'
               : 'Prefill from scan + live K-Ruoka'
+        : fromBarcode
+          ? 'Prefill from barcode + catalog match'
           : 'Prefill from scan + catalog match';
     return enrichmentFromProduct(
       {

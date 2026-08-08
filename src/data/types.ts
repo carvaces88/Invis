@@ -271,6 +271,13 @@ export type RootStackParamList = {
     extract: VisionExtract;
     imageUri?: string;
   };
+  /** On-device EAN/UPC scan (no Gemini) → Confirm or Add Product prefill */
+  BarcodeScan: {
+    purpose?: 'confirm' | 'addProduct';
+    imageUri?: string;
+    quantity?: number | null;
+    expiryDate?: string | null;
+  };
   BatchConfirm: {
     document: DocumentExtract;
     imageUri?: string;
@@ -296,6 +303,9 @@ export type RootStackParamList = {
     document?: DocumentExtract;
     returnToFridge?: boolean;
     fridgeDocument?: DocumentExtract;
+    /** Set by BarcodeScanScreen when returning with EAN prefill */
+    scannedEan?: string;
+    barcodeEnrichNotes?: string;
   };
   ProductScan: undefined;
   KuormaScan: undefined;

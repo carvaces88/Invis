@@ -105,6 +105,14 @@ export function ProductScanScreen() {
           <Text style={styles.btnGhostText}>{t('library')}</Text>
         </Pressable>
       </View>
+      <Pressable
+        style={styles.barcodeBtn}
+        onPress={() => navigation.navigate('BarcodeScan', { purpose: 'confirm' })}
+        accessibilityRole="button"
+        accessibilityLabel={t('scanBarcode')}
+      >
+        <Text style={styles.barcodeBtnText}>{t('scanBarcode')}</Text>
+      </Pressable>
 
       <Text style={styles.label}>{t('productScanHintLabel')}</Text>
       <TextInput
@@ -181,6 +189,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   btnGhostText: { color: colors.ink, fontWeight: '600' },
+  barcodeBtn: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.accent,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    alignItems: 'center',
+  },
+  barcodeBtnText: { color: '#fff', fontWeight: '700' },
   label: {
     marginTop: spacing.lg,
     marginBottom: spacing.sm,

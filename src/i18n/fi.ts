@@ -246,7 +246,7 @@ export const fi: Messages = {
   recordItemPlaceholder: 'Kokeile “coriander”, “cilantro” tai “jogurtti”…',
   voiceDictateLabel: 'Sanele kylmiökävely',
   voiceDictateSub:
-    'Kerro mitä näet (esim. “kaksi majoneesia, kolme maitoa”). Muokkaa tekstiä ja käytä nimenä.',
+    'Kerro mitä näet (esim. “kaksi majoneesia, kolme maitoa, yksi purkki kaprista”). Muokkaa tekstiä, tarkista rivit tai käytä yhtenä nimenä.',
   voiceMic: 'Mic',
   voiceStop: 'Stop',
   voiceStartA11y: 'Aloita äänisanelu',
@@ -256,9 +256,15 @@ export const fi: Messages = {
   voiceRecording: 'Ääntä nauhoitetaan…',
   voiceTranscribing: 'Litteroidaan…',
   voiceTranscriptPlaceholder: 'Litterointi tulee tähän — voit muokata',
+  voiceReviewLines: 'Tarkista inventaariorivit',
+  voiceReviewLinesN: 'Tarkista {n} riviä',
+  voiceWalkthroughTitle: 'Äänikävely',
+  voiceReviewOpened: 'Avataan {n} riviä vahvistukseen…',
+  voiceParseFailed:
+    'Tuotteita ei saatu tekstistä — muokkaa ja yritä uudelleen',
   voiceApplyToName: 'Käytä tuotenimenä',
   voiceClear: 'Tyhjennä',
-  voiceReadyHint: 'Muokkaa tarvittaessa, sitten käytä nimenä',
+  voiceReadyHint: 'Muokkaa tarvittaessa, sitten tarkista rivit tai käytä nimenä',
   voiceApplied: 'Tuotenimi täytetty — valitse määrä ja tallenna',
   voiceEmpty: 'Ei litterointia vielä — yritä uudelleen',
   voiceFailed: 'Sanelu epäonnistui',
@@ -391,7 +397,7 @@ export const fi: Messages = {
 
   productScanTitle: 'Tuotekuva',
   productScanSub:
-    'Kuva kartongista tai viivakoodista → AI-luku → katalogiosuma → vahvistus.',
+    'Skannaa viivakoodi tarkan EAN-osuman saamiseksi, tai kuvaa kartonki → AI-luku → vahvistus.',
   productScanPlaceholder: 'Ota tai valitse kuva tuotteen etiketistä tai viivakoodista',
   productScanHintLabel: 'Valinnainen vihje',
   productScanHintPlaceholder: 'esim. “tuuti 2” tai EAN-numerot',
@@ -450,5 +456,23 @@ export const fi: Messages = {
   exporting: 'Viedään…',
   camera: 'Kamera',
   library: 'Kirjasto',
+  scanBarcode: 'Skannaa viivakoodi',
+  barcodeScanTitle: 'Skannaa viivakoodi',
+  barcodeScanHint:
+    'Keskitä pakkauksen EAN / UPC kehykseen. Haemme tuotteen koodilla — AI-kuvaa ei tarvita.',
+  barcodeScanWebFallback: 'Käytössä selaimen dekooderi (Safari/Firefox-varatie).',
+  barcodeUseZxing: 'Skanneri ei toimi? Kokeile vaihtoehtoista web-dekooderia',
+  barcodePermissionTitle: 'Kameran lupa',
+  barcodePermissionBody:
+    'Salli kameran käyttö, jotta voit skannata tuotteiden viivakoodeja inventaarioon.',
+  barcodePermissionGrant: 'Salli kamera',
+  barcodeInvalidTitle: 'Ei tuotteen viivakoodi',
+  barcodeInvalidBody:
+    'Osoita pakkauksen EAN-13-, EAN-8- tai UPC-viivakoodia (ei QR-koodia).',
+  barcodeLookupFailedTitle: 'Viivakoodihaku epäonnistui',
+  barcodeLookupFailedBody:
+    'EAN:ia ei voitu hakea. Yritä uudelleen tai lisää manuaalisesti.',
+  barcodeLookingUp: 'Haetaan tuotetta…',
+  barcodeScanForMatch: 'Skannaa viivakoodi tarkan osuman saamiseksi',
   all: 'Kaikki',
 };
