@@ -3,7 +3,7 @@
  *
  * Client (optional, inlined at build):
  *   EXPO_PUBLIC_GEMINI_API_KEY=...
- *   EXPO_PUBLIC_GEMINI_MODEL=gemini-2.0-flash
+ *   EXPO_PUBLIC_GEMINI_MODEL=gemini-3.6-flash
  *   EXPO_PUBLIC_VISION_URL=https://your-app.vercel.app/api/vision
  *
  * Production preferred: set server-only GEMINI_API_KEY on Vercel for /api/vision
@@ -16,7 +16,7 @@ export function getGeminiApiKey(): string | undefined {
 
 export function getGeminiModel(): string {
   return (
-    process.env.EXPO_PUBLIC_GEMINI_MODEL?.trim() || 'gemini-2.0-flash'
+    process.env.EXPO_PUBLIC_GEMINI_MODEL?.trim() || 'gemini-3.6-flash'
   );
 }
 

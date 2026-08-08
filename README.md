@@ -22,7 +22,9 @@ Set **server-only** env (Production + Preview), then redeploy:
 | Variable | Required | Notes |
 |---|---|---|
 | `GEMINI_API_KEY` | **Yes** | Google AI Studio key for `/api/vision` |
+| `GEMINI_MODEL` | Optional | Defaults to `gemini-3.6-flash` (server `/api/vision`) |
 | `EXPO_PUBLIC_GEMINI_API_KEY` | Optional | Only if you also want the key in the client bundle |
+| `EXPO_PUBLIC_GEMINI_MODEL` | Optional | Defaults to `gemini-3.6-flash` (client direct calls) |
 | `EXPO_PUBLIC_VISION_URL` | Optional | Defaults to same-origin `/api/vision` on web |
 | `EXPO_PUBLIC_KRUOKA_LOOKUP_URL` | Optional | Defaults to same-origin `/api/kruoka-lookup` |
 

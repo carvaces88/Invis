@@ -5,7 +5,7 @@
  * mode product (default) → VisionExtract JSON
  * mode fridge → DocumentExtract-shaped JSON { kind:'fridge', lines, confidence, title? }
  */
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+const DEFAULT_MODEL = 'gemini-3.6-flash';
 
 const SYSTEM_PROMPT = `You are Inventaario kitchen inventory vision for Finnish restaurants.
 Read product label / pack / barcode photos carefully (OCR). Return JSON only.
