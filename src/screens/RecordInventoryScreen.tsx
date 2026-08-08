@@ -27,6 +27,7 @@ import { DidYouMeanModal } from '../components/DidYouMeanModal';
 import { PackCheckModal } from '../components/PackCheckModal';
 import { PhotoCaptureTip } from '../components/PhotoCaptureTip';
 import { PlaceSelect } from '../components/PlaceSelect';
+import { VoiceDictationBar } from '../components/VoiceDictationBar';
 import { useI18n } from '../i18n';
 import { alertAck, alertInfo } from '../lib/alertAck';
 import { confirmIfRecentAdd } from '../lib/confirmIfRecentAdd';
@@ -568,6 +569,8 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
       ) : null}
 
       <View style={styles.divider} />
+
+      <VoiceDictationBar onApplyToName={onQueryChange} />
 
       <Text style={styles.label}>{t('recordItemName')}</Text>
       <TextInput

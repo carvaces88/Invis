@@ -9,6 +9,10 @@
     "api/kruoka-lookup.js": {
       "maxDuration": 30,
       "memory": 512
+    },
+    "api/transcribe.js": {
+      "maxDuration": 60,
+      "memory": 1024
     }
   },
   "rewrites": [

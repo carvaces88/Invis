@@ -22,6 +22,8 @@ type Props = {
   label?: string;
   /** Skip horizontal inset when parent already pads */
   flush?: boolean;
+  /** Tighter padding for dense Inventory chrome */
+  compact?: boolean;
 };
 
 /**
@@ -36,6 +38,7 @@ export function PlaceSelect({
   allLabel,
   label,
   flush = false,
+  compact = false,
 }: Props) {
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
@@ -57,18 +60,30 @@ export function PlaceSelect({
   }
 
   return (
-    <View style={[styles.wrap, flush && styles.wrapFlush]}>
-      <Text style={styles.label}>{resolvedLabel}</Text>
+    <View
+      style={[
+        styles.wrap,
+        flush && styles.wrapFlush,
+        compact && styles.wrapCompact,
+      ]}
+    >
+      <Text style={[styles.label, compact && styles.labelCompact]}>
+        {resolvedLabel}
+      </Text>
       <Pressable
         onPress={() => setOpen(true)}
         style={({ pressed }) => [
           styles.trigger,
+          compact && styles.triggerCompact,
           pressed && { opacity: 0.88 },
         ]}
         accessibilityRole="button"
         accessibilityLabel={`${resolvedLabel}: ${selectedLabel}`}
       >
-        <Text style={styles.triggerText} numberOfLines={1}>
+        <Text
+          style={[styles.triggerText, compact && styles.triggerTextCompact]}
+          numberOfLines={1}
+        >
           {selectedLabel}
         </Text>
         <Text style={styles.chevron}>▾</Text>
@@ -165,6 +180,9 @@ const styles = StyleSheet.create({
   wrapFlush: {
     paddingHorizontal: 0,
   },
+  wrapCompact: {
+    marginBottom: spacing.xs,
+  },
   label: {
     fontSize: 12,
     fontWeight: '600',
@@ -172,6 +190,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
+  },
+  labelCompact: {
+    fontSize: 10,
+    marginBottom: 2,
   },
   trigger: {
     flexDirection: 'row',
@@ -184,11 +206,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
   },
+  triggerCompact: {
+    paddingVertical: 8,
+    paddingHorizontal: spacing.sm,
+  },
   triggerText: {
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
     color: colors.ink,
+  },
+  triggerTextCompact: {
+    fontSize: 14,
   },
   chevron: {
     fontSize: 14,

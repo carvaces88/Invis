@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -35,10 +36,18 @@ import {
 } from '../lib/export/viewProfileStorage';
 import { FOOD_ALV_RATE, formatMoney } from '../lib/alv';
 import { formatUpdatedLabel } from '../lib/relativeTime';
+import {
+  isDictationAvailable,
+  startDictation,
+  type DictationSession,
+} from '../lib/speechDictation';
 import { useUnitSystem } from '../lib/unitSystem';
 import { colors, radius, spacing } from '../theme/colors';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+/** Matches App.tsx tabBar height so last rows clear the bottom tabs. */
+const TAB_BAR_CLEARANCE = 72;
 
 type ExportKind = 'xlsx' | 'pdf' | 'docx';
 
@@ -159,6 +168,59 @@ export function InventaarioScreen() {
   /** false = 0% ALV (stored), true = display with food ALV */
   const [showWithAlv, setShowWithAlv] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  /** Extra actions (verify / scratch) stay collapsed so the sheet gets height. */
+  const [toolsOpen, setToolsOpen] = useState(false);
+  /** Explicit pixel height — nested H-ScrollView + FlatList needs a bound on web. */
+  const [listHeight, setListHeight] = useState(0);
+  const [micListening, setMicListening] = useState(false);
+  const micSessionRef = useRef<DictationSession | null>(null);
+  const dictationOk = isDictationAvailable();
+
+  useEffect(() => {
+    return () => {
+      const s = micSessionRef.current;
+      micSessionRef.current = null;
+      if (s?.active) void s.stop().catch(() => {});
+    };
+  }, []);
+
+  async function toggleSearchMic() {
+    if (!dictationOk) {
+      alertInfo(t('voiceDictateLabel'), t('voiceUnsupported'));
+      return;
+    }
+    if (micListening && micSessionRef.current) {
+      try {
+        const text = await micSessionRef.current.stop();
+        micSessionRef.current = null;
+        setMicListening(false);
+        if (text.trim()) setSearchQuery(text.trim());
+      } catch (e) {
+        micSessionRef.current = null;
+        setMicListening(false);
+        alertInfo(
+          t('voiceDictateLabel'),
+          e instanceof Error ? e.message : t('voiceFailed'),
+        );
+      }
+      return;
+    }
+    try {
+      const session = await startDictation({
+        language: locale === 'fi' ? 'fi' : 'en',
+        onPartial: (text) => {
+          if (text) setSearchQuery(text);
+        },
+      });
+      micSessionRef.current = session;
+      setMicListening(true);
+    } catch (e) {
+      alertInfo(
+        t('voiceDictateLabel'),
+        e instanceof Error ? e.message : t('voiceFailed'),
+      );
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -406,227 +468,307 @@ export function InventaarioScreen() {
     }
   }
 
+  const listPadBottom = TAB_BAR_CLEARANCE + Math.max(insets.bottom, 8);
+
+  const tableHead = (
+    <View style={styles.tableHead}>
+      {columns.map((col) =>
+        col === 'unit' ? (
+          <UnitColumnLegend key={col} />
+        ) : (
+          <Text
+            key={col}
+            style={[styles.th, colStyle(col)]}
+            numberOfLines={viewProfile.finnishExportHeaders ? 3 : 1}
+          >
+            {columnHeader(col, strings, {
+              finnishRestolution: Boolean(viewProfile.finnishExportHeaders),
+            })}
+          </Text>
+        ),
+      )}
+    </View>
+  );
+
   return (
-    <View style={[styles.root, { paddingTop: insets.top + spacing.sm }]}>
-      <View style={styles.header}>
-        <Text style={styles.kicker}>{t('appBrand')}</Text>
-        <Text style={styles.title}>{t('currentInventory')}</Text>
-        <Text style={styles.meta}>
-          {t('currentInventorySub').replace('{count}', String(recordedCount))}
-        </Text>
-        <Text style={styles.meta}>
-          {t('date')}: {session.date.split('-').reverse().join('.')}
-          {siteName ? ` · ${siteName}` : ''}
-          {showPriceCols
-            ? ` · ${showWithAlv ? t('alvWith') : t('alvZero')}`
-            : ''}
-        </Text>
-        <View style={styles.headerActions}>
-          <Pressable
-            onPress={() => navigation.navigate('VerifyAmounts', { mode: 'pending' })}
-            style={({ pressed }) => [
-              styles.verifyBtn,
-              pressed && { opacity: 0.85 },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={t('verifyAmountsOpen')}
-          >
-            <Text style={styles.verifyBtnText}>{t('verifyAmountsOpen')}</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => navigation.navigate('RecentActivity')}
-            style={({ pressed }) => [
-              styles.headerLink,
-              pressed && { opacity: 0.75 },
-            ]}
-            accessibilityRole="button"
-          >
-            <Text style={styles.headerLinkText}>{t('recentActivityOpen')}</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              alertConfirm(
-                t('startInventoryScratch'),
-                t('startInventoryScratchConfirm'),
-                {
-                  destructive: true,
-                  confirmLabel: t('startInventoryScratch'),
-                  cancelLabel: t('cancel'),
-                  onConfirm: () => {
-                    clearAllInventory();
-                    alertAck(
-                      t('startInventoryScratch'),
-                      t('startInventoryScratchDone'),
-                    );
-                  },
-                },
-              );
-            }}
-            style={({ pressed }) => [
-              styles.scratchBtn,
-              pressed && { opacity: 0.85 },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={t('startInventoryScratch')}
-          >
-            <Text style={styles.scratchBtnText}>
-              {t('startInventoryScratch')}
+    <View style={[styles.root, { paddingTop: insets.top + spacing.xs }]}>
+      <View style={styles.chrome}>
+        <View style={styles.titleRow}>
+          <View style={styles.titleBlock}>
+            <Text style={styles.kicker}>{t('appBrand')}</Text>
+            <Text style={styles.title} numberOfLines={1}>
+              {t('currentInventory')}
             </Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {places.length > 1 ? (
-        <PlaceSelect
-          places={places}
-          selectedId={placeFilter}
-          onSelect={setPlaceFilter}
-          includeAll
-          allLabel={t('placesAll')}
-          label={t('placesFilter')}
-        />
-      ) : null}
-
-      <View style={styles.filterRow}>
-        <Pressable
-          onPress={() => setShowFullSheet(false)}
-          style={[styles.filterChip, !showFullSheet && styles.filterChipOn]}
-        >
-          <Text
-            style={[
-              styles.filterChipText,
-              !showFullSheet && styles.filterChipTextOn,
-            ]}
-          >
-            {t('showRecordedOnly')}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setShowFullSheet(true)}
-          style={[styles.filterChip, showFullSheet && styles.filterChipOn]}
-        >
-          <Text
-            style={[
-              styles.filterChipText,
-              showFullSheet && styles.filterChipTextOn,
-            ]}
-          >
-            {t('showFullSheet')}
-          </Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.searchRow}>
-        <TextInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder={t('inventorySearchPlaceholder')}
-          placeholderTextColor={colors.inkFaint}
-          autoCapitalize="none"
-          autoCorrect={false}
-          clearButtonMode="never"
-          style={styles.searchInput}
-          accessibilityLabel={t('inventorySearchPlaceholder')}
-        />
-        {searchActive ? (
+            <Text style={styles.meta} numberOfLines={1}>
+              {t('currentInventorySub').replace(
+                '{count}',
+                String(recordedCount),
+              )}
+              {' · '}
+              {session.date.split('-').reverse().join('.')}
+              {siteName ? ` · ${siteName}` : ''}
+              {showPriceCols
+                ? ` · ${showWithAlv ? t('alvWith') : t('alvZero')}`
+                : ''}
+            </Text>
+          </View>
           <Pressable
-            onPress={() => setSearchQuery('')}
+            onPress={() => setToolsOpen((v) => !v)}
             style={({ pressed }) => [
-              styles.searchClear,
-              pressed && { opacity: 0.75 },
+              styles.toolsToggle,
+              toolsOpen && styles.toolsToggleOn,
+              pressed && { opacity: 0.85 },
             ]}
             accessibilityRole="button"
-            accessibilityLabel={t('inventorySearchClear')}
+            accessibilityState={{ expanded: toolsOpen }}
+            accessibilityLabel={t('inventoryToolsToggle')}
             hitSlop={8}
           >
-            <Text style={styles.searchClearText}>×</Text>
+            <Text style={styles.toolsToggleText}>{toolsOpen ? '▾' : '⋯'}</Text>
           </Pressable>
-        ) : null}
-      </View>
+        </View>
 
-      {showPriceCols ? (
-        <>
-          <View style={styles.filterRow}>
+        {toolsOpen ? (
+          <View style={styles.toolsRow}>
             <Pressable
-              onPress={() => setShowWithAlv(false)}
-              style={[styles.filterChip, !showWithAlv && styles.filterChipOn]}
+              onPress={() =>
+                navigation.navigate('VerifyAmounts', { mode: 'pending' })
+              }
+              style={({ pressed }) => [
+                styles.toolLink,
+                pressed && { opacity: 0.75 },
+              ]}
               accessibilityRole="button"
-              accessibilityState={{ selected: !showWithAlv }}
+              accessibilityLabel={t('verifyAmountsOpen')}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  !showWithAlv && styles.filterChipTextOn,
-                ]}
-              >
-                {t('alvZero')}
-              </Text>
+              <Text style={styles.toolLinkText}>{t('verifyAmountsOpen')}</Text>
             </Pressable>
             <Pressable
-              onPress={() => setShowWithAlv(true)}
-              style={[styles.filterChip, showWithAlv && styles.filterChipOn]}
+              onPress={() => navigation.navigate('RecentActivity')}
+              style={({ pressed }) => [
+                styles.toolLink,
+                pressed && { opacity: 0.75 },
+              ]}
               accessibilityRole="button"
-              accessibilityState={{ selected: showWithAlv }}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  showWithAlv && styles.filterChipTextOn,
-                ]}
-              >
-                {t('alvWith')}
+              <Text style={styles.toolLinkText}>{t('recentActivityOpen')}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                alertConfirm(
+                  t('startInventoryScratch'),
+                  t('startInventoryScratchConfirm'),
+                  {
+                    destructive: true,
+                    confirmLabel: t('startInventoryScratch'),
+                    cancelLabel: t('cancel'),
+                    onConfirm: () => {
+                      clearAllInventory();
+                      alertAck(
+                        t('startInventoryScratch'),
+                        t('startInventoryScratchDone'),
+                      );
+                    },
+                  },
+                );
+              }}
+              style={({ pressed }) => [
+                styles.toolLinkDanger,
+                pressed && { opacity: 0.75 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('startInventoryScratch')}
+            >
+              <Text style={styles.toolLinkDangerText}>
+                {t('startInventoryScratch')}
               </Text>
             </Pressable>
           </View>
-          <Text style={styles.alvHint}>
-            {t('alvToggleHint').replace('{rate}', alvPercentLabel)}
-          </Text>
-        </>
-      ) : null}
+        ) : null}
 
-      <View style={styles.exportRow}>
-        <Pressable
-          onPress={() => navigation.navigate('ExportPreview')}
-          style={({ pressed }) => [
-            styles.previewBtn,
-            pressed && { opacity: 0.85 },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={t('exportPreviewOpen')}
+        {places.length > 1 ? (
+          <PlaceSelect
+            places={places}
+            selectedId={placeFilter}
+            onSelect={setPlaceFilter}
+            includeAll
+            allLabel={t('placesAll')}
+            label={t('placesFilter')}
+            compact
+          />
+        ) : null}
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipScroll}
+          contentContainerStyle={styles.filterRow}
+          keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.previewBtnText}>{t('exportPreviewOpen')}</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setColumnsSheetOpen(true)}
-          style={({ pressed }) => [
-            styles.columnsBtn,
-            pressed && { opacity: 0.85 },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={t('spreadsheetChooseColumns')}
-        >
-          <Text style={styles.columnsBtnText}>
-            {t('spreadsheetColumnsBtn')}
-          </Text>
-          <Text style={styles.columnsBtnHint} numberOfLines={1}>
-            {t(profileTitleKey(viewProfileId))}
-          </Text>
-        </Pressable>
-        {(['xlsx', 'pdf', 'docx'] as const).map((kind) => (
           <Pressable
-            key={kind}
-            disabled={exporting}
-            onPress={() => setExportKind(kind)}
-            style={({ pressed }) => [
-              styles.exportBtn,
-              pressed && { opacity: 0.85 },
-            ]}
+            onPress={() => setShowFullSheet(false)}
+            style={[styles.filterChip, !showFullSheet && styles.filterChipOn]}
           >
-            <Text style={styles.exportBtnText}>
-              {kind === 'xlsx' ? 'Excel' : kind === 'pdf' ? 'PDF' : 'Word'}
+            <Text
+              style={[
+                styles.filterChipText,
+                !showFullSheet && styles.filterChipTextOn,
+              ]}
+            >
+              {t('showRecordedOnly')}
             </Text>
           </Pressable>
-        ))}
+          <Pressable
+            onPress={() => setShowFullSheet(true)}
+            style={[styles.filterChip, showFullSheet && styles.filterChipOn]}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                showFullSheet && styles.filterChipTextOn,
+              ]}
+            >
+              {t('showFullSheet')}
+            </Text>
+          </Pressable>
+          {showPriceCols ? (
+            <>
+              <Pressable
+                onPress={() => setShowWithAlv(false)}
+                style={[styles.filterChip, !showWithAlv && styles.filterChipOn]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: !showWithAlv }}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    !showWithAlv && styles.filterChipTextOn,
+                  ]}
+                >
+                  {t('alvZero')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setShowWithAlv(true)}
+                style={[styles.filterChip, showWithAlv && styles.filterChipOn]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: showWithAlv }}
+                accessibilityHint={t('alvToggleHint').replace(
+                  '{rate}',
+                  alvPercentLabel,
+                )}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    showWithAlv && styles.filterChipTextOn,
+                  ]}
+                >
+                  {t('alvWith')}
+                </Text>
+              </Pressable>
+            </>
+          ) : null}
+        </ScrollView>
+
+        <View style={styles.searchRow}>
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={t('inventorySearchPlaceholder')}
+            placeholderTextColor={colors.inkFaint}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="never"
+            style={styles.searchInput}
+            accessibilityLabel={t('inventorySearchPlaceholder')}
+          />
+          {dictationOk ? (
+            <Pressable
+              onPress={() => void toggleSearchMic()}
+              style={({ pressed }) => [
+                styles.searchMic,
+                micListening && styles.searchMicOn,
+                pressed && { opacity: 0.75 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={
+                micListening
+                  ? t('inventorySearchMicStop')
+                  : t('inventorySearchMic')
+              }
+              hitSlop={8}
+            >
+              <Text
+                style={[
+                  styles.searchMicText,
+                  micListening && styles.searchMicTextOn,
+                ]}
+              >
+                {micListening ? t('voiceStop') : t('voiceMic')}
+              </Text>
+            </Pressable>
+          ) : null}
+          {searchActive ? (
+            <Pressable
+              onPress={() => setSearchQuery('')}
+              style={({ pressed }) => [
+                styles.searchClear,
+                pressed && { opacity: 0.75 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('inventorySearchClear')}
+              hitSlop={8}
+            >
+              <Text style={styles.searchClearText}>×</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        <View style={styles.exportRow}>
+          <Pressable
+            onPress={() => navigation.navigate('ExportPreview')}
+            style={({ pressed }) => [
+              styles.previewBtn,
+              pressed && { opacity: 0.85 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t('exportPreviewOpen')}
+          >
+            <Text style={styles.previewBtnText}>{t('exportPreviewOpen')}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setColumnsSheetOpen(true)}
+            style={({ pressed }) => [
+              styles.columnsBtn,
+              pressed && { opacity: 0.85 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t('spreadsheetChooseColumns')}
+          >
+            <Text style={styles.columnsBtnText}>
+              {t('spreadsheetColumnsBtn')}
+            </Text>
+            <Text style={styles.columnsBtnHint} numberOfLines={1}>
+              {t(profileTitleKey(viewProfileId))}
+            </Text>
+          </Pressable>
+          {(['xlsx', 'pdf', 'docx'] as const).map((kind) => (
+            <Pressable
+              key={kind}
+              disabled={exporting}
+              onPress={() => setExportKind(kind)}
+              style={({ pressed }) => [
+                styles.exportBtn,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Text style={styles.exportBtnText}>
+                {kind === 'xlsx' ? 'Excel' : kind === 'pdf' ? 'PDF' : 'Word'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
 
       <ExportColumnsSheet
@@ -652,52 +794,47 @@ export function InventaarioScreen() {
       />
 
       {/*
-        listWrap scopes FlatList absolute-fill on web so filters/header above
-        stay visible; flexGrow on the h-scroll content keeps vertical height.
+        Measure listWrap height so the nested horizontal ScrollView + FlatList
+        get a hard pixel bound (web VirtualizedList absolute-fill needs this).
       */}
-      <View style={styles.listWrap}>
+      <View
+        style={styles.listWrap}
+        onLayout={(e) => {
+          const h = Math.floor(e.nativeEvent.layout.height);
+          if (h > 0 && Math.abs(h - listHeight) > 1) setListHeight(h);
+        }}
+      >
         <ScrollView
           horizontal={needsHScroll}
           nestedScrollEnabled
           showsHorizontalScrollIndicator={needsHScroll}
-          style={styles.tableScroll}
+          style={[
+            styles.tableScroll,
+            listHeight > 0 ? { height: listHeight } : null,
+          ]}
           contentContainerStyle={[
             styles.tableScrollContent,
-            needsHScroll ? { minWidth: minTableWidth } : null,
+            needsHScroll ? { minWidth: minTableWidth } : { flexGrow: 1 },
+            listHeight > 0 ? { height: listHeight } : null,
+            Platform.OS === 'web' && listHeight <= 0
+              ? ({ height: '100%' } as object)
+              : null,
           ]}
         >
           <View
             style={[
               styles.tableInner,
-              needsHScroll ? { minWidth: minTableWidth } : null,
+              needsHScroll ? { minWidth: minTableWidth } : { flex: 1 },
+              listHeight > 0 ? { height: listHeight } : null,
             ]}
           >
-            <View style={styles.tableHead}>
-              {columns.map((col) =>
-                col === 'unit' ? (
-                  <UnitColumnLegend key={col} />
-                ) : (
-                  <Text
-                    key={col}
-                    style={[styles.th, colStyle(col)]}
-                    numberOfLines={viewProfile.finnishExportHeaders ? 3 : 1}
-                  >
-                    {columnHeader(col, strings, {
-                      finnishRestolution: Boolean(
-                        viewProfile.finnishExportHeaders,
-                      ),
-                    })}
-                  </Text>
-                ),
-              )}
-            </View>
-
+            {tableHead}
             <FlatList
               data={visibleLines}
               keyExtractor={(item) => item.id}
               style={styles.tableList}
               nestedScrollEnabled
-              contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+              contentContainerStyle={{ paddingBottom: listPadBottom }}
               ListEmptyComponent={
                 <Text style={styles.empty}>
                   {searchActive
@@ -748,9 +885,7 @@ export function InventaarioScreen() {
                             </Text>
                           );
                         default:
-                          return (
-                            <View key={col} style={colStyle(col)} />
-                          );
+                          return <View key={col} style={colStyle(col)} />;
                       }
                     })}
                   </View>
@@ -766,71 +901,100 @@ export function InventaarioScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  chrome: {
+    flexGrow: 0,
+    flexShrink: 0,
+    zIndex: 2,
+    backgroundColor: colors.bg,
+    paddingBottom: spacing.xs,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xs,
+  },
+  titleBlock: { flex: 1, minWidth: 0 },
   kicker: {
     color: colors.primary,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
-    letterSpacing: 0.6,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   title: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.ink,
-    marginTop: 4,
+    marginTop: 1,
   },
-  meta: { color: colors.inkMuted, marginTop: 4, fontSize: 13 },
-  headerActions: {
-    marginTop: spacing.sm,
+  meta: { color: colors.inkMuted, marginTop: 2, fontSize: 12 },
+  toolsToggle: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.bgElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  toolsToggleOn: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  toolsToggleText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.primary,
+    lineHeight: 20,
+  },
+  toolsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
   },
-  headerLink: {
-    alignSelf: 'flex-start',
+  toolLink: {
     paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
   },
-  headerLinkText: {
+  toolLinkText: {
     color: colors.primary,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 12,
   },
-  verifyBtn: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.success,
-    backgroundColor: colors.successSoft,
-  },
-  verifyBtnText: {
-    color: colors.success,
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  scratchBtn: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.danger,
+  toolLinkDanger: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: radius.pill,
     backgroundColor: colors.dangerSoft,
   },
-  scratchBtnText: {
+  toolLinkDangerText: {
     color: colors.danger,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 12,
+  },
+  chipScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+    marginBottom: spacing.xs,
   },
   filterRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
+    paddingVertical: 2,
   },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.line,
@@ -840,14 +1004,14 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     backgroundColor: colors.primarySoft,
   },
-  filterChipText: { fontSize: 12, fontWeight: '600', color: colors.inkMuted },
+  filterChipText: { fontSize: 11, fontWeight: '600', color: colors.inkMuted },
   filterChipTextOn: { color: colors.primary },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   searchInput: {
     flex: 1,
@@ -856,13 +1020,13 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-    fontSize: 16,
+    paddingVertical: Platform.OS === 'web' ? 8 : 10,
+    fontSize: 15,
     color: colors.ink,
   },
   searchClear: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.line,
@@ -871,69 +1035,87 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   searchClearText: {
-    fontSize: 22,
-    lineHeight: 24,
+    fontSize: 20,
+    lineHeight: 22,
     color: colors.inkMuted,
     fontWeight: '600',
   },
-  alvHint: {
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
+  searchMic: {
+    minWidth: 44,
+    height: 36,
+    paddingHorizontal: 8,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchMicOn: {
+    borderColor: colors.danger,
+    backgroundColor: colors.dangerSoft,
+  },
+  searchMicText: {
     fontSize: 11,
-    color: colors.inkFaint,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  searchMicTextOn: {
+    color: colors.danger,
   },
   exportRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
   },
   previewBtn: {
     backgroundColor: colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: radius.pill,
   },
   previewBtnText: {
     color: '#fff',
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 12,
   },
   columnsBtn: {
     flexGrow: 1,
-    flexBasis: '42%',
-    minWidth: 140,
+    flexBasis: '36%',
+    minWidth: 120,
     backgroundColor: colors.bgElevated,
     borderWidth: 1,
     borderColor: colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: radius.pill,
   },
   columnsBtnText: {
     color: colors.primary,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 12,
   },
   columnsBtnHint: {
-    marginTop: 2,
+    marginTop: 1,
     color: colors.inkMuted,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
   },
   exportBtn: {
     backgroundColor: colors.primarySoft,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: radius.pill,
   },
-  exportBtnText: { color: colors.primary, fontWeight: '600', fontSize: 13 },
+  exportBtnText: { color: colors.primary, fontWeight: '600', fontSize: 12 },
   listWrap: {
     flex: 1,
     minHeight: 0,
     zIndex: 0,
+    position: 'relative',
   },
   tableScroll: { flex: 1 },
   tableScrollContent: {
@@ -941,15 +1123,17 @@ const styles = StyleSheet.create({
   },
   tableInner: {
     flex: 1,
+    minHeight: 0,
   },
   tableList: {
     flex: 1,
+    minHeight: 0,
   },
   tableHead: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
     backgroundColor: colors.primarySoft,
