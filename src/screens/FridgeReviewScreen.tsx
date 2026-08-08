@@ -12,10 +12,15 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CroppedImage } from '../components/CroppedImage';
 import { useChefNudge } from '../components/ChefNudge';
+import {
+  ImageZoomModal,
+  type ImageZoomTarget,
+} from '../components/ImageZoomModal';
 import { PackCheckModal } from '../components/PackCheckModal';
 import { PlaceSelect } from '../components/PlaceSelect';
 import { ProductSearchInput } from '../components/ProductSearchInput';
 import { ProductThumb } from '../components/ProductThumb';
+import { productImageSource } from '../data/seedKruoka';
 import { useInventory } from '../data/store';
 import type {
   ProductMatch,
@@ -25,7 +30,14 @@ import type {
 import { useI18n } from '../i18n';
 import { alertAck, alertInfo } from '../lib/alertAck';
 import { confirmIfRecentAdd } from '../lib/confirmIfRecentAdd';
-import { bestExtractMatch, isIdentityCatalogMatch, isGarbageProductName } from '../lib/fuzzyMatch';
+import {
+  bestExtractMatch,
+  isGarbageProductName,
+  isIdentityCatalogMatch,
+  isStrongCatalogMatch,
+  SIMILAR_MATCH_MIN,
+  visionContradictsProduct,
+} from '../lib/fuzzyMatch';
 import {
   shouldShowPackCheck,
   type PackCheckInfo,
@@ -46,14 +58,40 @@ type ReviewLine = {
   isSuggested: boolean;
 };
 
+/** Voice / typed name without a shelf crop — inventory-first, not “add new”. */
+function isTextNamedLine(extract: VisionExtract): boolean {
+  if (isGarbageProductName(extract.suggestedName)) return false;
+  const notes = extract.rawNotes ?? '';
+  if (/^Voice:/i.test(notes.trim()) || /\bDictated:/i.test(notes)) return true;
+  // No photo crop → treat suggestedName as the staff’s intended product phrase
+  return !extract.crop;
+}
+
 function isSuggestedLine(extract: VisionExtract, match: ProductMatch | null) {
+  // Inventory-first: dictated / named lines that hit catalog → confirm flow
+  if (
+    match &&
+    isTextNamedLine(extract) &&
+    match.score >= SIMILAR_MATCH_MIN &&
+    !visionContradictsProduct(extract, match.product)
+  ) {
+    return false;
+  }
+  if (
+    match &&
+    (isIdentityCatalogMatch(match, extract) ||
+      isStrongCatalogMatch(match, extract))
+  ) {
+    return false;
+  }
   if (extract.unrecognized) return true;
   if (extract.confidence < 0.45) return true;
   if (!match || match.score < 0.45) return true;
+  if (match && visionContradictsProduct(extract, match.product)) return true;
   // Clear AI label that is not the same catalog SKU → Add product, not
   // “already have” / Yes-confirm on a different dairy synonym.
   if (
-    !isIdentityCatalogMatch(match) &&
+    !isIdentityCatalogMatch(match, extract) &&
     !isGarbageProductName(extract.suggestedName)
   ) {
     return true;
@@ -80,14 +118,25 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
   const initial = useMemo<ReviewLine[]>(
     () =>
       document.lines.map((extract, i) => {
-        const match = extract.unrecognized
-          ? null
-          : bestExtractMatch(products, extract);
+        // Always try inventory match first (incl. unrecognized / voice names).
+        let match = bestExtractMatch(products, extract);
+        if (match && visionContradictsProduct(extract, match.product)) {
+          match = null;
+        }
         const suggested = isSuggestedLine(extract, match);
+        const resolvedExtract =
+          match && !suggested
+            ? { ...extract, unrecognized: false }
+            : extract;
         return {
           key: `f-${i}-${extract.suggestedName}`,
-          extract,
-          match: suggested && extract.unrecognized ? null : match,
+          extract: resolvedExtract,
+          // Keep match for suggested only when staff can still pick it; empty
+          // unrecognized crops without a hit stay match-less.
+          match:
+            suggested && !(match && isTextNamedLine(extract))
+              ? null
+              : match,
           qty:
             extract.quantity != null ? String(extract.quantity) : '1',
           status: 'pending' as LineStatus,
@@ -102,6 +151,7 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
   const [detailsKey, setDetailsKey] = useState<string | null>(null);
   const [detailsText, setDetailsText] = useState('');
   const [pickerKey, setPickerKey] = useState<string | null>(null);
+  const [zoomTarget, setZoomTarget] = useState<ImageZoomTarget>(null);
   const [packCheck, setPackCheck] = useState<{
     info: PackCheckInfo;
     lineKey: string;
@@ -217,6 +267,16 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
     writeConfirmed({ ...line, qty: String(n) }, n);
   }
 
+  function onPackCountAsUnits(_resolved?: PackCheckResolve) {
+    if (!packCheck) return;
+    const line = lines.find((l) => l.key === packCheck.lineKey);
+    const n = packCheck.info.packQty;
+    setPackCheck(null);
+    if (!line) return;
+    setQty(line.key, String(n));
+    writeConfirmed({ ...line, qty: String(n) }, n);
+  }
+
   function skipOne(key: string) {
     setStatus(key, 'skipped');
   }
@@ -288,26 +348,104 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
   }
 
   function renderMatchPair(line: ReviewLine) {
+    const catalogSrc = line.match
+      ? productImageSource(line.match.product)
+      : null;
+    // Dictation / text-only: no shelf crop — show catalog packshot only.
+    if (!imageUri && line.match) {
+      return (
+        <View style={styles.matchPair}>
+          <View style={styles.matchCol}>
+            <Pressable
+              onPress={() => {
+                if (!catalogSrc) return;
+                setZoomTarget({
+                  source: catalogSrc,
+                  label: line.match!.product.officialName,
+                });
+              }}
+              disabled={!catalogSrc}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('fridgeOfficialPhoto')} · ${t('imageZoomTitle')}`}
+            >
+              <ProductThumb product={line.match.product} size={96} />
+            </Pressable>
+            <Text style={styles.matchCap}>{t('fridgeOfficialPhoto')}</Text>
+          </View>
+        </View>
+      );
+    }
     return (
       <View style={styles.matchPair}>
         <View style={styles.matchCol}>
-          <CroppedImage
-            uri={imageUri}
-            crop={line.extract.crop}
-            size={96}
-            fallbackColor={line.extract.crop?.previewColor}
-          />
-          <Text style={styles.matchCap}>{t('fridgeDetectedCrop')}</Text>
-        </View>
-        <Text style={styles.matchArrow}>→</Text>
-        <View style={styles.matchCol}>
-          {line.match ? (
-            <ProductThumb product={line.match.product} size={96} />
+          {imageUri ? (
+            <Pressable
+              onPress={() =>
+                setZoomTarget({
+                  source: { uri: imageUri },
+                  label: line.extract.suggestedName,
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={`${t('fridgeDetectedCrop')} · ${t('imageZoomTitle')}`}
+            >
+              <CroppedImage
+                uri={imageUri}
+                crop={line.extract.crop}
+                size={96}
+                fallbackColor={line.extract.crop?.previewColor}
+              />
+            </Pressable>
+          ) : line.match ? (
+            <Pressable
+              onPress={() => {
+                if (!catalogSrc) return;
+                setZoomTarget({
+                  source: catalogSrc,
+                  label: line.match!.product.officialName,
+                });
+              }}
+              disabled={!catalogSrc}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('fridgeOfficialPhoto')} · ${t('imageZoomTitle')}`}
+            >
+              <ProductThumb product={line.match.product} size={96} />
+            </Pressable>
           ) : (
             <View style={[styles.packPlaceholder, { width: 96, height: 96 }]} />
           )}
-          <Text style={styles.matchCap}>{t('fridgeOfficialPhoto')}</Text>
+          <Text style={styles.matchCap}>
+            {imageUri ? t('fridgeDetectedCrop') : t('fridgeOfficialPhoto')}
+          </Text>
         </View>
+        {imageUri ? (
+          <>
+            <Text style={styles.matchArrow}>→</Text>
+            <View style={styles.matchCol}>
+              {line.match ? (
+                <Pressable
+                  onPress={() => {
+                    if (!catalogSrc) return;
+                    setZoomTarget({
+                      source: catalogSrc,
+                      label: line.match!.product.officialName,
+                    });
+                  }}
+                  disabled={!catalogSrc}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t('fridgeOfficialPhoto')} · ${t('imageZoomTitle')}`}
+                >
+                  <ProductThumb product={line.match.product} size={96} />
+                </Pressable>
+              ) : (
+                <View
+                  style={[styles.packPlaceholder, { width: 96, height: 96 }]}
+                />
+              )}
+              <Text style={styles.matchCap}>{t('fridgeOfficialPhoto')}</Text>
+            </View>
+          </>
+        ) : null}
       </View>
     );
   }
@@ -341,7 +479,10 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
             {Math.round(line.match.score * 100)}%
           </Text>
         ) : null}
-        {line.match && isIdentityCatalogMatch(line.match) ? (
+        {line.match &&
+        (isIdentityCatalogMatch(line.match, line.extract) ||
+          isStrongCatalogMatch(line.match, line.extract) ||
+          isTextNamedLine(line.extract)) ? (
           <Text style={styles.alreadyHave}>{t('confirmAlreadyHaveTitle')}</Text>
         ) : null}
         {line.status === 'confirmed' ? (
@@ -402,12 +543,42 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
       >
         <Text style={styles.suggestBadge}>{t('fridgeSuggested')}</Text>
         <View style={styles.cardTop}>
-          <CroppedImage
-            uri={imageUri}
-            crop={line.extract.crop}
-            size={72}
-            fallbackColor={line.extract.crop?.previewColor}
-          />
+          {imageUri ? (
+            <Pressable
+              onPress={() =>
+                setZoomTarget({
+                  source: { uri: imageUri },
+                  label: line.extract.suggestedName,
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={`${t('fridgeDetectedCrop')} · ${t('imageZoomTitle')}`}
+            >
+              <CroppedImage
+                uri={imageUri}
+                crop={line.extract.crop}
+                size={72}
+                fallbackColor={line.extract.crop?.previewColor}
+              />
+            </Pressable>
+          ) : line.match ? (
+            <Pressable
+              onPress={() => {
+                const src = productImageSource(line.match!.product);
+                if (!src) return;
+                setZoomTarget({
+                  source: src,
+                  label: line.match!.product.officialName,
+                });
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('fridgeOfficialPhoto')} · ${t('imageZoomTitle')}`}
+            >
+              <ProductThumb product={line.match.product} size={72} />
+            </Pressable>
+          ) : (
+            <View style={[styles.packPlaceholder, { width: 72, height: 72 }]} />
+          )}
           <View style={{ flex: 1 }}>
             <Text style={styles.matchName}>
               {line.extract.suggestedName}
@@ -596,7 +767,13 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
         info={packCheck?.info ?? null}
         onYesPacks={onPackYes}
         onChangeToPieces={onPackChangeToPieces}
+        onCountAsUnits={onPackCountAsUnits}
         onEdit={() => setPackCheck(null)}
+      />
+
+      <ImageZoomModal
+        target={zoomTarget}
+        onClose={() => setZoomTarget(null)}
       />
     </>
   );

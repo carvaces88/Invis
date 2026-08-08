@@ -19,6 +19,24 @@ const SYNONYM_GROUPS: string[][] = [
   ['yogurt', 'yoghurt', 'jogurtti', 'jugurtti'],
   ['capers', 'kapris', 'caper', 'kapriksia'],
   [
+    'kurkku',
+    'kurkkuja',
+    'cucumber',
+    'cucumbers',
+    'gurka',
+    'gurkor',
+    'finska gurkor',
+  ],
+  [
+    'mayo',
+    'mayonnaise',
+    'majoneesi',
+    'vegan mayo',
+    'vege mayo',
+    'vegaaninen majoneesi',
+    'vegaaninen majo',
+  ],
+  [
     'tuuti',
     'tuuti2',
     'tuuti 2',
@@ -196,6 +214,145 @@ export function namesIdentityCompatible(
   if (tTokens.length >= qTokens.length + 2) return false;
 
   return true;
+}
+
+/** Jaccard overlap of significant tokens between two product labels. */
+export function visionCatalogTokenOverlap(
+  extract: VisionExtract,
+  product: Product,
+): number {
+  const vision = [extract.suggestedName, extract.brand ?? '']
+    .filter(Boolean)
+    .join(' ');
+  return tokenJaccard(vision, product.officialName);
+}
+
+type PackFamily = 'crate' | 'tub' | 'bottle' | 'bag' | 'other';
+
+function packagingFamily(
+  hint: string | null | undefined,
+  unit?: string | null,
+): PackFamily {
+  const h = normalizeLoose(hint ?? '');
+  const u = (unit ?? '').toUpperCase();
+  if (u === 'LTK' || /laatikko|crate|cardboard|laatik/.test(h)) return 'crate';
+  if (
+    u === 'PRK' ||
+    /purkki|astia|bucket|tub|jar|kannu|mayo|majoneesi/.test(h)
+  ) {
+    return 'tub';
+  }
+  if (u === 'PL' || u === 'PLO' || /pullo|bottle/.test(h)) return 'bottle';
+  if (u === 'PSS' || /pussi|bag|pouch/.test(h)) return 'bag';
+  return 'other';
+}
+
+/** Ingredient families that must not identity-match each other. */
+const INCOMPATIBLE_INGREDIENT_PAIRS = new Set([
+  'produce|sauces',
+  'sauces|produce',
+  'produce|dairy',
+  'dairy|produce',
+  'produce|oils',
+  'oils|produce',
+  'produce|meat',
+  'meat|produce',
+  'produce|poultry',
+  'poultry|produce',
+  'produce|bakery',
+  'bakery|produce',
+  'produce|deli',
+  'deli|produce',
+  'produce|frozen',
+  'frozen|produce',
+]);
+
+function brandAppearsInProduct(brand: string, product: Product): boolean {
+  const b = normalizeLoose(brand);
+  if (b.length < 3) return true;
+  const hay = normalizeLoose(
+    [product.officialName, ...product.aliases].join(' '),
+  );
+  if (hay.includes(b)) return true;
+  const tokens = significantTokens(brand).filter((t) => t.length >= 3);
+  if (!tokens.length) return true;
+  const hits = tokens.filter((t) => hay.includes(t));
+  return hits.length >= Math.max(1, Math.ceil(tokens.length * 0.5));
+}
+
+function productBrandInVision(product: Product, extract: VisionExtract): boolean {
+  const first = significantTokens(product.officialName)[0];
+  if (!first || first.length < 3) return true;
+  const hay = normalizeLoose(
+    [extract.suggestedName, extract.brand ?? '', ...(extract.aliases ?? [])].join(
+      ' ',
+    ),
+  );
+  return hay.includes(first);
+}
+
+/**
+ * True when vision label/brand/packaging clearly describes a different
+ * physical product than the catalog row (e.g. cucumber crate vs mayo tub).
+ * Used to reject false EAN / fuzzy “already have” identity.
+ */
+export function visionContradictsProduct(
+  extract: VisionExtract,
+  product: Product,
+): boolean {
+  const brand = extract.brand?.trim() ?? '';
+  if (brand.length >= 4) {
+    const brandOk = brandAppearsInProduct(brand, product);
+    const productBrandOk = productBrandInVision(product, extract);
+    if (!brandOk && !productBrandOk) return true;
+  }
+
+  if (
+    extract.ingredientType &&
+    product.ingredientType &&
+    INCOMPATIBLE_INGREDIENT_PAIRS.has(
+      `${extract.ingredientType}|${product.ingredientType}`,
+    )
+  ) {
+    return true;
+  }
+
+  const visionPack = packagingFamily(extract.containerHint, extract.unit);
+  const productPack = packagingFamily(null, product.unit);
+  if (
+    visionPack !== 'other' &&
+    productPack !== 'other' &&
+    visionPack !== productPack
+  ) {
+    // Crate of produce vs jar/tub sauce is the classic false identity.
+    if (
+      (visionPack === 'crate' && productPack === 'tub') ||
+      (visionPack === 'tub' && productPack === 'crate')
+    ) {
+      return true;
+    }
+  }
+
+  const visionLabel = [extract.suggestedName, extract.brand ?? '']
+    .filter(Boolean)
+    .join(' ');
+  if (
+    !isGarbageProductName(extract.suggestedName) &&
+    !isGarbageProductName(product.officialName)
+  ) {
+    const overlap = tokenJaccard(visionLabel, product.officialName);
+    const vTokens = significantTokens(visionLabel);
+    const pTokens = significantTokens(product.officialName);
+    if (vTokens.length >= 2 && pTokens.length >= 2 && overlap < 0.12) {
+      // Allow same-brand variants (Valio milk ↔ Valio yogurt) when brand overlaps.
+      if (brand.length >= 4 && brandAppearsInProduct(brand, product)) {
+        return false;
+      }
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /** Cap for suggestion-band scores (below “already have” identity). */
@@ -406,7 +563,14 @@ function applyIdentitySignals(
 ) {
   const eanQ = normalizeEan(extract.ean);
   const eanP = normalizeEan(product.ean);
-  if (eanQ && eanP && eanQ === eanP) {
+  // Never trust a hallucinated / wrong EAN over clear visual contradiction
+  // (cucumber crate + mayo EAN → reject identity).
+  if (
+    eanQ &&
+    eanP &&
+    eanQ === eanP &&
+    !visionContradictsProduct(extract, product)
+  ) {
     consider(map, product, 1, 'ean', product.ean!);
   }
 
@@ -659,6 +823,13 @@ export function matchExtractToCatalog(
 
   sanitizeIdentityScores(bestByProduct, extract.suggestedName);
 
+  // Hard demote catalog rows that contradict visible brand / category / pack.
+  for (const [id, m] of bestByProduct) {
+    if (visionContradictsProduct(extract, m.product)) {
+      demote(bestByProduct, id, 0.2);
+    }
+  }
+
   return [...bestByProduct.values()]
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
@@ -670,19 +841,40 @@ export function bestExtractMatch(
 ): ProductMatch | null {
   const results = matchExtractToCatalog(products, extract, 1);
   if (!results.length || results[0].score < SIMILAR_MATCH_MIN) return null;
+  if (visionContradictsProduct(extract, results[0].product)) return null;
   return results[0];
 }
 
-export function isStrongCatalogMatch(match: ProductMatch | null): boolean {
-  return Boolean(match && match.score >= STRONG_MATCH_MIN);
+export function isStrongCatalogMatch(
+  match: ProductMatch | null,
+  extract?: VisionExtract | null,
+): boolean {
+  if (!match || match.score < STRONG_MATCH_MIN) return false;
+  if (extract && visionContradictsProduct(extract, match.product)) return false;
+  return true;
 }
 
 /**
  * ≥90% “already have” only for EAN, strong brand+pack, or exact/near-exact
  * official/alias scores — not vision/fuzzy dairy word overlap.
+ * Optional extract: brand/category contradictions never count as identity.
  */
-export function isIdentityCatalogMatch(match: ProductMatch | null): boolean {
+export function isIdentityCatalogMatch(
+  match: ProductMatch | null,
+  extract?: VisionExtract | null,
+): boolean {
   if (!match || match.score < IDENTITY_MATCH_MIN) return false;
+  if (extract && visionContradictsProduct(extract, match.product)) return false;
+  if (extract) {
+    const overlap = visionCatalogTokenOverlap(extract, match.product);
+    if (
+      overlap < 0.2 &&
+      match.matchedOn !== 'ean' &&
+      !(extract.brand && brandAppearsInProduct(extract.brand, match.product))
+    ) {
+      return false;
+    }
+  }
   if (match.matchedOn === 'ean') return true;
   if (match.matchedOn === 'brand_pack') return match.score >= 0.95;
   if (match.matchedOn === 'vision') return false;

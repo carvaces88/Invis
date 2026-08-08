@@ -61,7 +61,7 @@ export const en = {
   inventorySearchEmpty: 'No products match this search.',
   inventorySearchClear: 'Clear search',
   inventoryToolsToggle: 'More inventory tools',
-  inventorySearchMic: 'Dictate search',
+  inventorySearchMic: 'Dictate search (beta)',
   inventorySearchMicStop: 'Stop dictation',
   exportPreviewTitle: 'Export preview',
   exportPreviewOpen: 'Preview export',
@@ -168,6 +168,7 @@ export const en = {
   packCheckYes: 'Yes, {n} {pack}',
   packCheckChange: 'Change to {n} {base}',
   packCheckChangeUnknown: 'Change to {n} {base}',
+  packCheckCountAsUnit: 'Count as {n} {base} (KPL)',
   packCheckEdit: 'Edit',
   packHint:
     '1 {pack} = {per} {base} for this item',
@@ -248,20 +249,21 @@ export const en = {
   recordItemName: 'Item name',
   recordItemPlaceholder: 'Try “coriander”, “cilantro”, or “yogurt”…',
   voiceDictateLabel: 'Dictate fridge walk-through',
+  voiceBeta: 'Beta',
   voiceDictateSub:
-    'Speak what you see (e.g. “two mayo, three milk, one jar of capers”). Edit the transcript, then review lines or use as a single name.',
+    'Beta — we’re testing speech recognition. Speak what you see (e.g. “two mayo, three milk, one jar of capers”). Edit the transcript, then review lines or use as a single name.',
   voiceMic: 'Mic',
   voiceStop: 'Stop',
-  voiceStartA11y: 'Start voice dictation',
+  voiceStartA11y: 'Start voice dictation (beta)',
   voiceStopA11y: 'Stop voice dictation',
   voiceListening: 'Listening…',
-  voiceListeningLive: 'Live speech recognition',
+  voiceListeningLive: 'Live speech recognition (beta)',
   voiceRecording: 'Recording audio…',
   voiceTranscribing: 'Transcribing…',
   voiceTranscriptPlaceholder: 'Transcript appears here — you can edit it',
   voiceReviewLines: 'Review inventory lines',
   voiceReviewLinesN: 'Review {n} lines',
-  voiceWalkthroughTitle: 'Voice walk-through',
+  voiceWalkthroughTitle: 'Voice walk-through (beta)',
   voiceReviewOpened: 'Opening {n} line(s) to confirm…',
   voiceParseFailed:
     'Could not parse products from that text — edit and try again',
@@ -272,7 +274,7 @@ export const en = {
   voiceEmpty: 'Nothing transcribed yet — try again',
   voiceFailed: 'Dictation failed',
   voiceUnsupported:
-    'Voice dictation needs a browser with microphone access (Chrome/Edge recommended).',
+    'Voice dictation (beta) needs a browser with microphone access (Chrome/Edge recommended).',
   recordNoMatch: 'No match yet — you can still add this name',
   recordMoreUnits: 'More units',
   recordUnitCatalogNote:
@@ -443,6 +445,11 @@ export const en = {
   confirmPickProductTitle: 'Pick a product',
   confirmPickProductBody: 'Select a catalog match or add to catalog first.',
   confirmInvalidQty: 'Enter a valid quantity.',
+  confirmMismatchWarning:
+    'Photo label does not match this catalog product. Pick another match or add as new — do not confirm as “already have”.',
+  imageZoomTitle: 'Inspect photo',
+  imageZoomClose: 'Close photo',
+  imageZoomHint: 'Tap outside or × to close. Pinch to zoom where supported.',
 
   reports: 'Reports',
   export: 'Export',

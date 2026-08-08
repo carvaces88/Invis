@@ -59,7 +59,7 @@ export const fi: Messages = {
   inventorySearchEmpty: 'Ei tuotteita tällä haulla.',
   inventorySearchClear: 'Tyhjennä haku',
   inventoryToolsToggle: 'Lisää inventaariotyökaluja',
-  inventorySearchMic: 'Sanele haku',
+  inventorySearchMic: 'Sanele haku (beta)',
   inventorySearchMicStop: 'Lopeta sanelu',
   exportPreviewTitle: 'Viennin esikatselu',
   exportPreviewOpen: 'Esikatsele vientiä',
@@ -166,6 +166,7 @@ export const fi: Messages = {
   packCheckYes: 'Kyllä, {n} {pack}',
   packCheckChange: 'Vaihda {n} {base}',
   packCheckChangeUnknown: 'Vaihda {n} {base}',
+  packCheckCountAsUnit: 'Laske {n} {base} (KPL)',
   packCheckEdit: 'Muokkaa',
   packHint:
     '1 {pack} = {per} {base} tälle tuotteelle',
@@ -245,20 +246,21 @@ export const fi: Messages = {
   recordItemName: 'Tuotenimi',
   recordItemPlaceholder: 'Kokeile “coriander”, “cilantro” tai “jogurtti”…',
   voiceDictateLabel: 'Sanele kylmiökävely',
+  voiceBeta: 'Beta',
   voiceDictateSub:
-    'Kerro mitä näet (esim. “kaksi majoneesia, kolme maitoa, yksi purkki kaprista”). Muokkaa tekstiä, tarkista rivit tai käytä yhtenä nimenä.',
+    'Beta — testaamme puheentunnistusta. Kerro mitä näet (esim. “kaksi majoneesia, kolme maitoa, yksi purkki kaprista”). Muokkaa tekstiä, tarkista rivit tai käytä yhtenä nimenä.',
   voiceMic: 'Mic',
   voiceStop: 'Stop',
-  voiceStartA11y: 'Aloita äänisanelu',
+  voiceStartA11y: 'Aloita äänisanelu (beta)',
   voiceStopA11y: 'Lopeta äänisanelu',
   voiceListening: 'Kuunnellaan…',
-  voiceListeningLive: 'Live-puheentunnistus',
+  voiceListeningLive: 'Live-puheentunnistus (beta)',
   voiceRecording: 'Ääntä nauhoitetaan…',
   voiceTranscribing: 'Litteroidaan…',
   voiceTranscriptPlaceholder: 'Litterointi tulee tähän — voit muokata',
   voiceReviewLines: 'Tarkista inventaariorivit',
   voiceReviewLinesN: 'Tarkista {n} riviä',
-  voiceWalkthroughTitle: 'Äänikävely',
+  voiceWalkthroughTitle: 'Äänikävely (beta)',
   voiceReviewOpened: 'Avataan {n} riviä vahvistukseen…',
   voiceParseFailed:
     'Tuotteita ei saatu tekstistä — muokkaa ja yritä uudelleen',
@@ -269,7 +271,7 @@ export const fi: Messages = {
   voiceEmpty: 'Ei litterointia vielä — yritä uudelleen',
   voiceFailed: 'Sanelu epäonnistui',
   voiceUnsupported:
-    'Äänisanelu tarvitsee selaimen mikrofonilla (Chrome/Edge suositeltu).',
+    'Äänisanelu (beta) tarvitsee selaimen mikrofonilla (Chrome/Edge suositeltu).',
   recordNoMatch: 'Ei osumaa vielä — voit silti lisätä tämän nimen',
   recordMoreUnits: 'Lisää yksiköitä',
   recordUnitCatalogNote:
@@ -434,6 +436,11 @@ export const fi: Messages = {
   confirmPickProductTitle: 'Valitse tuote',
   confirmPickProductBody: 'Valitse katalogiosuma tai lisää katalogiin ensin.',
   confirmInvalidQty: 'Anna kelvollinen määrä.',
+  confirmMismatchWarning:
+    'Kuvan etiketti ei vastaa tätä katalogituotetta. Valitse toinen osuma tai lisää uutena — älä vahvista “jo inventaariossa”.',
+  imageZoomTitle: 'Tarkastele kuvaa',
+  imageZoomClose: 'Sulje kuva',
+  imageZoomHint: 'Sulje napauttamalla taustaa tai ×. Pinch-zoomaa jos tuettu.',
 
   reports: 'Raportit',
   export: 'Vie',

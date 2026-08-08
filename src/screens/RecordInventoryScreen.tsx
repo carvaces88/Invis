@@ -415,6 +415,20 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
     commitSave(selected, n);
   }
 
+  function onPackCountAsUnits(resolved?: PackCheckResolve) {
+    if (!packCheck || !selected) return;
+    const baseUnit = resolved?.packBaseUnit ?? 'KPL';
+    const baseOpt =
+      friendlyOptionForBaseUnit(baseUnit) ??
+      COMMON_UNIT_OPTIONS.find((o) => o.id === 'piece')!;
+    setUnitOption(baseOpt);
+    const n = packCheck.packQty;
+    setQty(String(n));
+    setQtyOther(true);
+    setPackCheck(null);
+    commitSave(selected, n);
+  }
+
   const packHintText = (() => {
     if (!selected) return null;
     const per = resolveUnitsPerPack(selected.product);
@@ -800,6 +814,7 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
         info={packCheck}
         onYesPacks={onPackYes}
         onChangeToPieces={onPackChangeToPieces}
+        onCountAsUnits={onPackCountAsUnits}
         onEdit={() => setPackCheck(null)}
       />
 

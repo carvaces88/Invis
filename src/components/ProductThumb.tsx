@@ -26,7 +26,11 @@ export function ProductThumb({ product, size = 72, style }: Props) {
   }
   return (
     <View style={[styles.box, { width: size, height: size }, style]}>
-      <Image source={source} style={{ width: size, height: size }} resizeMode="cover" />
+      <Image
+        source={source}
+        style={{ width: size, height: size, backgroundColor: '#fff' }}
+        resizeMode="contain"
+      />
     </View>
   );
 }

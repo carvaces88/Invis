@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -7,10 +7,16 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import type { DocumentExtract } from '../data/types';
 import { useI18n } from '../i18n';
+import {
+  countDictationLines,
+  transcriptToFridgeDocument,
+} from '../lib/parseDictationTranscript';
 import {
   isDictationAvailable,
   preferProductPhrase,
+  collapseRepeatedSpeech,
   startDictation,
   type DictationSession,
 } from '../lib/speechDictation';
@@ -19,16 +25,19 @@ import { colors, radius, spacing } from '../theme/colors';
 type Props = {
   /** Called when user wants the transcript applied to the product name field */
   onApplyToName: (phrase: string) => void;
+  /** Multi-item walk-through → FridgeReview confirm flow */
+  onReviewLines?: (document: DocumentExtract) => void;
   /** Optional: full transcript updates while listening / after stop */
   onTranscriptChange?: (text: string) => void;
 };
 
 /**
- * Mic → live/final transcript → editable text → apply to record search.
+ * Mic → live/final transcript → editable text → review lines or apply to name.
  * Web: Web Speech API; fallback MediaRecorder + Gemini /api/transcribe.
  */
 export function VoiceDictationBar({
   onApplyToName,
+  onReviewLines,
   onTranscriptChange,
 }: Props) {
   const { t, locale } = useI18n();
@@ -38,6 +47,10 @@ export function VoiceDictationBar({
   const [transcript, setTranscript] = useState('');
   const [hint, setHint] = useState<string | null>(null);
   const sessionRef = useRef<DictationSession | null>(null);
+  const lineCount = useMemo(
+    () => countDictationLines(transcript),
+    [transcript],
+  );
 
   useEffect(() => {
     return () => {
@@ -48,8 +61,9 @@ export function VoiceDictationBar({
   }, []);
 
   function setText(next: string) {
-    setTranscript(next);
-    onTranscriptChange?.(next);
+    const cleaned = collapseRepeatedSpeech(next);
+    setTranscript(cleaned);
+    onTranscriptChange?.(cleaned);
   }
 
   async function toggle() {
@@ -109,7 +123,7 @@ export function VoiceDictationBar({
     }
   }
 
-  function apply() {
+  function applyName() {
     const phrase = preferProductPhrase(transcript);
     if (!phrase) {
       setHint(t('voiceEmpty'));
@@ -117,6 +131,18 @@ export function VoiceDictationBar({
     }
     onApplyToName(phrase);
     setHint(t('voiceApplied'));
+  }
+
+  function reviewLines() {
+    const doc = transcriptToFridgeDocument(transcript, {
+      title: t('voiceWalkthroughTitle'),
+    });
+    if (!doc || doc.lines.length === 0) {
+      setHint(t('voiceParseFailed'));
+      return;
+    }
+    onReviewLines?.(doc);
+    setHint(t('voiceReviewOpened').replace('{n}', String(doc.lines.length)));
   }
 
   if (!supported) {
@@ -130,7 +156,12 @@ export function VoiceDictationBar({
   return (
     <View style={styles.wrap}>
       <View style={styles.headerRow}>
-        <Text style={styles.label}>{t('voiceDictateLabel')}</Text>
+        <View style={styles.titleBlock}>
+          <Text style={styles.label}>{t('voiceDictateLabel')}</Text>
+          <View style={styles.betaBadge} accessibilityLabel={t('voiceBeta')}>
+            <Text style={styles.betaBadgeText}>{t('voiceBeta')}</Text>
+          </View>
+        </View>
         <Pressable
           onPress={() => void toggle()}
           disabled={busy}
@@ -173,18 +204,43 @@ export function VoiceDictationBar({
         accessibilityLabel={t('voiceTranscriptPlaceholder')}
       />
       <View style={styles.actions}>
+        {onReviewLines ? (
+          <Pressable
+            onPress={reviewLines}
+            disabled={!transcript.trim() || lineCount === 0}
+            style={({ pressed }) => [
+              styles.applyBtn,
+              (!transcript.trim() || lineCount === 0) && styles.applyBtnDisabled,
+              pressed && transcript.trim() && lineCount > 0 && { opacity: 0.88 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t('voiceReviewLines')}
+          >
+            <Text style={styles.applyBtnText}>
+              {lineCount > 0
+                ? t('voiceReviewLinesN').replace('{n}', String(lineCount))
+                : t('voiceReviewLines')}
+            </Text>
+          </Pressable>
+        ) : null}
         <Pressable
-          onPress={apply}
+          onPress={applyName}
           disabled={!transcript.trim()}
           style={({ pressed }) => [
-            styles.applyBtn,
+            onReviewLines ? styles.secondaryBtn : styles.applyBtn,
             !transcript.trim() && styles.applyBtnDisabled,
             pressed && transcript.trim() && { opacity: 0.88 },
           ]}
           accessibilityRole="button"
           accessibilityLabel={t('voiceApplyToName')}
         >
-          <Text style={styles.applyBtnText}>{t('voiceApplyToName')}</Text>
+          <Text
+            style={
+              onReviewLines ? styles.secondaryBtnText : styles.applyBtnText
+            }
+          >
+            {t('voiceApplyToName')}
+          </Text>
         </Pressable>
         {transcript.trim() ? (
           <Pressable
@@ -223,11 +279,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  label: {
+  titleBlock: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  label: {
     fontSize: 13,
     fontWeight: '700',
     color: colors.ink,
+  },
+  betaBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    backgroundColor: colors.warningSoft,
+    borderWidth: 1,
+    borderColor: colors.warning,
+  },
+  betaBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    color: colors.warning,
   },
   sub: {
     marginTop: 4,
@@ -304,6 +381,19 @@ const styles = StyleSheet.create({
   },
   applyBtnText: {
     color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  secondaryBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.bg,
+  },
+  secondaryBtnText: {
+    color: colors.ink,
     fontWeight: '700',
     fontSize: 13,
   },

@@ -41,7 +41,13 @@ type Props = {
   info: PackCheckInfo | null;
   onYesPacks: (resolved?: PackCheckResolve) => void;
   onChangeToPieces: (resolved?: PackCheckResolve) => void;
+  /** Dismiss without saving — return to qty/unit form */
   onEdit: () => void;
+  /**
+   * Count the entered number as loose units (KPL/pieces), not as packs.
+   * Does not multiply by unitsPerPack.
+   */
+  onCountAsUnits?: (resolved?: PackCheckResolve) => void;
 };
 
 function formatQty(n: number): string {
@@ -62,12 +68,19 @@ export function PackCheckModal({
   onYesPacks,
   onChangeToPieces,
   onEdit,
+  onCountAsUnits,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { t, locale } = useI18n();
   const [perPackText, setPerPackText] = useState('');
   const [baseChip, setBaseChip] = useState<BaseChip>(BASE_CHIPS[1]);
   const [needPerPackHint, setNeedPerPackHint] = useState(false);
+  /** Keep last info so Modal can close via `visible` instead of unmounting mid-tap. */
+  const [cached, setCached] = useState<PackCheckInfo | null>(info);
+
+  useEffect(() => {
+    if (info) setCached(info);
+  }, [info]);
 
   useEffect(() => {
     if (!info) return;
@@ -76,31 +89,36 @@ export function PackCheckModal({
     setNeedPerPackHint(false);
   }, [info]);
 
-  if (!info) return null;
+  const check = info ?? cached;
+  if (!check) return null;
 
-  const check = info;
+  const packInfo = check;
   const preferBunch = baseChip.preferBunch === true;
   const packWord =
     locale === 'fi'
-      ? packUnitLabelFi(check.packUnit)
-      : packUnitLabelEn(check.packUnit);
+      ? packUnitLabelFi(packInfo.packUnit)
+      : packUnitLabelEn(packInfo.packUnit);
   const packOne =
     locale === 'fi'
-      ? packUnitSingularFi(check.packUnit)
-      : packUnitSingularEn(check.packUnit);
+      ? packUnitSingularFi(packInfo.packUnit)
+      : packUnitSingularEn(packInfo.packUnit);
   const baseWord =
     locale === 'fi'
       ? baseUnitLabelFi(baseChip.code, preferBunch)
       : baseUnitLabelEn(baseChip.code, preferBunch);
+  const pieceWord =
+    locale === 'fi'
+      ? baseUnitLabelFi('KPL', false)
+      : baseUnitLabelEn('KPL', false);
 
-  const known = !check.needsUnitsPerPack && check.unitsPerPack != null;
+  const known = !packInfo.needsUnitsPerPack && packInfo.unitsPerPack != null;
   const pieceQty =
-    known && check.pieceQty != null
-      ? check.pieceQty
+    known && packInfo.pieceQty != null
+      ? packInfo.pieceQty
       : (() => {
           const per = Number(perPackText.replace(',', '.'));
           if (!Number.isFinite(per) || per <= 1) return null;
-          return Math.round(check.packQty * per * 1000) / 1000;
+          return Math.round(packInfo.packQty * per * 1000) / 1000;
         })();
 
   function parsePerPack(): number | null {
@@ -110,10 +128,10 @@ export function PackCheckModal({
   }
 
   function resolveOrHint(): PackCheckResolve | null {
-    if (known && check.unitsPerPack != null) {
+    if (known && packInfo.unitsPerPack != null) {
       return {
-        unitsPerPack: check.unitsPerPack,
-        packBaseUnit: check.baseUnit,
+        unitsPerPack: packInfo.unitsPerPack,
+        packBaseUnit: packInfo.baseUnit,
       };
     }
     const per = parsePerPack();
@@ -127,13 +145,13 @@ export function PackCheckModal({
   const body = known
     ? t('packCheckBody')
         .replace('{base}', baseWord)
-        .replace('{per}', String(check.unitsPerPack))
-        .replace('{packQty}', formatQty(check.packQty))
+        .replace('{per}', String(packInfo.unitsPerPack))
+        .replace('{packQty}', formatQty(packInfo.packQty))
         .replace('{pack}', packWord)
-        .replace('{pieceQty}', formatQty(check.pieceQty ?? 0))
+        .replace('{pieceQty}', formatQty(packInfo.pieceQty ?? 0))
         .replace('{base2}', baseWord)
     : t('packCheckBodyUnknown')
-        .replace(/\{packQty\}/g, formatQty(check.packQty))
+        .replace(/\{packQty\}/g, formatQty(packInfo.packQty))
         .replace(/\{pack\}/g, packWord)
         .replace(/\{base\}/g, baseWord);
 
@@ -141,14 +159,18 @@ export function PackCheckModal({
     .replace('{base}', baseWord)
     .replace('{packOne}', packOne);
 
-  const changeQty = pieceQty ?? check.packQty;
+  const changeQty = pieceQty ?? packInfo.packQty;
   const changeLabel = known
     ? t('packCheckChange')
         .replace('{n}', formatQty(changeQty))
         .replace('{base}', baseWord)
     : t('packCheckChangeUnknown')
-        .replace('{n}', formatQty(check.packQty))
+        .replace('{n}', formatQty(packInfo.packQty))
         .replace('{base}', baseWord);
+
+  const countAsLabel = t('packCheckCountAsUnit')
+    .replace('{n}', formatQty(packInfo.packQty))
+    .replace('{base}', pieceWord);
 
   return (
     <Modal
@@ -157,15 +179,20 @@ export function PackCheckModal({
       animationType="fade"
       onRequestClose={onEdit}
     >
-      <Pressable style={styles.backdrop} onPress={onEdit}>
+      <View style={styles.backdrop}>
         <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onEdit}
+          accessibilityRole="button"
+          accessibilityLabel={t('packCheckEdit')}
+        />
+        <View
           style={[styles.card, { marginBottom: insets.bottom + spacing.md }]}
-          onPress={(e) => e.stopPropagation()}
         >
           <Text style={styles.title}>{t('packCheckTitle')}</Text>
           <Text style={styles.body}>{body}</Text>
 
-          {check.needsUnitsPerPack ? (
+          {packInfo.needsUnitsPerPack ? (
             <View style={styles.clarify}>
               <Text style={styles.ask}>{askPer}</Text>
               <TextInput
@@ -205,7 +232,7 @@ export function PackCheckModal({
           <Pressable
             style={styles.primaryBtn}
             onPress={() => {
-              if (check.needsUnitsPerPack) {
+              if (packInfo.needsUnitsPerPack) {
                 const resolved = resolveOrHint();
                 if (!resolved) return;
                 onYesPacks(resolved);
@@ -217,7 +244,7 @@ export function PackCheckModal({
           >
             <Text style={styles.primaryBtnText}>
               {t('packCheckYes')
-                .replace('{n}', formatQty(check.packQty))
+                .replace('{n}', formatQty(packInfo.packQty))
                 .replace('{pack}', packWord)}
             </Text>
           </Pressable>
@@ -227,7 +254,7 @@ export function PackCheckModal({
             onPress={() => {
               // Known → save converted piece qty. Unknown → reinterpret number as base units.
               // If chef filled per-pack while clarifying, persist it for next time.
-              if (check.needsUnitsPerPack) {
+              if (packInfo.needsUnitsPerPack) {
                 const per = parsePerPack();
                 onChangeToPieces({
                   ...(per != null ? { unitsPerPack: per } : {}),
@@ -242,15 +269,31 @@ export function PackCheckModal({
             <Text style={styles.secondaryBtnText}>{changeLabel}</Text>
           </Pressable>
 
+          {onCountAsUnits ? (
+            <Pressable
+              style={styles.secondaryBtn}
+              onPress={() =>
+                onCountAsUnits({
+                  packBaseUnit: 'KPL',
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={countAsLabel}
+            >
+              <Text style={styles.secondaryBtnText}>{countAsLabel}</Text>
+            </Pressable>
+          ) : null}
+
           <Pressable
             style={styles.editBtn}
             onPress={onEdit}
             accessibilityRole="button"
+            accessibilityLabel={t('packCheckEdit')}
           >
             <Text style={styles.editBtnText}>{t('packCheckEdit')}</Text>
           </Pressable>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -268,6 +311,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.line,
+    zIndex: 1,
   },
   title: {
     fontSize: 18,

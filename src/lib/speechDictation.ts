@@ -87,6 +87,39 @@ function speechLang(language: DictationLanguage): string {
   return language === 'fi' ? 'fi-FI' : 'en-US';
 }
 
+/**
+ * Collapse consecutive repeated phrases from buggy STT streams
+ * e.g. "two vegan two vegan mayo two vegan mayo" → "two vegan mayo"
+ */
+export function collapseRepeatedSpeech(text: string): string {
+  let out = text.replace(/\s+/g, ' ').trim();
+  if (!out) return '';
+
+  // Drop immediate duplicate words: "mayo mayo" → "mayo"
+  out = out.replace(/\b([\p{L}\p{N}']+)(?:\s+\1\b)+/giu, '$1');
+
+  // Drop consecutive duplicate n-grams (2–6 words), repeatedly
+  for (let n = 6; n >= 2; n--) {
+    const re = new RegExp(
+      `\\b((?:[\\p{L}\\p{N}']+\\s+){${n - 1}}[\\p{L}\\p{N}']+)(?:\\s+\\1\\b)+`,
+      'giu',
+    );
+    let prev = '';
+    while (prev !== out) {
+      prev = out;
+      out = out.replace(re, '$1');
+    }
+  }
+
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+function joinSpeechParts(finalText: string, interimText: string): string {
+  return collapseRepeatedSpeech(
+    [finalText, interimText].filter(Boolean).join(' '),
+  );
+}
+
 async function blobToBase64(blob: Blob): Promise<string> {
   const buf = await blob.arrayBuffer();
   const bytes = new Uint8Array(buf);
@@ -175,6 +208,10 @@ async function transcribeWithGemini(
 /**
  * Start live Web Speech recognition. Calls onPartial with interim+final text.
  * stop() resolves with the final transcript.
+ *
+ * Important: rebuild from the full `results` list every event. Chrome often
+ * re-sends earlier finals with resultIndex 0; appending those duplicates the
+ * transcript ("two vegan two vegan two vegan…").
  */
 export function startWebSpeechDictation(options: {
   language: DictationLanguage;
@@ -190,29 +227,46 @@ export function startWebSpeechDictation(options: {
   recognition.lang = speechLang(options.language);
   recognition.continuous = true;
   recognition.interimResults = true;
+  // Helps some browsers avoid re-hypothesizing the whole buffer as new finals
+  try {
+    (recognition as SpeechRecognitionLike & { maxAlternatives?: number }).maxAlternatives = 1;
+  } catch {
+    /* ignore */
+  }
 
-  let finalBits: string[] = [];
+  let stableCommitted = '';
+  let sessionCommitted = '';
   let interim = '';
   let active = true;
+  let userStopped = false;
   let settle: ((text: string) => void) | null = null;
 
+  const currentText = () =>
+    joinSpeechParts(
+      joinSpeechParts(stableCommitted, sessionCommitted),
+      interim,
+    );
+
   const emit = () => {
-    const joined = [...finalBits, interim].filter(Boolean).join(' ').trim();
-    options.onPartial(joined);
+    options.onPartial(currentText());
   };
 
   recognition.onresult = (ev) => {
-    interim = '';
-    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+    let finals = '';
+    let inter = '';
+    // Always scan the full list — do not append from resultIndex.
+    for (let i = 0; i < ev.results.length; i++) {
       const row = ev.results[i];
-      const piece = row[0]?.transcript?.trim() ?? '';
+      const piece = row[0]?.transcript ?? '';
       if (!piece) continue;
       if (row.isFinal) {
-        finalBits.push(piece);
+        finals += piece;
       } else {
-        interim = piece;
+        inter += piece;
       }
     }
+    sessionCommitted = finals.replace(/\s+/g, ' ').trim();
+    interim = inter.replace(/\s+/g, ' ').trim();
     emit();
   };
 
@@ -223,8 +277,30 @@ export function startWebSpeechDictation(options: {
   };
 
   recognition.onend = () => {
+    // Fold this Chrome session into stable text before restarting —
+    // a new recognition() clears `results`, which would wipe the UI.
+    const folded = joinSpeechParts(stableCommitted, sessionCommitted);
+    if (interim) {
+      stableCommitted = joinSpeechParts(folded, interim);
+    } else {
+      stableCommitted = folded;
+    }
+    sessionCommitted = '';
+    interim = '';
+
+    // Chrome often ends after a short pause in continuous mode — keep
+    // listening until the user hits Stop.
+    if (!userStopped) {
+      try {
+        recognition.start();
+        emit();
+        return;
+      } catch {
+        /* fall through and settle */
+      }
+    }
     active = false;
-    const text = [...finalBits, interim].filter(Boolean).join(' ').trim();
+    const text = currentText();
     settle?.(text);
     settle = null;
   };
@@ -237,21 +313,18 @@ export function startWebSpeechDictation(options: {
     },
     stop: () =>
       new Promise((resolve) => {
+        userStopped = true;
         settle = resolve;
         active = false;
         try {
           recognition.stop();
         } catch {
-          resolve([...finalBits, interim].filter(Boolean).join(' ').trim());
+          resolve(currentText());
         }
         // Safety if onend never fires
         setTimeout(() => {
           if (settle) {
-            const text = [...finalBits, interim]
-              .filter(Boolean)
-              .join(' ')
-              .trim();
-            settle(text);
+            settle(currentText());
             settle = null;
           }
         }, 1500);
@@ -362,7 +435,7 @@ export async function startDictation(options: {
  * Prefer the last non-empty line / comma segment for the name field.
  */
 export function preferProductPhrase(transcript: string): string {
-  const cleaned = transcript.replace(/\s+/g, ' ').trim();
+  const cleaned = collapseRepeatedSpeech(transcript);
   if (!cleaned) return '';
   const parts = cleaned
     .split(/[\n;]+|(?:\s+and\s+)|(?:\s+ja\s+)/i)
