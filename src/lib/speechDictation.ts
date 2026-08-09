@@ -87,13 +87,67 @@ function speechLang(language: DictationLanguage): string {
   return language === 'fi' ? 'fi-FI' : 'en-US';
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Join STT chunks with a space when the engine omits one. */
+function appendSpeechChunk(acc: string, piece: string): string {
+  const p = piece.replace(/\s+/g, ' ').trim();
+  if (!p) return acc;
+  if (!acc) return p;
+  if (/^[.,!?;:]/.test(p)) return acc + p;
+  return `${acc} ${p}`;
+}
+
+/**
+ * veganveganvegan → vegan (Chrome sometimes glues identical chunks).
+ */
+function collapseGluedToken(token: string): string {
+  if (token.length < 4) return token;
+  // Whole token is unit repeated N times
+  for (let n = 1; n <= Math.floor(token.length / 2); n++) {
+    if (token.length % n !== 0) continue;
+    const unit = token.slice(0, n);
+    if (unit.length < 2) continue;
+    if (unit.repeat(token.length / n).toLowerCase() === token.toLowerCase()) {
+      return unit;
+    }
+  }
+  // Leading glued repeat: veganveganmayo → veganmayo
+  for (let n = Math.floor(token.length / 2); n >= 2; n--) {
+    const unit = token.slice(0, n);
+    const re = new RegExp(`^(${escapeRegExp(unit)}){2,}`, 'i');
+    if (re.test(token)) {
+      return token.replace(re, unit);
+    }
+  }
+  return token;
+}
+
+/** Common kitchen STT mishearings (Web Speech). */
+function applyKitchenSttFixes(text: string): string {
+  return text
+    .replace(/\bmario\b/gi, 'mayo')
+    .replace(/\bmayonaise\b/gi, 'mayonnaise')
+    .replace(/\bollive\b/gi, 'olive')
+    .replace(/\byog+hurt\b/gi, 'yogurt')
+    .replace(/\bjog+hurt\b/gi, 'jogurtti');
+}
+
 /**
  * Collapse consecutive repeated phrases from buggy STT streams
- * e.g. "two vegan two vegan mayo two vegan mayo" → "two vegan mayo"
+ * e.g. "two vegan two vegan mayo" → "two vegan mayo"
+ * and "veganveganvegan" → "vegan"
  */
 export function collapseRepeatedSpeech(text: string): string {
   let out = text.replace(/\s+/g, ' ').trim();
   if (!out) return '';
+
+  out = out
+    .split(/\s+/)
+    .map(collapseGluedToken)
+    .join(' ');
 
   // Drop immediate duplicate words: "mayo mayo" → "mayo"
   out = out.replace(/\b([\p{L}\p{N}']+)(?:\s+\1\b)+/giu, '$1');
@@ -111,13 +165,26 @@ export function collapseRepeatedSpeech(text: string): string {
     }
   }
 
-  return out.replace(/\s+/g, ' ').trim();
+  out = applyKitchenSttFixes(out.replace(/\s+/g, ' ').trim());
+  return out;
 }
 
-function joinSpeechParts(finalText: string, interimText: string): string {
-  return collapseRepeatedSpeech(
-    [finalText, interimText].filter(Boolean).join(' '),
-  );
+function joinSpeechParts(a: string, b: string): string {
+  return collapseRepeatedSpeech(appendSpeechChunk(a.trim(), b.trim()));
+}
+
+/** Avoid re-appending the same phrase when Chrome restarts mid-utterance. */
+function foldCommitted(stable: string, next: string): string {
+  const a = stable.trim();
+  const b = next.trim();
+  if (!b) return collapseRepeatedSpeech(a);
+  if (!a) return collapseRepeatedSpeech(b);
+  const al = a.toLowerCase();
+  const bl = b.toLowerCase();
+  if (al === bl || al.endsWith(bl) || bl.startsWith(al)) {
+    return collapseRepeatedSpeech(a.length >= b.length ? a : b);
+  }
+  return joinSpeechParts(a, b);
 }
 
 async function blobToBase64(blob: Blob): Promise<string> {
@@ -209,9 +276,9 @@ async function transcribeWithGemini(
  * Start live Web Speech recognition. Calls onPartial with interim+final text.
  * stop() resolves with the final transcript.
  *
- * Important: rebuild from the full `results` list every event. Chrome often
- * re-sends earlier finals with resultIndex 0; appending those duplicates the
- * transcript ("two vegan two vegan two vegan…").
+ * Uses phrase mode (continuous=false) + auto-restart so Chrome finalizes one
+ * spoken chunk at a time. Continuous mode often glued duplicate chunks
+ * ("veganveganvegan") and re-heard the same word on session restart.
  */
 export function startWebSpeechDictation(options: {
   language: DictationLanguage;
@@ -225,9 +292,9 @@ export function startWebSpeechDictation(options: {
 
   const recognition = new Ctor();
   recognition.lang = speechLang(options.language);
-  recognition.continuous = true;
+  // Phrase mode: wait for end-of-speech, then we restart for the next item.
+  recognition.continuous = false;
   recognition.interimResults = true;
-  // Helps some browsers avoid re-hypothesizing the whole buffer as new finals
   try {
     (recognition as SpeechRecognitionLike & { maxAlternatives?: number }).maxAlternatives = 1;
   } catch {
@@ -240,33 +307,42 @@ export function startWebSpeechDictation(options: {
   let active = true;
   let userStopped = false;
   let settle: ((text: string) => void) | null = null;
+  let restartTimer: ReturnType<typeof setTimeout> | null = null;
 
   const currentText = () =>
-    joinSpeechParts(
-      joinSpeechParts(stableCommitted, sessionCommitted),
-      interim,
+    collapseRepeatedSpeech(
+      appendSpeechChunk(
+        appendSpeechChunk(stableCommitted, sessionCommitted),
+        interim,
+      ),
     );
 
   const emit = () => {
     options.onPartial(currentText());
   };
 
+  const clearRestart = () => {
+    if (restartTimer) {
+      clearTimeout(restartTimer);
+      restartTimer = null;
+    }
+  };
+
   recognition.onresult = (ev) => {
     let finals = '';
     let inter = '';
-    // Always scan the full list — do not append from resultIndex.
     for (let i = 0; i < ev.results.length; i++) {
       const row = ev.results[i];
       const piece = row[0]?.transcript ?? '';
       if (!piece) continue;
       if (row.isFinal) {
-        finals += piece;
+        finals = appendSpeechChunk(finals, piece);
       } else {
-        inter += piece;
+        inter = appendSpeechChunk(inter, piece);
       }
     }
-    sessionCommitted = finals.replace(/\s+/g, ' ').trim();
-    interim = inter.replace(/\s+/g, ' ').trim();
+    sessionCommitted = finals;
+    interim = inter;
     emit();
   };
 
@@ -277,29 +353,34 @@ export function startWebSpeechDictation(options: {
   };
 
   recognition.onend = () => {
-    // Fold this Chrome session into stable text before restarting —
-    // a new recognition() clears `results`, which would wipe the UI.
-    const folded = joinSpeechParts(stableCommitted, sessionCommitted);
-    if (interim) {
-      stableCommitted = joinSpeechParts(folded, interim);
-    } else {
-      stableCommitted = folded;
+    // Only keep finalized text across restarts. Folding interim caused the
+    // same word to be saved, then heard again → "veganvegan…".
+    if (sessionCommitted) {
+      stableCommitted = foldCommitted(stableCommitted, sessionCommitted);
     }
     sessionCommitted = '';
     interim = '';
+    emit();
 
-    // Chrome often ends after a short pause in continuous mode — keep
-    // listening until the user hits Stop.
     if (!userStopped) {
-      try {
-        recognition.start();
-        emit();
-        return;
-      } catch {
-        /* fall through and settle */
-      }
+      clearRestart();
+      // Small gap so Chrome doesn't re-capture the same audio tail.
+      restartTimer = setTimeout(() => {
+        restartTimer = null;
+        if (userStopped) return;
+        try {
+          recognition.start();
+        } catch {
+          active = false;
+          settle?.(currentText());
+          settle = null;
+        }
+      }, 280);
+      return;
     }
+
     active = false;
+    clearRestart();
     const text = currentText();
     settle?.(text);
     settle = null;
@@ -314,6 +395,7 @@ export function startWebSpeechDictation(options: {
     stop: () =>
       new Promise((resolve) => {
         userStopped = true;
+        clearRestart();
         settle = resolve;
         active = false;
         try {
@@ -321,7 +403,6 @@ export function startWebSpeechDictation(options: {
         } catch {
           resolve(currentText());
         }
-        // Safety if onend never fires
         setTimeout(() => {
           if (settle) {
             settle(currentText());

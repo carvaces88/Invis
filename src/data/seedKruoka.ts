@@ -34,6 +34,12 @@ export function resolveDemoShelfUri(
 export function productImageSource(product: Product) {
   const local = KRUOKA_PACK_IMAGES[product.id];
   if (local != null) return local;
+  // Buffet mayo stock (aliases include “vegan mayo”) — reuse Herkkumaa packshot
+  // so FridgeReview / Confirm never show an empty placeholder for kitchen mayo.
+  if (product.id === 'buffet-majoneesi') {
+    const mayoPack = KRUOKA_PACK_IMAGES['kruoka-herkkumaa-taysmajoneesi-5kg'];
+    if (mayoPack != null) return mayoPack;
+  }
   if (product.imageUrl) return { uri: product.imageUrl };
   return null;
 }

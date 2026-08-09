@@ -865,20 +865,34 @@ export function isIdentityCatalogMatch(
 ): boolean {
   if (!match || match.score < IDENTITY_MATCH_MIN) return false;
   if (extract && visionContradictsProduct(extract, match.product)) return false;
+  // Exact official/alias hits are identity even when informal speech differs
+  // from the POS title (e.g. “vegan mayo” ↔ Majoneesi L) — do not require
+  // Jaccard overlap with officialName.
+  if (match.matchedOn === 'ean') return true;
+  if (match.matchedOn === 'brand_pack') return match.score >= 0.95;
+  if (match.matchedOn === 'official' || match.matchedOn === 'alias') {
+    if (
+      extract &&
+      !namesIdentityCompatible(extract.suggestedName, match.matchedTerm) &&
+      !namesIdentityCompatible(extract.suggestedName, match.product.officialName)
+    ) {
+      // Fuzzy high score on a loosely related term — not “already have”
+      const overlap = visionCatalogTokenOverlap(extract, match.product);
+      if (overlap < 0.2) return false;
+    }
+    return true;
+  }
   if (extract) {
     const overlap = visionCatalogTokenOverlap(extract, match.product);
     if (
       overlap < 0.2 &&
-      match.matchedOn !== 'ean' &&
       !(extract.brand && brandAppearsInProduct(extract.brand, match.product))
     ) {
       return false;
     }
   }
-  if (match.matchedOn === 'ean') return true;
-  if (match.matchedOn === 'brand_pack') return match.score >= 0.95;
   if (match.matchedOn === 'vision') return false;
-  return match.matchedOn === 'official' || match.matchedOn === 'alias';
+  return false;
 }
 
 /**

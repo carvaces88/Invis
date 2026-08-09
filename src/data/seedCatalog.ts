@@ -162,11 +162,12 @@ export const SEED_PRODUCTS: Product[] = [
   {
     id: 'kiivi-karpalo',
     officialName: 'Kiivi karpalo Pirkka',
-    unit: 'LTK',
+    unit: 'KPL',
+    packSize: '250 ml',
     unitsPerPack: 8,
     packBaseUnit: 'KPL',
     unitPriceAlv0: 4.0,
-    ingredientType: 'produce',
+    ingredientType: 'other',
     aliases: ['kiwi cranberry', 'kiivi', 'karpalo', 'pirkka kiivi'],
   },
   {
