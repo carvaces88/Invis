@@ -54,23 +54,28 @@ const VISION_SCHEMA = {
       description:
         'Best product name as staff would say it; prefer Finnish retail/POS style when readable on label',
     },
-    brand: { type: 'string', nullable: true },
+    brand: {
+      type: 'string',
+      nullable: true,
+      description:
+        'Producer / brand printed on the pack (e.g. Korsnäs Grönsaker, Herkkumaa, Valio). Not a different nearby product.',
+    },
     unit: {
       type: 'string',
       nullable: true,
       description:
-        'Finnish POS YKSIKKÖ: L, KPL, PRK, RSA, PSS, PL, PLO, LTK, KG, RAS, PKT',
+        'Finnish POS YKSIKKÖ: L, KPL, PRK, RSA, PSS, PL, PLO, LTK, KG, RAS, PKT. Wholesale produce crates → LTK (or KG if sold by weight). Jars/tubs → PRK. Never PRK for an open cardboard produce crate.',
     },
     packSize: {
       type: 'string',
       nullable: true,
-      description: 'e.g. 935g/600g or 5 kg',
+      description: 'Net / crate weight from label, e.g. "5 kg", "935g/600g", "1 L"',
     },
     containerHint: {
       type: 'string',
       nullable: true,
       description:
-        'Packaging style from label/logo: e.g. "Tetra Pak / kartonki", Purkki, Pullo, Pussi, Rasia, Laatikko. Read Tetra Pak marks, C/PAP, kartonki recycling cues.',
+        'Packaging actually visible: Laatikko (crate/box), Purkki (jar/tub), Pullo, Pussi, Rasia, Tetra Pak / kartonki. Match what you see — crate ≠ mayo tub.',
     },
     quantity: { type: 'number', nullable: true },
     unitPriceAlv0: {
@@ -83,13 +88,13 @@ const VISION_SCHEMA = {
       type: 'string',
       nullable: true,
       description:
-        'EAN/GTIN digits only (8–14). CRITICAL: if a barcode is visible (bars + human-readable digits under it), read those digits carefully even when glare or crop is tight. Prefer the printed number under the bars.',
+        'EAN/GTIN digits only (8–14) when barcode bars + digits are readable. If unreadable or absent, return null — NEVER invent a common catalog EAN.',
     },
     aliases: {
       type: 'array',
       items: { type: 'string' },
       description:
-        'Informal EN/FI search nicknames: brand, product line (Tuuti 2 / Tuuti2), category words (vieroitusvalmiste, follow-on formula), OCR variants without spaces/hyphens',
+        'FI/SV/EN search nicknames from the label: e.g. kurkku, kurkkuja, Finska gurkor, Finnish cucumber, brand short name, product-line OCR variants',
     },
     ingredientType: {
       type: 'string',
@@ -97,7 +102,12 @@ const VISION_SCHEMA = {
       description: INGREDIENT_TYPES.join(', '),
     },
     confidence: { type: 'number' },
-    rawNotes: { type: 'string', nullable: true },
+    rawNotes: {
+      type: 'string',
+      nullable: true,
+      description:
+        'Extra label facts: class (Luokka I), storage °C, origin (Holland/Suomi), Puhtaasti Kotimainen, piece size (450–550 g), etc.',
+    },
     unrecognized: { type: 'boolean', nullable: true },
   },
   required: ['suggestedName', 'confidence'],
@@ -339,21 +349,32 @@ function toVisionExtract(raw: Record<string, unknown>): VisionExtract {
 }
 
 const SYSTEM_PROMPT = `You are Inventaario kitchen inventory vision for Finnish restaurants.
-Read product label / pack / barcode photos carefully (OCR). Return JSON only.
+Ground on WHAT IS IN THE PHOTO — OCR the visible label and name the physical product. Return JSON only.
+
+CRITICAL GROUNDING (never invent a different SKU):
+- Identify the product type you see (fresh cucumbers in a crate, mayo tub, milk carton, etc.).
+- Transcribe brand/producer + Finnish/Swedish title text actually printed (e.g. "SUOMALAISIA KURKKUJA" / "FINSKA GURKOR", producer "Korsnäs Grönsaker").
+- brand, suggestedName, containerHint, ingredientType must describe THE SAME physical item.
+- Produce crates (kurkku, tomaatti, …) are NOT mayonnaise or jarred sauces — never swap to an unrelated catalog SKU.
+- If barcode digits are unreadable or absent → ean null. Do NOT guess a common EAN from memory.
 
 PRIORITY when multiple photos:
-1) Barcode close-ups: read EAN-13 digits under the bars (digits only in "ean"). Glare is common — still try.
-2) Front label: brand + product line + Finnish title + size (e.g. Valio Tuuti2 / TUUTI 2, 1 L).
-3) Packaging cues: Tetra Pak logo, "kartonki", C/PAP, pullo, purkki → containerHint + POS unit.
+1) Barcode close-ups: read EAN-13 digits under the bars (digits only in "ean"). Glare is common — still try; if unsure, null.
+2) Front / crate label: brand + product line + FI/SV title + pack weight (e.g. 5 kg).
+3) Packaging cues: laatikko/crate, purkki, Tetra Pak/kartonki, pullo, pussi → containerHint + POS unit.
 
 YKSIKKÖ (POS unit): L, KPL, PRK, RSA, PSS, PL, PLO, LTK, KG, RAS, PKT.
-- Ready-to-drink Tetra Pak / kartonki sold per carton → unit KPL, packSize like "1 L" (volume in packSize, not unit L).
-- Loose liquids by liter → L; bottles → PL/PLO; cans/jars → PRK.
+- Wholesale produce crate / cardboard box → unit LTK (or KG if counted by weight), containerHint "Laatikko (crate / box)", packSize like "5 kg".
+- Ready-to-drink Tetra Pak / kartonki sold per carton → unit KPL, packSize like "1 L".
+- Loose liquids by liter → L; bottles → PL/PLO; cans/jars/tubs → PRK.
+
+ingredientType: produce for fresh fruit/veg crates; sauces for mayo/mustard; dairy for milk/yogurt; etc.
 
 Prices at 0% ALV. Finnish food shelf € usually includes 14% VAT → shelf€ / 1.14.
-suggestedName: prefer official Finnish retail style when readable (brand + product + size/age).
-aliases: FI + EN nicknames staff type (Tuuti 2, vieroitusvalmiste, follow-on formula, etc.).
-If unsure, unrecognized true + rawNotes — still best-guess suggestedName.`;
+suggestedName: official-ish Finnish retail style from the label (brand optional + product + size), e.g. "Korsnäs Grönsaker suomalaisia kurkkuja 5 kg" or "Suomalaisia kurkkuja 5 kg".
+aliases: FI + SV + EN nicknames staff type (kurkku, kurkkuja, Finska gurkor, Finnish cucumber, korsnäs, …).
+rawNotes: class, storage °C, origin, logos (Puhtaasti Kotimainen), piece size if printed.
+If unsure, unrecognized true + rawNotes — still best-guess suggestedName from visible text / product type.`;
 
 export async function analyzeImagesWithGemini(
   imageUris: string[],
@@ -461,8 +482,10 @@ async function callGeminiDirect(
         hint?.trim()
           ? `Optional staff hint (may be wrong): ${hint.trim()}`
           : null,
-        `Analyze ${payloads.length} close-up photo(s) of one product (front label and/or barcode).`,
-        'If any photo shows a barcode, put EAN digits in "ean". Prefer official Finnish retail name when readable.',
+        `Analyze ${payloads.length} close-up photo(s) of one product (front label, crate label, and/or barcode).`,
+        'Name the product visible in the image. Transcribe printed FI/SV brand + title + pack weight.',
+        'If any photo shows a readable barcode, put EAN digits in "ean"; otherwise ean must be null (do not invent).',
+        'Produce crate ≠ sauce tub. Map fields for inventory: suggestedName, brand, unit, packSize, containerHint, aliases, ingredientType, rawNotes.',
       ]
         .filter(Boolean)
         .join('\n'),
@@ -524,17 +547,20 @@ const FRIDGE_SYSTEM_PROMPT = `You are Inventaario kitchen inventory vision for F
 Analyze a WIDE fridge / walk-in / shelf panorama photo. Return JSON only.
 
 List EVERY distinct product visible (do not merge different brands/sizes).
+Ground each line on what that crop shows — a cucumber crate is produce (kurkku), not a mayo tub.
 For each product estimate quantity by counting cans, bottles, jars, packs, bags, or crates you can see.
 YKSIKKÖ (POS unit codes — pick one): L, KPL, PRK, RSA, PSS, PL, PLO, LTK, KG, RAS, PKT.
 - RSA and RAS are both "Rasia" but DIFFERENT codes — prefer RAS for retail tubs/trays, RSA when labeled as rasia pack count.
 - Bottles → PL or PLO; cans/jars → PRK; bags → PSS; crates/boxes → LTK; packets → PKT; pieces → KPL; weight → KG; volume bulk → L.
+- Never invent EAN digits; leave ean null when barcode is not readable.
 
 crop: normalized 0–1 box {x,y,width,height} around that product in the photo when you can locate it.
 confidence: 0–1 how sure you are of the name.
-brand, packSize (e.g. "5 kg", "380 g"), containerHint (purkki, pullo, pussi…), aliases (FI/EN nicknames).
+brand, packSize (e.g. "5 kg", "380 g"), containerHint (purkki, pullo, pussi, laatikko…), aliases (FI/SV/EN nicknames).
 Prices at 0% ALV if you see a shelf tag (€ ÷ 1.14 for 14% food VAT).
 If a pack is unreadable, still include a line with unrecognized true + best-guess suggestedName + aiDescription.
-suggestedName: Finnish retail style when readable (brand + product).`;
+suggestedName: Finnish retail style when readable (brand + product).
+rawNotes: class, storage, origin when printed on the crate/label.`;
 
 const FRIDGE_LINE_SCHEMA = {
   type: 'object',

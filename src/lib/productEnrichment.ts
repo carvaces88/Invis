@@ -17,6 +17,7 @@ import {
   bestMatch,
   isGarbageProductName,
   isIdentityCatalogMatch,
+  visionContradictsProduct,
 } from './fuzzyMatch';
 import {
   extractHasLookupSignal,
@@ -214,7 +215,9 @@ export function matchExtractListing(
   catalog: Product[],
 ): { product: Product; fromKruoka: boolean; score: number } | null {
   const byEan = matchByEan(extract.ean, catalog);
-  if (byEan) {
+  // Reject hallucinated EANs that point at a clearly different product
+  // (cucumber crate → mayo tub EAN must never become 100% identity).
+  if (byEan && !visionContradictsProduct(extract, byEan)) {
     return {
       product: byEan,
       fromKruoka: byEan.id.startsWith('kruoka-'),
@@ -228,7 +231,11 @@ export function matchExtractListing(
   }
 
   const catalogHit = bestExtractMatch(catalog, extract);
-  if (catalogHit && catalogHit.score >= 0.45) {
+  if (
+    catalogHit &&
+    catalogHit.score >= 0.45 &&
+    !visionContradictsProduct(extract, catalogHit.product)
+  ) {
     return {
       product: catalogHit.product,
       fromKruoka: catalogHit.product.id.startsWith('kruoka-'),
@@ -236,7 +243,11 @@ export function matchExtractListing(
     };
   }
   const kruokaHit = bestExtractMatch(SEED_KRUOKA_PRODUCTS, extract);
-  if (kruokaHit && kruokaHit.score >= 0.45) {
+  if (
+    kruokaHit &&
+    kruokaHit.score >= 0.45 &&
+    !visionContradictsProduct(extract, kruokaHit.product)
+  ) {
     return {
       product: kruokaHit.product,
       fromKruoka: true,
@@ -277,14 +288,14 @@ export async function matchExtractListingAsync(
   }
 
   const live = await lookupKruokaForExtract(extract);
-  if (live) {
+  if (live && !visionContradictsProduct(extract, live.product)) {
     // Prefer existing catalog row when EAN/name already stocked
     if (live.hit.ean) {
       const inStock = catalog.find(
         (p) =>
           normalizeEanDigits(p.ean) === normalizeEanDigits(live.hit.ean),
       );
-      if (inStock) {
+      if (inStock && !visionContradictsProduct(extract, inStock)) {
         return {
           product: {
             ...inStock,
@@ -428,7 +439,7 @@ export function enrichFromExtract(
   catalog: Product[],
 ): ProductEnrichment {
   const listing = matchExtractListing(extract, catalog);
-  if (listing) {
+  if (listing && !visionContradictsProduct(extract, listing.product)) {
     const { product, fromKruoka, score } = listing;
     return enrichmentFromProduct(
       {
@@ -443,12 +454,15 @@ export function enrichFromExtract(
         imageUrl: extract.imageUrl ?? product.imageUrl,
       },
       Math.max(extract.confidence, score),
-      isIdentityCatalogMatch({
-        product,
-        score,
-        matchedOn: 'vision',
-        matchedTerm: extract.suggestedName,
-      })
+      isIdentityCatalogMatch(
+        {
+          product,
+          score,
+          matchedOn: 'vision',
+          matchedTerm: extract.suggestedName,
+        },
+        extract,
+      )
         ? 'Already in catalog — confirm existing product'
         : fromKruoka
           ? 'Prefill from scan + K-Ruoka seed'
@@ -466,17 +480,21 @@ export async function enrichFromExtractAsync(
   catalog: Product[],
 ): Promise<ProductEnrichment> {
   const listing = await matchExtractListingAsync(extract, catalog);
-  if (listing) {
+  if (listing && !visionContradictsProduct(extract, listing.product)) {
     const { product, fromKruoka, score, liveSource } = listing;
     const eanIdentity =
       Boolean(extract.ean) &&
-      normalizeEanDigits(extract.ean) === normalizeEanDigits(product.ean);
-    const identity = isIdentityCatalogMatch({
-      product,
-      score,
-      matchedOn: eanIdentity ? 'ean' : 'vision',
-      matchedTerm: extract.ean ?? extract.suggestedName,
-    });
+      normalizeEanDigits(extract.ean) === normalizeEanDigits(product.ean) &&
+      !visionContradictsProduct(extract, product);
+    const identity = isIdentityCatalogMatch(
+      {
+        product,
+        score,
+        matchedOn: eanIdentity ? 'ean' : 'vision',
+        matchedTerm: extract.ean ?? extract.suggestedName,
+      },
+      extract,
+    );
     const fromBarcode =
       extract.rawNotes?.includes('Scanned barcode') ||
       (eanIdentity && extract.confidence >= 0.99 && !extract.aiDescription);
@@ -499,6 +517,13 @@ export async function enrichFromExtractAsync(
         : fromBarcode
           ? 'Prefill from barcode + catalog match'
           : 'Prefill from scan + catalog match';
+    // Drop EAN when vision product clearly ≠ catalog row that owns that EAN
+    const safeEan =
+      extract.ean &&
+      (!product.ean ||
+        normalizeEanDigits(extract.ean) === normalizeEanDigits(product.ean))
+        ? extract.ean
+        : product.ean;
     return enrichmentFromProduct(
       {
         ...product,
@@ -507,16 +532,17 @@ export async function enrichFromExtractAsync(
           extract.unitPriceAlv0 != null && extract.unitPriceAlv0 > 0
             ? extract.unitPriceAlv0
             : product.unitPriceAlv0,
-        ean: extract.ean ?? product.ean,
+        ean: safeEan ?? undefined,
         sourceUrl: extract.sourceUrl ?? product.sourceUrl,
         imageUrl: extract.imageUrl ?? product.imageUrl,
       },
-      Math.max(extract.confidence, score),
+      identity ? Math.max(extract.confidence, score) : extract.confidence,
       note,
-      true,
+      identity || fromKruoka,
       extract,
     );
   }
+  // No trusted catalog hit — keep vision transcription as Add Product prefill
   return enrichmentFromExtract(extract);
 }
 

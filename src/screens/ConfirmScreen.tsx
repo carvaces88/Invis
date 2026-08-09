@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,14 +13,24 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CroppedImage } from '../components/CroppedImage';
+import { ImageZoomModal, type ImageZoomTarget } from '../components/ImageZoomModal';
 import { ProductSearchInput } from '../components/ProductSearchInput';
 import { PackCheckModal } from '../components/PackCheckModal';
 import { PlaceSelect } from '../components/PlaceSelect';
 import { ProductThumb } from '../components/ProductThumb';
+import {
+  COMMON_UNIT_OPTIONS,
+  MORE_UNIT_OPTIONS,
+  friendlyOptionForCode,
+  type FriendlyUnitOption,
+} from '../data/units';
+import { productImageSource } from '../data/seedKruoka';
 import { getStockQty, useInventory } from '../data/store';
 import type {
+  Product,
   ProductMatch,
   RootStackParamList,
+  UnitCode,
   VisionExtract,
 } from '../data/types';
 import { useI18n } from '../i18n';
@@ -29,8 +41,11 @@ import {
   isIdentityCatalogMatch,
   isStrongCatalogMatch,
   matchExtractToCatalog,
+  visionCatalogTokenOverlap,
+  visionContradictsProduct,
 } from '../lib/fuzzyMatch';
 import {
+  friendlyOptionForBaseUnit,
   shouldShowPackCheck,
   type PackCheckInfo,
   type PackCheckResolve,
@@ -40,7 +55,39 @@ import {
   enrichmentToExtract,
 } from '../lib/productEnrichment';
 import { formatClockTime } from '../lib/relativeTime';
+import { useUnitSystem } from '../lib/unitSystem';
 import { colors, radius, spacing } from '../theme/colors';
+
+function unitOptionForProduct(
+  product: Product | null,
+  extractUnit?: UnitCode | null,
+): FriendlyUnitOption {
+  // Prefer vision/extract unit over catalog when staff photo says KPL etc.
+  if (extractUnit) {
+    const fromExtract = friendlyOptionForCode(extractUnit);
+    if (fromExtract) return fromExtract;
+  }
+  if (product) {
+    const fromProduct = friendlyOptionForCode(product.unit);
+    if (fromProduct) return fromProduct;
+  }
+  return COMMON_UNIT_OPTIONS.find((o) => o.id === 'piece')!;
+}
+
+function mergeUniqueAliases(
+  a?: string[] | null,
+  b?: string[] | null,
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of [...(a ?? []), ...(b ?? [])]) {
+    const key = raw.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(raw.trim());
+  }
+  return out;
+}
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Confirm'>;
 
@@ -62,6 +109,7 @@ export function ConfirmScreen({ route, navigation }: Props) {
   const { extract: routeExtract, imageUri } = route.params;
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const { unitSystem, displayUnit, toStorageQty, formatQty } = useUnitSystem();
   const {
     products,
     session,
@@ -77,6 +125,11 @@ export function ConfirmScreen({ route, navigation }: Props) {
   const [extract, setExtract] = useState<VisionExtract>(routeExtract);
   const [enriching, setEnriching] = useState(true);
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
+  const [zoomTarget, setZoomTarget] = useState<ImageZoomTarget>(null);
+
+  // Always show the original vision label in “Model said …” (enrichment must
+  // not rewrite cucumbers into a mayo catalog title).
+  const visionLabel = routeExtract;
 
   useEffect(() => {
     let cancelled = false;
@@ -94,13 +147,24 @@ export function ConfirmScreen({ route, navigation }: Props) {
         const enrichment = await enrichFromExtractAsync(routeExtract, products);
         if (cancelled) return;
         const next = enrichmentToExtract(enrichment);
+        // Always keep vision label fields; only fill gaps from catalog enrich.
+        // Prevents “Korsnäs crate” brand sitting on a mayo officialName/EAN.
         setExtract({
           ...next,
+          suggestedName: routeExtract.suggestedName,
+          brand: routeExtract.brand ?? next.brand,
+          containerHint: routeExtract.containerHint ?? next.containerHint,
+          packSize: routeExtract.packSize ?? next.packSize,
+          unit: routeExtract.unit ?? next.unit,
+          ingredientType:
+            routeExtract.ingredientType ?? next.ingredientType,
+          aliases: mergeUniqueAliases(routeExtract.aliases, next.aliases),
+          ean: routeExtract.ean ?? next.ean,
           quantity: routeExtract.quantity ?? next.quantity,
           expiryDate: routeExtract.expiryDate ?? next.expiryDate,
           crop: routeExtract.crop ?? next.crop,
-          confidence: Math.max(routeExtract.confidence, next.confidence),
-          unrecognized: routeExtract.unrecognized || next.unrecognized,
+          confidence: routeExtract.confidence,
+          unrecognized: routeExtract.unrecognized,
           rawNotes: [routeExtract.rawNotes, enrichment.notes]
             .filter(Boolean)
             .join(' · '),
@@ -116,36 +180,81 @@ export function ConfirmScreen({ route, navigation }: Props) {
   }, []);
 
   const initialMatch = useMemo(() => {
-    const hit = bestExtractMatch(products, extract);
+    const hit = bestExtractMatch(products, visionLabel);
     if (!hit) return null;
-    if (extract.unrecognized && hit.score < 0.85) return null;
-    return hit;
-  }, [products, extract]);
-  const suggestions = useMemo(() => {
-    const list = matchExtractToCatalog(products, extract, SUGGESTION_LIMIT);
-    if (extract.unrecognized) {
-      return list.filter((m) => m.score >= 0.55);
+    if (visionContradictsProduct(visionLabel, hit.product)) return null;
+    if (
+      visionCatalogTokenOverlap(visionLabel, hit.product) < 0.12 &&
+      hit.matchedOn !== 'ean'
+    ) {
+      return null;
     }
-    return list;
-  }, [products, extract]);
+    if (visionLabel.unrecognized && hit.score < 0.85) return null;
+    return hit;
+  }, [products, visionLabel]);
+  const suggestions = useMemo(() => {
+    const list = matchExtractToCatalog(products, visionLabel, SUGGESTION_LIMIT);
+    return list.filter((m) => {
+      if (visionContradictsProduct(visionLabel, m.product)) return false;
+      if (visionLabel.unrecognized) return m.score >= 0.55;
+      return true;
+    });
+  }, [products, visionLabel]);
   const visibleSuggestions = showAllSuggestions
     ? suggestions
     : suggestions.slice(0, SUGGESTIONS_VISIBLE_DEFAULT);
   const hasMoreSuggestions = suggestions.length > SUGGESTIONS_VISIBLE_DEFAULT;
 
   const [selected, setSelected] = useState<ProductMatch | null>(null);
+  const [unitOption, setUnitOption] = useState<FriendlyUnitOption>(() =>
+    unitOptionForProduct(null, routeExtract.unit),
+  );
+  const [moreOpen, setMoreOpen] = useState(false);
   useEffect(() => {
     setSelected(initialMatch);
   }, [initialMatch]);
+
+  // Default unit when the matched product changes (not on every extract tick).
+  const selectedProductId = selected?.product.id;
+  useEffect(() => {
+    if (!selected) return;
+    setUnitOption(unitOptionForProduct(selected.product, extract.unit));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on product identity
+  }, [selectedProductId]);
 
   const [qty, setQty] = useState(
     routeExtract.quantity != null ? String(routeExtract.quantity) : '1',
   );
   const [expiry, setExpiry] = useState(routeExtract.expiryDate ?? '');
   const [packCheck, setPackCheck] = useState<PackCheckInfo | null>(null);
+  const moreIsActive = MORE_UNIT_OPTIONS.some((o) => o.id === unitOption.id);
 
-  const strongMatch = isStrongCatalogMatch(selected);
-  const identityMatch = isIdentityCatalogMatch(selected);
+  function pickUnit(option: FriendlyUnitOption) {
+    setUnitOption(option);
+    setMoreOpen(false);
+  }
+
+  function selectMatch(match: ProductMatch) {
+    setSelected(match);
+    setUnitOption(unitOptionForProduct(match.product, extract.unit));
+  }
+
+  const matchContradicts = Boolean(
+    selected && visionContradictsProduct(visionLabel, selected.product),
+  );
+  const tokenOverlapLow = Boolean(
+    selected &&
+      visionCatalogTokenOverlap(visionLabel, selected.product) < 0.2 &&
+      selected.matchedOn !== 'ean',
+  );
+  const strongMatch =
+    isStrongCatalogMatch(selected, visionLabel) &&
+    !matchContradicts &&
+    !tokenOverlapLow;
+  const identityMatch =
+    isIdentityCatalogMatch(selected, visionLabel) &&
+    !matchContradicts &&
+    !tokenOverlapLow;
   const unmatched = !strongMatch;
   const onHand = selected
     ? getStockQty(session, selected.product.id, activePlaceId)
@@ -179,19 +288,24 @@ export function ConfirmScreen({ route, navigation }: Props) {
 
   function commitSave(n: number) {
     if (!selected) return;
+    const storedQty = toStorageQty(selected.product.unit, n);
     const run = () => {
       const result = addQuantity({
         productId: selected.product.id,
-        delta: n,
+        delta: storedQty,
         placeId: activePlaceId,
         expiryDate: expiry.trim() || null,
       });
       const time = formatClockTime(
         result?.lastUpdatedAt ?? new Date().toISOString(),
       );
+      const unitLabel = displayUnit(unitOption.code);
       const body = t('recordAddedSummary')
-        .replace('{added}', String(n))
-        .replace('{total}', String(result?.quantityAfter ?? n))
+        .replace('{added}', `${formatQty(n)} ${unitLabel}`)
+        .replace(
+          '{total}',
+          `${formatQty(result?.quantityAfter ?? storedQty)} ${displayUnit(selected.product.unit)}`,
+        )
         .replace('{time}', time);
       alertAck(t('recordSavedTitle'), body, () => navigation.popToTop());
     };
@@ -214,7 +328,7 @@ export function ConfirmScreen({ route, navigation }: Props) {
     }
     const check = shouldShowPackCheck(
       selected.product,
-      selected.product.unit,
+      unitOption.code,
       n,
     );
     if (check) {
@@ -247,6 +361,13 @@ export function ConfirmScreen({ route, navigation }: Props) {
         resolved.packBaseUnit,
       );
     }
+    const baseUnit = resolved?.packBaseUnit ?? packCheck.baseUnit;
+    const baseOpt =
+      packCheck.preferBunchLabel && baseUnit === 'KPL'
+        ? MORE_UNIT_OPTIONS.find((o) => o.id === 'bunch') ??
+          friendlyOptionForBaseUnit(baseUnit)
+        : friendlyOptionForBaseUnit(baseUnit);
+    if (baseOpt) setUnitOption(baseOpt);
     const n =
       packCheck.needsUnitsPerPack || packCheck.pieceQty == null
         ? packCheck.packQty
@@ -256,25 +377,50 @@ export function ConfirmScreen({ route, navigation }: Props) {
     commitSave(n);
   }
 
+  /** Entered qty as single retail units (KPL) — no pack × multiplier. */
+  function onPackCountAsUnits(resolved?: PackCheckResolve) {
+    if (!packCheck || !selected) return;
+    const baseUnit = resolved?.packBaseUnit ?? 'KPL';
+    const baseOpt =
+      friendlyOptionForBaseUnit(baseUnit) ??
+      COMMON_UNIT_OPTIONS.find((o) => o.id === 'piece')!;
+    setUnitOption(baseOpt);
+    const n = packCheck.packQty;
+    setQty(String(n));
+    setPackCheck(null);
+    commitSave(n);
+  }
+
+  function onPackEdit() {
+    setPackCheck(null);
+  }
+
   function openAddProduct() {
     navigation.navigate('AddProduct', {
-      prefillName: extract.suggestedName,
-      unit: extract.unit ?? undefined,
-      packSize: extract.packSize ?? undefined,
-      unitPriceAlv0: extract.unitPriceAlv0 ?? undefined,
-      aliases: extract.aliases,
-      ean: extract.ean ?? undefined,
+      prefillName: visionLabel.suggestedName,
+      unit: visionLabel.unit ?? extract.unit ?? undefined,
+      packSize: visionLabel.packSize ?? extract.packSize ?? undefined,
+      unitPriceAlv0:
+        visionLabel.unitPriceAlv0 ?? extract.unitPriceAlv0 ?? undefined,
+      aliases: mergeUniqueAliases(visionLabel.aliases, extract.aliases),
+      ean: visionLabel.ean ?? undefined,
       sourceUrl: extract.sourceUrl ?? undefined,
       imageUrl: extract.imageUrl ?? undefined,
-      ingredientType: extract.ingredientType ?? undefined,
-      brand: extract.brand ?? undefined,
-      containerHint: extract.containerHint ?? undefined,
+      ingredientType:
+        visionLabel.ingredientType ?? extract.ingredientType ?? undefined,
+      brand: visionLabel.brand ?? extract.brand ?? undefined,
+      containerHint:
+        visionLabel.containerHint ?? extract.containerHint ?? undefined,
       photoUris: imageUri ? [imageUri] : undefined,
       returnToConfirm: true,
-      extract,
+      extract: visionLabel,
       imageUri,
     });
   }
+
+  const catalogZoomSource = selected
+    ? productImageSource(selected.product)
+    : null;
 
   return (
     <ScrollView
@@ -290,8 +436,8 @@ export function ConfirmScreen({ route, navigation }: Props) {
       <Text style={styles.title}>{t('fridgeIsThisProduct')}</Text>
       <Text style={styles.sub}>
         {t('confirmModelSaid')
-          .replace('{name}', extract.suggestedName)
-          .replace('{pct}', String(Math.round(extract.confidence * 100)))}
+          .replace('{name}', visionLabel.suggestedName)
+          .replace('{pct}', String(Math.round(visionLabel.confidence * 100)))}
       </Text>
 
       {enriching ? (
@@ -317,24 +463,62 @@ export function ConfirmScreen({ route, navigation }: Props) {
 
       <View style={styles.matchPair}>
         <View style={styles.matchCol}>
-          <CroppedImage
-            uri={imageUri}
-            crop={extract.crop}
-            size={108}
-            fallbackColor={extract.crop?.previewColor}
-          />
+          <Pressable
+            onPress={() => {
+              if (!imageUri) return;
+              setZoomTarget({
+                source: { uri: imageUri },
+                label: t('fridgeDetectedCrop'),
+              });
+            }}
+            disabled={!imageUri}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('fridgeDetectedCrop')} · ${t('imageZoomTitle')}`}
+          >
+            <CroppedImage
+              uri={imageUri}
+              crop={extract.crop ?? visionLabel.crop}
+              size={108}
+              fallbackColor={
+                extract.crop?.previewColor ?? visionLabel.crop?.previewColor
+              }
+            />
+          </Pressable>
           <Text style={styles.matchCap}>{t('fridgeDetectedCrop')}</Text>
         </View>
         <Text style={styles.matchArrow}>→</Text>
         <View style={styles.matchCol}>
           {selected ? (
-            <ProductThumb product={selected.product} size={108} />
+            <Pressable
+              onPress={() => {
+                if (!catalogZoomSource) return;
+                setZoomTarget({
+                  source: catalogZoomSource,
+                  label: selected.product.officialName,
+                });
+              }}
+              disabled={!catalogZoomSource}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('fridgeOfficialPhoto')} · ${t('imageZoomTitle')}`}
+            >
+              <ProductThumb product={selected.product} size={108} />
+            </Pressable>
           ) : (
             <View style={styles.packPlaceholder} />
           )}
           <Text style={styles.matchCap}>{t('fridgeOfficialPhoto')}</Text>
         </View>
       </View>
+
+      {matchContradicts || tokenOverlapLow ? (
+        <View
+          style={styles.warnBox}
+          accessibilityRole="summary"
+          accessibilityLabel={t('confirmMismatchWarning')}
+        >
+          <Text style={styles.warnBody}>{t('confirmMismatchWarning')}</Text>
+        </View>
+      ) : null}
 
       {strongMatch && selected ? (
         <View
@@ -413,7 +597,7 @@ export function ConfirmScreen({ route, navigation }: Props) {
             return (
               <Pressable
                 key={m.product.id}
-                onPress={() => setSelected(m)}
+                onPress={() => selectMatch(m)}
                 style={[styles.matchRow, on && styles.matchRowOn]}
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
@@ -459,14 +643,63 @@ export function ConfirmScreen({ route, navigation }: Props) {
       </Text>
       <ProductSearchInput
         products={products}
-        initialQuery={extract.suggestedName}
-        onSelect={(m) => setSelected(m)}
+        initialQuery={visionLabel.suggestedName}
+        onSelect={(m) => selectMatch(m)}
       />
 
       {strongMatch ? (
         <Pressable style={styles.addBtnGhost} onPress={openAddProduct}>
           <Text style={styles.addBtnGhostText}>{t('confirmAddDifferent')}</Text>
         </Pressable>
+      ) : null}
+
+      <Text style={styles.label}>{t('unit')}</Text>
+      <View style={styles.chips}>
+        {COMMON_UNIT_OPTIONS.map((option) => {
+          const on = unitOption.id === option.id;
+          return (
+            <Pressable
+              key={option.id}
+              onPress={() => pickUnit(option)}
+              style={[styles.chip, on && styles.chipOn]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+            >
+              <Text style={[styles.chipText, on && styles.chipTextOn]}>
+                {option.id === 'kg' && unitSystem === 'imperial'
+                  ? t('unitChipLb')
+                  : option.id === 'liter' && unitSystem === 'imperial'
+                    ? t('unitChipFloz')
+                    : t(option.labelKey)}
+              </Text>
+              <Text style={[styles.chipCode, on && styles.chipCodeOn]}>
+                {displayUnit(option.code)}
+              </Text>
+            </Pressable>
+          );
+        })}
+        <Pressable
+          onPress={() => setMoreOpen(true)}
+          style={[styles.chip, moreIsActive && styles.chipOn]}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.chipText, moreIsActive && styles.chipTextOn]}>
+            {moreIsActive ? t(unitOption.labelKey) : t('recordMoreUnits')}
+          </Text>
+          {moreIsActive ? (
+            <Text style={[styles.chipCode, styles.chipCodeOn]}>
+              {unitOption.code}
+            </Text>
+          ) : null}
+        </Pressable>
+      </View>
+      {selected && selected.product.unit !== unitOption.code ? (
+        <Text style={styles.unitNote}>
+          {t('recordUnitCatalogNote').replace(
+            '{unit}',
+            selected.product.unit,
+          )}
+        </Text>
       ) : null}
 
       <Text style={styles.label}>{t('qty')}</Text>
@@ -495,12 +728,54 @@ export function ConfirmScreen({ route, navigation }: Props) {
         </Text>
       </Pressable>
 
+      <Modal
+        visible={moreOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setMoreOpen(false)}
+      >
+        <Pressable
+          style={styles.moreBackdrop}
+          onPress={() => setMoreOpen(false)}
+        >
+          <Pressable
+            style={[
+              styles.moreSheet,
+              { paddingBottom: insets.bottom + spacing.lg },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.moreTitle}>{t('recordMoreUnits')}</Text>
+            <FlatList
+              data={MORE_UNIT_OPTIONS}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.modalRow}
+                  onPress={() => pickUnit(item)}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.modalRowText}>{t(item.labelKey)}</Text>
+                  <Text style={styles.modalRowCode}>{item.code}</Text>
+                </Pressable>
+              )}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <PackCheckModal
         visible={packCheck != null}
         info={packCheck}
         onYesPacks={onPackYes}
         onChangeToPieces={onPackChangeToPieces}
-        onEdit={() => setPackCheck(null)}
+        onCountAsUnits={onPackCountAsUnits}
+        onEdit={onPackEdit}
+      />
+
+      <ImageZoomModal
+        target={zoomTarget}
+        onClose={() => setZoomTarget(null)}
       />
     </ScrollView>
   );
@@ -565,6 +840,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginTop: 4,
+  },
+  warnBox: {
+    marginTop: spacing.md,
+    backgroundColor: '#FFF4E5',
+    borderWidth: 1,
+    borderColor: '#E6A23C',
+    padding: spacing.md,
+    borderRadius: radius.md,
+  },
+  warnBody: {
+    color: colors.ink,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
   },
   notHaveBox: {
     marginTop: spacing.md,
@@ -680,6 +969,66 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.ink,
   },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  chipOn: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+  },
+  chipText: { fontSize: 14, fontWeight: '600', color: colors.ink },
+  chipTextOn: { color: colors.primary },
+  chipCode: { fontSize: 11, fontWeight: '600', color: colors.inkFaint },
+  chipCodeOn: { color: colors.primaryMid },
+  unitNote: {
+    marginTop: spacing.sm,
+    fontSize: 12,
+    color: colors.inkMuted,
+    lineHeight: 16,
+  },
+  moreBackdrop: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    justifyContent: 'flex-end',
+  },
+  moreSheet: {
+    backgroundColor: colors.bgElevated,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    paddingTop: spacing.md,
+    maxHeight: '55%',
+  },
+  moreTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.ink,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  modalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.line,
+  },
+  modalRowText: { fontSize: 15, fontWeight: '600', color: colors.ink },
+  modalRowCode: { fontSize: 13, fontWeight: '600', color: colors.inkMuted },
   save: {
     marginTop: spacing.lg,
     backgroundColor: colors.primary,
