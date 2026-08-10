@@ -294,6 +294,14 @@ async function searchDirectKruoka(
     .filter(Boolean) as KruokaHit[];
 }
 
+/** Sync offline seed match for snappy list UIs (no network). */
+export function lookupKruokaSeedSync(
+  query: string,
+  ean?: string | null,
+): KruokaHit[] {
+  return searchSeed(query, ean);
+}
+
 function searchSeed(query: string, ean?: string | null): KruokaHit[] {
   if (ean) {
     const byEan = SEED_KRUOKA_PRODUCTS.find((p) => p.ean === ean);

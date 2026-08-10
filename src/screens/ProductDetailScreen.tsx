@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -15,10 +15,11 @@ import { useInventory } from '../data/store';
 import type { RootStackParamList } from '../data/types';
 import { INGREDIENT_TYPE_LABELS, UNIT_LABELS } from '../data/units';
 import { useI18n, type MessageKey } from '../i18n';
-import { FOOD_ALV_RATE, foodAlvPercentLabel } from '../lib/alv';
+import { FOOD_ALV_RATE, foodAlvPercentLabel, withFoodAlv } from '../lib/alv';
 import {
   compareProductPrices,
   formatEur,
+  partitionCatalogDistributorRows,
   type CompetitorRow,
   type CompetitorSourceId,
   type PriceComparisonResult,
@@ -83,6 +84,95 @@ function openUrl(url: string) {
   void Linking.openURL(url);
 }
 
+function DistributorCard({
+  row,
+  comparedAt,
+  showWithAlv,
+  alvPct,
+  locale,
+  t,
+}: {
+  row: CompetitorRow;
+  comparedAt?: string;
+  showWithAlv: boolean;
+  alvPct: string;
+  locale: string;
+  t: (k: MessageKey) => string;
+}) {
+  const displayAlv0 = row.unitPriceAlv0;
+  const displayAmount =
+    displayAlv0 != null && displayAlv0 > 0
+      ? withFoodAlv(displayAlv0, showWithAlv)
+      : undefined;
+
+  return (
+    <View style={styles.compCard}>
+      <View style={styles.compHead}>
+        <Text style={styles.compTitle}>{sourceTitle(row.id, t)}</Text>
+        <Text style={styles.compAvail}>{availabilityLabel(row, t)}</Text>
+      </View>
+
+      {row.matchedName ? (
+        <Text style={styles.matched}>
+          {t('priceCompareMatchedAs').replace('{name}', row.matchedName)}
+          {row.packSize ? ` · ${row.packSize}` : ''}
+        </Text>
+      ) : (
+        <Text style={styles.matchedMuted}>
+          {row.id === 'aimo' || row.id === 'vihannesporssi'
+            ? t('priceCompareWholesaleHint')
+            : row.id === 'lidl'
+              ? t('priceCompareRetailLinkHint')
+              : t('priceCompareNoLiveMatch')}
+        </Text>
+      )}
+
+      {displayAmount != null ? (
+        <>
+          <Text style={styles.compPrice}>
+            {formatEur(displayAmount)}{' '}
+            <Text style={styles.ourSuffix}>
+              {showWithAlv ? t('alvWith') : t('priceCompareAlv0')}
+            </Text>
+          </Text>
+          {row.shelfPriceEur != null && !showWithAlv ? (
+            <Text style={styles.compShelf}>
+              {row.shelfIncludesAlv
+                ? t('priceCompareRetailInclAlv')
+                    .replace('{pct}', alvPct)
+                    .replace('{amount}', formatEur(row.shelfPriceEur))
+                : t('priceCompareWholesaleNet').replace(
+                    '{amount}',
+                    formatEur(row.shelfPriceEur),
+                  )}
+            </Text>
+          ) : null}
+          {comparedAt ? (
+            <Text style={styles.lastUpdated}>
+              {t('catalogDetailLastUpdated').replace(
+                '{date}',
+                formatAsOfDate(comparedAt, locale),
+              )}
+            </Text>
+          ) : null}
+        </>
+      ) : (
+        <Text style={styles.placeholder}>
+          {t('catalogDetailNoDistributorPrice')}
+        </Text>
+      )}
+
+      <Pressable
+        style={styles.linkBtn}
+        onPress={() => openUrl(row.sourceUrl)}
+        accessibilityRole="link"
+      >
+        <Text style={styles.linkBtnText}>{t('priceCompareOpenLink')}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export function ProductDetailScreen({ route, navigation }: Props) {
   const { productId } = route.params;
   const insets = useSafeAreaInsets();
@@ -94,6 +184,7 @@ export function ProductDetailScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const [showWithAlv, setShowWithAlv] = useState(false);
 
   const alvPct = foodAlvPercentLabel();
 
@@ -125,6 +216,14 @@ export function ProductDetailScreen({ route, navigation }: Props) {
     }
   }, [navigation, product]);
 
+  const partitioned = useMemo(
+    () =>
+      result
+        ? partitionCatalogDistributorRows(result.rows)
+        : { primary: [], other: [] },
+    [result],
+  );
+
   if (!product) {
     return (
       <View style={[styles.root, styles.centered]}>
@@ -140,7 +239,8 @@ export function ProductDetailScreen({ route, navigation }: Props) {
     );
   }
 
-  const withAlv =
+  const ourDisplay = withFoodAlv(product.unitPriceAlv0, showWithAlv);
+  const withAlvShelf =
     Math.round(product.unitPriceAlv0 * (1 + FOOD_ALV_RATE) * 100) / 100;
 
   return (
@@ -202,17 +302,52 @@ export function ProductDetailScreen({ route, navigation }: Props) {
         ) : null}
       </View>
 
+      <View style={styles.alvRow}>
+        <Pressable
+          style={[styles.alvChip, !showWithAlv && styles.alvChipOn]}
+          onPress={() => setShowWithAlv(false)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: !showWithAlv }}
+        >
+          <Text
+            style={[styles.alvChipText, !showWithAlv && styles.alvChipTextOn]}
+          >
+            {t('alvZero')}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.alvChip, showWithAlv && styles.alvChipOn]}
+          onPress={() => setShowWithAlv(true)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: showWithAlv }}
+          accessibilityHint={t('catalogDetailAlvToggleHint').replace(
+            '{rate}',
+            alvPct,
+          )}
+        >
+          <Text
+            style={[styles.alvChipText, showWithAlv && styles.alvChipTextOn]}
+          >
+            {t('alvWith')}
+          </Text>
+        </Pressable>
+      </View>
+
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>{t('catalogDetailOurPrice')}</Text>
         <Text style={styles.ourPrice}>
-          {formatEur(product.unitPriceAlv0)}{' '}
-          <Text style={styles.ourSuffix}>{t('priceCompareAlv0')}</Text>
+          {formatEur(ourDisplay)}{' '}
+          <Text style={styles.ourSuffix}>
+            {showWithAlv ? t('alvWith') : t('priceCompareAlv0')}
+          </Text>
         </Text>
-        <Text style={styles.ourRetail}>
-          {t('priceCompareOurPriceWithAlv')
-            .replace('{pct}', alvPct)
-            .replace('{amount}', formatEur(withAlv))}
-        </Text>
+        {!showWithAlv ? (
+          <Text style={styles.ourRetail}>
+            {t('priceCompareOurPriceWithAlv')
+              .replace('{pct}', alvPct)
+              .replace('{amount}', formatEur(withAlvShelf))}
+          </Text>
+        ) : null}
         <Text style={styles.priceNote}>{t('catalogDetailPriceNote')}</Text>
       </View>
 
@@ -267,72 +402,41 @@ export function ProductDetailScreen({ route, navigation }: Props) {
         </View>
       ) : null}
 
-      {result
-        ? result.rows.map((row) => (
-            <View key={row.id} style={styles.compCard}>
-              <View style={styles.compHead}>
-                <Text style={styles.compTitle}>{sourceTitle(row.id, t)}</Text>
-                <Text style={styles.compAvail}>{availabilityLabel(row, t)}</Text>
-              </View>
+      {result ? (
+        <>
+          <Text style={styles.groupTitle}>{t('catalogDetailPrimaryCols')}</Text>
+          {partitioned.primary.map((row) => (
+            <DistributorCard
+              key={row.id}
+              row={row}
+              comparedAt={result.comparedAt}
+              showWithAlv={showWithAlv}
+              alvPct={alvPct}
+              locale={locale}
+              t={t}
+            />
+          ))}
 
-              {row.matchedName ? (
-                <Text style={styles.matched}>
-                  {t('priceCompareMatchedAs').replace('{name}', row.matchedName)}
-                  {row.packSize ? ` · ${row.packSize}` : ''}
-                </Text>
-              ) : (
-                <Text style={styles.matchedMuted}>
-                  {row.id === 'aimo' || row.id === 'vihannesporssi'
-                    ? t('priceCompareWholesaleHint')
-                    : row.id === 'lidl'
-                      ? t('priceCompareRetailLinkHint')
-                      : t('priceCompareNoLiveMatch')}
-                </Text>
-              )}
-
-              {row.unitPriceAlv0 != null && row.unitPriceAlv0 > 0 ? (
-                <>
-                  <Text style={styles.compPrice}>
-                    {formatEur(row.unitPriceAlv0)}{' '}
-                    <Text style={styles.ourSuffix}>{t('priceCompareAlv0')}</Text>
-                  </Text>
-                  {row.shelfPriceEur != null ? (
-                    <Text style={styles.compShelf}>
-                      {row.shelfIncludesAlv
-                        ? t('priceCompareRetailInclAlv')
-                            .replace('{pct}', alvPct)
-                            .replace('{amount}', formatEur(row.shelfPriceEur))
-                        : t('priceCompareWholesaleNet').replace(
-                            '{amount}',
-                            formatEur(row.shelfPriceEur),
-                          )}
-                    </Text>
-                  ) : null}
-                  {result.comparedAt ? (
-                    <Text style={styles.lastUpdated}>
-                      {t('catalogDetailLastUpdated').replace(
-                        '{date}',
-                        formatAsOfDate(result.comparedAt, locale),
-                      )}
-                    </Text>
-                  ) : null}
-                </>
-              ) : (
-                <Text style={styles.placeholder}>
-                  {t('catalogDetailNoDistributorPrice')}
-                </Text>
-              )}
-
-              <Pressable
-                style={styles.linkBtn}
-                onPress={() => openUrl(row.sourceUrl)}
-                accessibilityRole="link"
-              >
-                <Text style={styles.linkBtnText}>{t('priceCompareOpenLink')}</Text>
-              </Pressable>
-            </View>
-          ))
-        : null}
+          {partitioned.other.length > 0 ? (
+            <>
+              <Text style={styles.groupTitle}>
+                {t('catalogDetailOtherSources')}
+              </Text>
+              {partitioned.other.map((row) => (
+                <DistributorCard
+                  key={row.id}
+                  row={row}
+                  comparedAt={result.comparedAt}
+                  showWithAlv={showWithAlv}
+                  alvPct={alvPct}
+                  locale={locale}
+                  t={t}
+                />
+              ))}
+            </>
+          ) : null}
+        </>
+      ) : null}
 
       <Text style={styles.footerNote}>{t('catalogDetailFooter')}</Text>
     </ScrollView>
@@ -384,6 +488,25 @@ const styles = StyleSheet.create({
   },
   sourceLink: { marginTop: spacing.md, alignSelf: 'flex-start' },
   sourceLinkText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
+  alvRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  alvChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  alvChipOn: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  alvChipText: { fontSize: 13, fontWeight: '600', color: colors.inkMuted },
+  alvChipTextOn: { color: '#fff' },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '700',
@@ -453,6 +576,15 @@ const styles = StyleSheet.create({
   },
   errorText: { color: colors.danger, fontSize: 13, lineHeight: 18 },
   errorRetry: { color: colors.primary, fontWeight: '700', fontSize: 14 },
+  groupTitle: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.inkMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
   compCard: {
     marginBottom: spacing.sm,
     backgroundColor: colors.bgElevated,

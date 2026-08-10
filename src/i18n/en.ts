@@ -436,6 +436,13 @@ export const en = {
   byIngredient: 'By ingredient',
   azName: 'A–Z name',
   addToDb: 'Add to DB',
+  catalogColKruoka: 'K-Ruoka',
+  catalogColSkaupat: 'S-kaupat',
+  catalogColLidl: 'Lidl',
+  catalogPriceColsHint:
+    'Seed/cached distributor € (0% ALV). Tap a row for live lookup.',
+  catalogPriceEmpty: '—',
+  catalogPriceInventoryHint: 'inv.',
   catalogDetailTitle: 'Product',
   catalogDetailMissing: 'This product is no longer in the catalog.',
   catalogDetailBack: 'Back',
@@ -451,12 +458,15 @@ export const en = {
     'Stored at 0% ALV. “With ALV” uses the 14% food VAT rate for shelf-equivalent display only.',
   catalogDetailDistributors: 'Distributor & retail prices',
   catalogDetailDistributorsSub:
-    'Last looked-up prices from each source when available. Sources without a match stay as open links until live data exists.',
+    'Catalog columns: K-Ruoka, S-Kaupat, Lidl. Live/seed lookup on open; wholesale sources below.',
+  catalogDetailPrimaryCols: 'Catalog price columns',
+  catalogDetailOtherSources: 'Wholesale & other',
   catalogDetailLastUpdated: 'Looked up {date}',
   catalogDetailNoDistributorPrice: 'No price from this source yet',
   catalogDetailFooter:
     'Catalog stores a single inventory unit price. Multi-source € comes from live/seed lookups — not a permanent price history per distributor.',
-
+  catalogDetailAlvToggleHint:
+    'Prices stored at 0% ALV. With ALV adds {rate}% food VAT for display only.',
   // Stack titles / common actions
   confirm: 'Confirm',
   confirmLines: 'Confirm lines',

@@ -41,6 +41,14 @@ function proxyBase(): string | null {
   return null;
 }
 
+/** Sync offline seed match for snappy list UIs (no network). */
+export function lookupSkaupatSeedSync(
+  query: string,
+  ean?: string | null,
+): SkaupatHit[] {
+  return scoreSeed(query, ean?.replace(/\D/g, '') || null);
+}
+
 function scoreSeed(query: string, ean: string | null): SkaupatHit[] {
   const q = normalizeLoose(query);
   const hits: { hit: SkaupatHit; score: number }[] = [];

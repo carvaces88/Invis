@@ -13,12 +13,71 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProductSearchInput } from '../components/ProductSearchInput';
 import { ProductThumb } from '../components/ProductThumb';
 import { useInventory } from '../data/store';
-import type { IngredientType, RootStackParamList } from '../data/types';
+import type { IngredientType, Product, RootStackParamList } from '../data/types';
 import { INGREDIENT_TYPE_LABELS } from '../data/units';
-import { useI18n } from '../i18n';
+import { useI18n, type MessageKey } from '../i18n';
+import {
+  formatEur,
+  peekCatalogListPrices,
+  type CatalogListPriceCell,
+  type CatalogPriceColumnId,
+} from '../lib/priceComparison';
 import { colors, radius, shadows, spacing, surfaces } from '../theme/colors';
 
 const TYPES = Object.keys(INGREDIENT_TYPE_LABELS) as IngredientType[];
+
+function columnHeaderKey(id: CatalogPriceColumnId): MessageKey {
+  switch (id) {
+    case 'kruoka':
+      return 'catalogColKruoka';
+    case 'skaupat':
+      return 'catalogColSkaupat';
+    case 'lidl':
+      return 'catalogColLidl';
+  }
+}
+
+function PriceCell({
+  cell,
+  emptyLabel,
+  inventoryHint,
+}: {
+  cell: CatalogListPriceCell;
+  emptyLabel: string;
+  inventoryHint: string;
+}) {
+  if (cell.unitPriceAlv0 == null || cell.unitPriceAlv0 <= 0) {
+    return <Text style={styles.priceEmpty}>{emptyLabel}</Text>;
+  }
+  return (
+    <View>
+      <Text style={styles.priceValue} numberOfLines={1}>
+        {formatEur(cell.unitPriceAlv0)}
+      </Text>
+      {cell.fromInventory ? (
+        <Text style={styles.priceHint}>{inventoryHint}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+function CatalogPriceRow({ product }: { product: Product }) {
+  const { t } = useI18n();
+  const cells = peekCatalogListPrices(product);
+  return (
+    <View style={styles.priceCols}>
+      {cells.map((cell) => (
+        <View key={cell.id} style={styles.priceCol}>
+          <PriceCell
+            cell={cell}
+            emptyLabel={t('catalogPriceEmpty')}
+            inventoryHint={t('catalogPriceInventoryHint')}
+          />
+        </View>
+      ))}
+    </View>
+  );
+}
 
 export function CatalogScreen() {
   const insets = useSafeAreaInsets();
@@ -160,6 +219,22 @@ export function CatalogScreen() {
             </Pressable>
           ))}
         </ScrollView>
+
+        <View style={styles.colHeaderBlock}>
+          <Text style={styles.colHint}>{t('catalogPriceColsHint')}</Text>
+          <View style={styles.colHeaderRow}>
+            <View style={styles.colHeaderFlex} />
+            <View style={styles.priceCols}>
+              {(['kruoka', 'skaupat', 'lidl'] as const).map((id) => (
+                <View key={id} style={styles.priceCol}>
+                  <Text style={styles.colHeaderText} numberOfLines={1}>
+                    {t(columnHeaderKey(id))}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
       </View>
 
       <View style={styles.listWrap}>
@@ -183,18 +258,17 @@ export function CatalogScreen() {
               accessibilityLabel={item.officialName}
             >
               <View style={styles.cardRow}>
-                <ProductThumb product={item} size={56} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardName}>{item.officialName}</Text>
-                  <Text style={styles.cardMeta}>
-                    {INGREDIENT_TYPE_LABELS[item.ingredientType]} · {item.unit}
-                    {item.packSize ? ` · ${item.packSize}` : ''} ·{' '}
-                    {item.unitPriceAlv0.toFixed(2)} €
+                <ProductThumb product={item} size={48} />
+                <View style={styles.cardBody}>
+                  <Text style={styles.cardName} numberOfLines={2}>
+                    {item.officialName}
                   </Text>
-                  <Text style={styles.aliases} numberOfLines={2}>
-                    Aliases: {item.aliases.join(', ')}
+                  <Text style={styles.cardMeta} numberOfLines={1}>
+                    {item.unit}
+                    {item.packSize ? ` · ${item.packSize}` : ''}
                   </Text>
                 </View>
+                <CatalogPriceRow product={item} />
               </View>
             </Pressable>
           )}
@@ -258,6 +332,30 @@ const styles = StyleSheet.create({
   typePillOn: { backgroundColor: colors.primary },
   typePillText: { fontSize: 12, color: colors.primary, fontWeight: '600' },
   typePillTextOn: { color: '#fff' },
+  colHeaderBlock: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+  },
+  colHint: {
+    fontSize: 11,
+    color: colors.inkFaint,
+    marginBottom: 6,
+  },
+  colHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+  },
+  colHeaderFlex: { flex: 1 },
+  colHeaderText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.inkMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    textAlign: 'right',
+  },
   /** Scopes FlatList absolute-fill so it cannot cover filters above. */
   listWrap: {
     flex: 1,
@@ -267,12 +365,48 @@ const styles = StyleSheet.create({
   list: { flex: 1 },
   card: {
     ...surfaces.cardTight,
-    padding: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     marginBottom: spacing.sm,
   },
   cardPressed: { opacity: 0.88 },
-  cardRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
-  cardName: { fontSize: 15, fontWeight: '600', color: colors.ink },
-  cardMeta: { fontSize: 12, color: colors.inkMuted, marginTop: 4 },
-  aliases: { fontSize: 12, color: colors.accent, marginTop: 8 },
+  cardRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  cardBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  cardName: { fontSize: 14, fontWeight: '600', color: colors.ink },
+  cardMeta: { fontSize: 11, color: colors.inkMuted, marginTop: 2 },
+  priceCols: {
+    flexDirection: 'row',
+    width: 168,
+    flexShrink: 0,
+  },
+  priceCol: {
+    flex: 1,
+    alignItems: 'flex-end',
+    paddingLeft: 4,
+  },
+  priceValue: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.ink,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
+  },
+  priceEmpty: {
+    fontSize: 12,
+    color: colors.inkFaint,
+    textAlign: 'right',
+  },
+  priceHint: {
+    fontSize: 9,
+    color: colors.inkFaint,
+    textAlign: 'right',
+    marginTop: 1,
+  },
 });

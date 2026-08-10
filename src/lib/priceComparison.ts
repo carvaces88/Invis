@@ -3,7 +3,11 @@
  */
 import type { Product } from '../data/types';
 import { FOOD_ALV_RATE, formatMoney, withFoodAlv } from './alv';
-import { lookupKruokaProducts, type KruokaHit } from './kruokaLookup';
+import {
+  lookupKruokaProducts,
+  lookupKruokaSeedSync,
+  type KruokaHit,
+} from './kruokaLookup';
 import {
   aimoPikatukkuSearchUrl,
   kruokaSearchUrl,
@@ -11,7 +15,11 @@ import {
   skaupatSearchUrl,
   vihannesporssiUrl,
 } from './priceComparisonUrls';
-import { lookupSkaupatProducts, type SkaupatHit } from './skaupatLookup';
+import {
+  lookupSkaupatProducts,
+  lookupSkaupatSeedSync,
+  type SkaupatHit,
+} from './skaupatLookup';
 
 export type CompetitorSourceId =
   | 'kruoka'
@@ -19,6 +27,27 @@ export type CompetitorSourceId =
   | 'lidl'
   | 'aimo'
   | 'vihannesporssi';
+
+/**
+ * Catalog list columns — the three retail sources already wired in price
+ * comparison (live/seed for K-Ruoka + S-Kaupat; Lidl link-only until an API
+ * exists). Wholesale (Aimo, Vihannespörssi) stay on ProductDetail only.
+ */
+export const CATALOG_PRICE_COLUMNS = [
+  'kruoka',
+  'skaupat',
+  'lidl',
+] as const satisfies readonly CompetitorSourceId[];
+
+export type CatalogPriceColumnId = (typeof CATALOG_PRICE_COLUMNS)[number];
+
+export type CatalogListPriceCell = {
+  id: CatalogPriceColumnId;
+  /** 0% ALV unit price when known from seed/cache */
+  unitPriceAlv0?: number;
+  /** True when K-Ruoka cell fell back to inventory unitPriceAlv0 */
+  fromInventory?: boolean;
+};
 
 export type CompetitorAvailability = 'live' | 'seed' | 'link' | 'manual';
 
@@ -86,6 +115,60 @@ export function alv0FromRetailShelf(shelfInclAlv: number): number {
 
 export function retailShelfFromAlv0(alv0: number): number {
   return Math.round(withFoodAlv(alv0, true) * 100) / 100;
+}
+
+/**
+ * Sync peek for catalog rows: seed/cache only (no network) so the list stays snappy.
+ * - K-Ruoka: seed match, else inventory unitPriceAlv0 as soft fallback
+ * - S-Kaupat: seed match or empty
+ * - Lidl: always empty (no public price API yet — detail opens a search link)
+ */
+export function peekCatalogListPrices(product: Product): CatalogListPriceCell[] {
+  const query = buildSearchQuery(product);
+  const ean = product.ean ?? null;
+
+  const kruoka = lookupKruokaSeedSync(query, ean)[0];
+  const skaupat = lookupSkaupatSeedSync(query, ean)[0];
+
+  const kruokaPrice =
+    kruoka?.unitPriceAlv0 != null && kruoka.unitPriceAlv0 > 0
+      ? kruoka.unitPriceAlv0
+      : undefined;
+  const inventoryFallback =
+    product.unitPriceAlv0 != null && product.unitPriceAlv0 > 0
+      ? product.unitPriceAlv0
+      : undefined;
+
+  return [
+    {
+      id: 'kruoka',
+      unitPriceAlv0: kruokaPrice ?? inventoryFallback,
+      fromInventory: kruokaPrice == null && inventoryFallback != null,
+    },
+    {
+      id: 'skaupat',
+      unitPriceAlv0:
+        skaupat?.unitPriceAlv0 != null && skaupat.unitPriceAlv0 > 0
+          ? skaupat.unitPriceAlv0
+          : undefined,
+    },
+    {
+      id: 'lidl',
+      // Link-only until a Lidl lookup exists
+    },
+  ];
+}
+
+/** Split compare rows into catalog columns vs other wholesale sources. */
+export function partitionCatalogDistributorRows(rows: CompetitorRow[]): {
+  primary: CompetitorRow[];
+  other: CompetitorRow[];
+} {
+  const primaryIds = new Set<string>(CATALOG_PRICE_COLUMNS);
+  return {
+    primary: rows.filter((r) => primaryIds.has(r.id)),
+    other: rows.filter((r) => !primaryIds.has(r.id)),
+  };
 }
 
 /**

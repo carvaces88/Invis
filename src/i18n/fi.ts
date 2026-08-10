@@ -429,6 +429,13 @@ export const fi: Messages = {
   byIngredient: 'Ainesosan mukaan',
   azName: 'A–Ö nimi',
   addToDb: 'Lisää DB:hen',
+  catalogColKruoka: 'K-Ruoka',
+  catalogColSkaupat: 'S-kaupat',
+  catalogColLidl: 'Lidl',
+  catalogPriceColsHint:
+    'Seed-/välimuistihinnat (0 % ALV). Avaa rivi live-hakua varten.',
+  catalogPriceEmpty: '—',
+  catalogPriceInventoryHint: 'inv.',
   catalogDetailTitle: 'Tuote',
   catalogDetailMissing: 'Tätä tuotetta ei ole enää katalogissa.',
   catalogDetailBack: 'Takaisin',
@@ -444,11 +451,15 @@ export const fi: Messages = {
     'Tallennettu 0 % ALV:lla. “ALV:n kanssa” käyttää 14 % elintarvike-ALV:a vain hyllyvastaavuuden näyttöön.',
   catalogDetailDistributors: 'Jakelijoiden ja kaupan hinnat',
   catalogDetailDistributorsSub:
-    'Viimeksi haetut hinnat kustakin lähteestä, jos saatavilla. Ilman osumaa lähde jää avattavaksi linkiksi.',
+    'Katalogisarakkeet: K-Ruoka, S-Kaupat, Lidl. Live-/seed-haku avattaessa; tukkulähteet alla.',
+  catalogDetailPrimaryCols: 'Katalogin hintasarakkeet',
+  catalogDetailOtherSources: 'Tukku ja muut',
   catalogDetailLastUpdated: 'Haettu {date}',
   catalogDetailNoDistributorPrice: 'Ei vielä hintaa tästä lähteestä',
   catalogDetailFooter:
     'Katalogissa on yksi inventaarioyksikköhinta. Usean lähteen € tulee live-/seed-hauista — ei pysyvää hintahistoriaa jakelijaa kohti.',
+  catalogDetailAlvToggleHint:
+    'Hinnat tallessa 0 % ALV:lla. ALV:n kanssa +{rate} % elintarvike-ALV vain näyttöön.',
 
   confirm: 'Vahvista',
   confirmLines: 'Vahvista rivit',
