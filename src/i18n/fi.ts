@@ -28,6 +28,7 @@ export const fi: Messages = {
   colNeed: 'Tarve',
   colVariance: 'Ero',
   colTurnover: 'Varastonkiertonopeus',
+  colStorage: 'Varasto',
   exclVat: 'alv 0 %',
   alvZero: '0 % ALV',
   alvWith: 'ALV:n kanssa',

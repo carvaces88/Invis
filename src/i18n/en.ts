@@ -28,6 +28,7 @@ export const en = {
   colNeed: 'Need',
   colVariance: 'Difference',
   colTurnover: 'Inventory turnover',
+  colStorage: 'Storage',
   exclVat: 'excl. VAT',
   alvZero: '0% ALV',
   alvWith: 'With ALV',

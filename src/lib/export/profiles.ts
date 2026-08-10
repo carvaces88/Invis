@@ -27,6 +27,7 @@ export type ExportColumnId =
   | 'total'
   | 'date'
   | 'productCode'
+  | 'storage'
   | 'openingStock'
   | 'purchases'
   | 'closingStock'
@@ -154,6 +155,8 @@ export function columnHeader(
       return labels.colDate;
     case 'productCode':
       return labels.colProductCode;
+    case 'storage':
+      return labels.colStorage;
     case 'openingStock':
       return labels.colOpeningStock;
     case 'purchases':
@@ -207,6 +210,9 @@ export function cellValue(
     }
     case 'productCode':
       return productCodeForLine(line, ctx?.products ?? []);
+    case 'storage':
+      // Place storage type is resolved on InventaarioScreen (needs places).
+      return '';
     case 'openingStock':
       return metricsFor(line, ctx).alkuvarasto;
     case 'purchases':

@@ -12,7 +12,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExportColumnsSheet } from '../components/ExportColumnsSheet';
 import { PlaceSelect } from '../components/PlaceSelect';
-import { StorageTypeSelect } from '../components/StorageTypeSelect';
+import {
+  StorageTypeSelect,
+  storageTypeLabelKey,
+} from '../components/StorageTypeSelect';
 import { UnitColumnLegend } from '../components/UnitColumnLegend';
 import { lineTotal, sessionTotals, useInventory } from '../data/store';
 import { resolveStorageType } from '../data/storageTypes';
@@ -64,12 +67,28 @@ function money(n: number) {
   return formatMoney(n);
 }
 
+/** Restolution export keeps its fixed import columns; on-screen view adds Storage. */
+function withViewStorageColumn(columns: ExportColumnId[]): ExportColumnId[] {
+  if (columns.includes('storage')) return columns;
+  const nameIdx = columns.indexOf('name');
+  if (nameIdx >= 0) {
+    return [
+      ...columns.slice(0, nameIdx + 1),
+      'storage',
+      ...columns.slice(nameIdx + 1),
+    ];
+  }
+  return ['storage', ...columns];
+}
+
 function colStyle(col: ExportColumnId) {
   switch (col) {
     case 'name':
       return styles.colName;
     case 'unit':
       return styles.colUnit;
+    case 'storage':
+      return styles.colStorage;
     case 'qty':
     case 'closingStock':
       return styles.colQty;
@@ -99,6 +118,8 @@ function tableMinWidth(columns: ExportColumnId[]): number {
         return sum + 180;
       case 'unit':
         return sum + 64;
+      case 'storage':
+        return sum + 88;
       case 'qty':
         return sum + 48;
       case 'closingStock':
@@ -259,7 +280,11 @@ export function InventaarioScreen() {
     () => getExportProfile(viewProfileId),
     [viewProfileId],
   );
-  const columns = viewProfile.columns;
+  /** On-screen columns — Storage is always visible (profile + Restolution inject). */
+  const columns = useMemo(
+    () => withViewStorageColumn(viewProfile.columns),
+    [viewProfile.columns],
+  );
   const showPriceCols =
     columns.includes('price') || columns.includes('total');
   const needsHScroll = viewProfileId === 'restolution' || columns.length > 5;
@@ -474,6 +499,21 @@ export function InventaarioScreen() {
             {displayUnit(item.unit)}
           </Text>
         );
+      case 'storage': {
+        const place = placeById.get(item.placeId);
+        const label = place
+          ? t(storageTypeLabelKey(resolveStorageType(place)))
+          : '—';
+        return (
+          <Text
+            key={col}
+            style={[styles.td, styles.colStorage, styles.storageCell]}
+            numberOfLines={2}
+          >
+            {label}
+          </Text>
+        );
+      }
       case 'qty':
       case 'closingStock':
         if (compareMonths) {
@@ -1323,6 +1363,17 @@ const styles = StyleSheet.create({
   },
   colName: { flex: 1.6, minWidth: 160, paddingRight: 4 },
   colUnit: { width: 64, textAlign: 'center', paddingTop: 1 },
+  colStorage: {
+    width: 88,
+    textAlign: 'left',
+    paddingTop: 1,
+    paddingRight: 4,
+  },
+  storageCell: {
+    color: colors.inkMuted,
+    fontSize: 12,
+    fontWeight: '500',
+  },
   colQty: { width: 56, alignItems: 'flex-end', paddingTop: 1 },
   lastMonthQty: { color: colors.inkMuted },
   colPrice: { width: 52, textAlign: 'right', paddingTop: 1 },
