@@ -16,7 +16,7 @@ import type {
   ScanMode,
 } from '../data/types';
 import { useI18n } from '../i18n';
-import { colors, radius, spacing } from '../theme/colors';
+import { colors, radius, spacing, surfaces } from '../theme/colors';
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Scan'>,
@@ -108,19 +108,30 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-  title: { fontSize: 24, fontWeight: '700', color: colors.ink, marginTop: 4 },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.ink,
+    marginTop: 4,
+    letterSpacing: -0.3,
+  },
   sub: { color: colors.inkMuted, marginTop: 6, marginBottom: spacing.lg },
   card: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.lg,
+    ...surfaces.card,
+    borderRadius: radius.xl,
     padding: spacing.lg,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.line,
   },
-  cardWarn: { borderColor: '#F0D0A8' },
-  cardTitle: { fontSize: 18, fontWeight: '700', color: colors.ink },
-  cardSub: { marginTop: 4, color: colors.inkMuted, fontSize: 14 },
+  cardWarn: {
+    backgroundColor: colors.warningSoft,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.ink,
+    letterSpacing: -0.2,
+  },
+  cardSub: { marginTop: 4, color: colors.inkMuted, fontSize: 14, lineHeight: 20 },
   link: { marginTop: spacing.md, alignItems: 'center' },
-  linkText: { color: colors.accent, fontWeight: '600' },
+  linkText: { color: colors.primary, fontWeight: '600' },
 });

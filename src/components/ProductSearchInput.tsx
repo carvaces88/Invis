@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import type { Product, ProductMatch } from '../data/types';
 import { searchProducts } from '../lib/fuzzyMatch';
-import { colors, radius, spacing } from '../theme/colors';
+import { colors, radius, shadows, spacing, surfaces } from '../theme/colors';
 
 type Props = {
   products: Product[];
@@ -89,23 +89,19 @@ export function ProductSearchInput({
 const styles = StyleSheet.create({
   wrap: { zIndex: 2 },
   input: {
-    backgroundColor: colors.bgElevated,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
+    ...surfaces.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 14,
     fontSize: 16,
     color: colors.ink,
   },
   dropdown: {
     marginTop: spacing.sm,
     backgroundColor: colors.bgElevated,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.line,
+    borderRadius: radius.lg,
     maxHeight: 280,
     overflow: 'hidden',
+    ...shadows.float,
   },
   row: {
     flexDirection: 'row',

@@ -51,7 +51,7 @@ import {
   type DictationSession,
 } from '../lib/speechDictation';
 import { useUnitSystem } from '../lib/unitSystem';
-import { colors, radius, spacing } from '../theme/colors';
+import { colors, radius, shadows, spacing, surfaces } from '../theme/colors';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -1106,16 +1106,14 @@ const styles = StyleSheet.create({
   toolsToggle: {
     width: 36,
     height: 36,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.line,
+    borderRadius: radius.pill,
     backgroundColor: colors.bgElevated,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
+    ...shadows.soft,
   },
   toolsToggleOn: {
-    borderColor: colors.primary,
     backgroundColor: colors.primarySoft,
   },
   toolsToggleText: {
@@ -1166,15 +1164,13 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   filterChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.line,
     backgroundColor: colors.bgElevated,
+    ...shadows.soft,
   },
   filterChipOn: {
-    borderColor: colors.primary,
     backgroundColor: colors.primarySoft,
   },
   filterChipText: { fontSize: 11, fontWeight: '600', color: colors.inkMuted },
@@ -1188,24 +1184,20 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    backgroundColor: colors.bgElevated,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: Platform.OS === 'web' ? 8 : 10,
+    ...surfaces.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: Platform.OS === 'web' ? 10 : 12,
     fontSize: 15,
     color: colors.ink,
   },
   searchClear: {
     width: 36,
     height: 36,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.line,
+    borderRadius: radius.pill,
     backgroundColor: colors.bgElevated,
     alignItems: 'center',
     justifyContent: 'center',
+    ...shadows.soft,
   },
   searchClearText: {
     fontSize: 20,
@@ -1217,15 +1209,13 @@ const styles = StyleSheet.create({
     minWidth: 44,
     height: 36,
     paddingHorizontal: 8,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.primary,
+    borderRadius: radius.pill,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+    ...shadows.soft,
   },
   searchMicOn: {
-    borderColor: colors.danger,
     backgroundColor: colors.dangerSoft,
   },
   searchMicText: {
@@ -1260,11 +1250,10 @@ const styles = StyleSheet.create({
     flexBasis: '36%',
     minWidth: 120,
     backgroundColor: colors.bgElevated,
-    borderWidth: 1,
-    borderColor: colors.primary,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: radius.pill,
+    ...shadows.soft,
   },
   columnsBtnText: {
     color: colors.primary,

@@ -9,7 +9,7 @@ import type { RootStackParamList } from '../data/types';
 import { useI18n, type Locale } from '../i18n';
 import { alertAck, alertConfirm } from '../lib/alertAck';
 import { useUnitSystem, type UnitSystem } from '../lib/unitSystem';
-import { colors, radius, spacing } from '../theme/colors';
+import { colors, radius, shadows, spacing, surfaces } from '../theme/colors';
 
 const brandWordmark = require('../../assets/invis-wordmark.png');
 
@@ -147,7 +147,7 @@ export function MoreScreen() {
       {items.map((item) => (
         <Pressable
           key={item.route}
-          style={styles.card}
+          style={({ pressed }) => [styles.card, pressed && styles.pressed]}
           onPress={() => navigation.navigate(item.route)}
         >
           <Text style={styles.cardTitle}>{item.title}</Text>
@@ -156,7 +156,7 @@ export function MoreScreen() {
       ))}
 
       <Pressable
-        style={styles.dangerCard}
+        style={({ pressed }) => [styles.dangerCard, pressed && styles.pressed]}
         onPress={() => {
           alertConfirm(
             t('startInventoryScratch'),
@@ -206,7 +206,12 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginBottom: spacing.md,
   },
-  title: { fontSize: 24, fontWeight: '700', color: colors.ink },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.ink,
+    letterSpacing: -0.3,
+  },
   sub: { color: colors.inkMuted, marginTop: 4 },
   credit: {
     color: colors.inkFaint,
@@ -215,12 +220,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   langCard: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.lg,
+    ...surfaces.card,
+    borderRadius: radius.xl,
     padding: spacing.lg,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.primary,
   },
   langRow: {
     flexDirection: 'row',
@@ -230,49 +233,48 @@ const styles = StyleSheet.create({
   langBtn: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.line,
+    borderRadius: radius.pill,
     alignItems: 'center',
     backgroundColor: colors.bg,
   },
   langBtnOn: {
     backgroundColor: colors.primarySoft,
-    borderColor: colors.primary,
   },
   langBtnText: {
-    fontWeight: '700',
+    fontWeight: '600',
     fontSize: 15,
     color: colors.inkMuted,
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
-  langBtnTextOn: { color: colors.primary },
+  langBtnTextOn: { color: colors.primary, fontWeight: '700' },
   valueCard: {
     backgroundColor: colors.primarySoft,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.lg,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.primaryMid,
+    ...shadows.soft,
   },
   card: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.lg,
+    ...surfaces.card,
+    borderRadius: radius.xl,
     padding: spacing.lg,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.line,
   },
+  pressed: { opacity: 0.9 },
   dangerCard: {
     backgroundColor: colors.dangerSoft,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.lg,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.danger,
+    ...shadows.soft,
   },
-  cardTitle: { fontSize: 17, fontWeight: '700', color: colors.ink },
-  cardSub: { marginTop: 4, color: colors.inkMuted },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.ink,
+    letterSpacing: -0.2,
+  },
+  cardSub: { marginTop: 4, color: colors.inkMuted, lineHeight: 20 },
   dangerTitle: { fontSize: 17, fontWeight: '700', color: colors.danger },
   dangerSub: { marginTop: 4, color: colors.danger, opacity: 0.85 },
 });
