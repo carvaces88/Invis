@@ -1,0 +1,519 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ProductThumb } from '../components/ProductThumb';
+import { useInventory } from '../data/store';
+import type { RootStackParamList } from '../data/types';
+import { INGREDIENT_TYPE_LABELS, UNIT_LABELS } from '../data/units';
+import { useI18n, type MessageKey } from '../i18n';
+import { FOOD_ALV_RATE, foodAlvPercentLabel } from '../lib/alv';
+import {
+  compareProductPrices,
+  formatEur,
+  type CompetitorRow,
+  type CompetitorSourceId,
+  type PriceComparisonResult,
+} from '../lib/priceComparison';
+import { colors, radius, spacing } from '../theme/colors';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'ProductDetail'>;
+
+function sourceTitle(id: CompetitorSourceId, t: (k: MessageKey) => string): string {
+  switch (id) {
+    case 'kruoka':
+      return t('priceCompareSourceKruoka');
+    case 'skaupat':
+      return t('priceCompareSourceSkaupat');
+    case 'lidl':
+      return t('priceCompareSourceLidl');
+    case 'aimo':
+      return t('priceCompareSourceAimo');
+    case 'vihannesporssi':
+      return t('priceCompareSourceVihannes');
+  }
+}
+
+function availabilityLabel(
+  row: CompetitorRow,
+  t: (k: MessageKey) => string,
+): string {
+  switch (row.availability) {
+    case 'live':
+      return t('priceCompareAvailLive');
+    case 'seed':
+      return t('priceCompareAvailSeed');
+    case 'manual':
+      return t('priceCompareAvailManual');
+    default:
+      return t('priceCompareAvailLink');
+  }
+}
+
+function formatAsOfDate(iso: string, locale: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return iso;
+  return d.toLocaleDateString(locale === 'fi' ? 'fi-FI' : 'en-GB', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.metaRow}>
+      <Text style={styles.metaLabel}>{label}</Text>
+      <Text style={styles.metaValue}>{value}</Text>
+    </View>
+  );
+}
+
+function openUrl(url: string) {
+  void Linking.openURL(url);
+}
+
+export function ProductDetailScreen({ route, navigation }: Props) {
+  const { productId } = route.params;
+  const insets = useSafeAreaInsets();
+  const { products } = useInventory();
+  const { t, locale } = useI18n();
+  const product = products.find((p) => p.id === productId);
+
+  const [result, setResult] = useState<PriceComparisonResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+
+  const alvPct = foodAlvPercentLabel();
+
+  const loadPrices = useCallback(async () => {
+    if (!product) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await compareProductPrices(
+        product,
+        undefined,
+        refreshNonce > 0 ? { forceRefresh: true } : undefined,
+      );
+      setResult(next);
+    } catch {
+      setError(t('priceCompareRefreshError'));
+    } finally {
+      setLoading(false);
+    }
+  }, [product, refreshNonce, t]);
+
+  useEffect(() => {
+    void loadPrices();
+  }, [loadPrices]);
+
+  useEffect(() => {
+    if (product) {
+      navigation.setOptions({ title: product.officialName });
+    }
+  }, [navigation, product]);
+
+  if (!product) {
+    return (
+      <View style={[styles.root, styles.centered]}>
+        <Text style={styles.missing}>{t('catalogDetailMissing')}</Text>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.linkBtn}
+          accessibilityRole="button"
+        >
+          <Text style={styles.linkBtnText}>{t('catalogDetailBack')}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const withAlv =
+    Math.round(product.unitPriceAlv0 * (1 + FOOD_ALV_RATE) * 100) / 100;
+
+  return (
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={{
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.md,
+        paddingBottom: insets.bottom + spacing.xl,
+      }}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.hero}>
+        <ProductThumb product={product} size={72} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.name}>{product.officialName}</Text>
+          <Text style={styles.heroMeta}>
+            {INGREDIENT_TYPE_LABELS[product.ingredientType]} · {product.unit}
+            {product.packSize ? ` · ${product.packSize}` : ''}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <MetaRow
+          label={t('catalogDetailUnit')}
+          value={UNIT_LABELS[product.unit]}
+        />
+        <MetaRow
+          label={t('catalogDetailPackSize')}
+          value={product.packSize?.trim() || t('catalogDetailEmDash')}
+        />
+        <MetaRow
+          label={t('catalogDetailEan')}
+          value={product.ean?.trim() || t('catalogDetailEmDash')}
+        />
+        <MetaRow
+          label={t('catalogDetailProductCode')}
+          value={product.productCode?.trim() || t('catalogDetailEmDash')}
+        />
+        <MetaRow
+          label={t('catalogDetailAliases')}
+          value={
+            product.aliases.length > 0
+              ? product.aliases.join(', ')
+              : t('catalogDetailEmDash')
+          }
+        />
+        {product.sourceUrl ? (
+          <Pressable
+            onPress={() => openUrl(product.sourceUrl!)}
+            style={styles.sourceLink}
+            accessibilityRole="link"
+          >
+            <Text style={styles.sourceLinkText}>
+              {t('catalogDetailOpenSource')}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>{t('catalogDetailOurPrice')}</Text>
+        <Text style={styles.ourPrice}>
+          {formatEur(product.unitPriceAlv0)}{' '}
+          <Text style={styles.ourSuffix}>{t('priceCompareAlv0')}</Text>
+        </Text>
+        <Text style={styles.ourRetail}>
+          {t('priceCompareOurPriceWithAlv')
+            .replace('{pct}', alvPct)
+            .replace('{amount}', formatEur(withAlv))}
+        </Text>
+        <Text style={styles.priceNote}>{t('catalogDetailPriceNote')}</Text>
+      </View>
+
+      <View style={styles.distribHead}>
+        <Text style={styles.sectionTitle}>{t('catalogDetailDistributors')}</Text>
+        <Text style={styles.distribSub}>{t('catalogDetailDistributorsSub')}</Text>
+        <View style={styles.refreshRow}>
+          {result?.comparedAt ? (
+            <Text style={styles.asOf}>
+              {t('priceCompareAsOf').replace(
+                '{date}',
+                formatAsOfDate(result.comparedAt, locale),
+              )}
+            </Text>
+          ) : (
+            <View style={{ flex: 1 }} />
+          )}
+          <Pressable
+            style={[styles.refreshBtn, loading && styles.refreshBtnDisabled]}
+            onPress={() => setRefreshNonce((n) => n + 1)}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={t('priceCompareRefresh')}
+          >
+            {loading ? (
+              <ActivityIndicator color={colors.primary} size="small" />
+            ) : (
+              <Text style={styles.refreshBtnText}>
+                {t('priceCompareRefresh')}
+              </Text>
+            )}
+          </Pressable>
+        </View>
+      </View>
+
+      {loading && !result ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={styles.loadingText}>{t('priceCompareLookingUp')}</Text>
+        </View>
+      ) : null}
+
+      {error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable
+            onPress={() => setRefreshNonce((n) => n + 1)}
+            accessibilityRole="button"
+          >
+            <Text style={styles.errorRetry}>{t('priceCompareRefresh')}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {result
+        ? result.rows.map((row) => (
+            <View key={row.id} style={styles.compCard}>
+              <View style={styles.compHead}>
+                <Text style={styles.compTitle}>{sourceTitle(row.id, t)}</Text>
+                <Text style={styles.compAvail}>{availabilityLabel(row, t)}</Text>
+              </View>
+
+              {row.matchedName ? (
+                <Text style={styles.matched}>
+                  {t('priceCompareMatchedAs').replace('{name}', row.matchedName)}
+                  {row.packSize ? ` · ${row.packSize}` : ''}
+                </Text>
+              ) : (
+                <Text style={styles.matchedMuted}>
+                  {row.id === 'aimo' || row.id === 'vihannesporssi'
+                    ? t('priceCompareWholesaleHint')
+                    : row.id === 'lidl'
+                      ? t('priceCompareRetailLinkHint')
+                      : t('priceCompareNoLiveMatch')}
+                </Text>
+              )}
+
+              {row.unitPriceAlv0 != null && row.unitPriceAlv0 > 0 ? (
+                <>
+                  <Text style={styles.compPrice}>
+                    {formatEur(row.unitPriceAlv0)}{' '}
+                    <Text style={styles.ourSuffix}>{t('priceCompareAlv0')}</Text>
+                  </Text>
+                  {row.shelfPriceEur != null ? (
+                    <Text style={styles.compShelf}>
+                      {row.shelfIncludesAlv
+                        ? t('priceCompareRetailInclAlv')
+                            .replace('{pct}', alvPct)
+                            .replace('{amount}', formatEur(row.shelfPriceEur))
+                        : t('priceCompareWholesaleNet').replace(
+                            '{amount}',
+                            formatEur(row.shelfPriceEur),
+                          )}
+                    </Text>
+                  ) : null}
+                  {result.comparedAt ? (
+                    <Text style={styles.lastUpdated}>
+                      {t('catalogDetailLastUpdated').replace(
+                        '{date}',
+                        formatAsOfDate(result.comparedAt, locale),
+                      )}
+                    </Text>
+                  ) : null}
+                </>
+              ) : (
+                <Text style={styles.placeholder}>
+                  {t('catalogDetailNoDistributorPrice')}
+                </Text>
+              )}
+
+              <Pressable
+                style={styles.linkBtn}
+                onPress={() => openUrl(row.sourceUrl)}
+                accessibilityRole="link"
+              >
+                <Text style={styles.linkBtnText}>{t('priceCompareOpenLink')}</Text>
+              </Pressable>
+            </View>
+          ))
+        : null}
+
+      <Text style={styles.footerNote}>{t('catalogDetailFooter')}</Text>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  missing: { color: colors.inkMuted, fontSize: 15, textAlign: 'center' },
+  hero: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  name: { fontSize: 18, fontWeight: '700', color: colors.ink },
+  heroMeta: { marginTop: 4, fontSize: 13, color: colors.inkMuted },
+  card: {
+    backgroundColor: colors.bgElevated,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  metaRow: {
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
+  },
+  metaLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.inkFaint,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  metaValue: {
+    marginTop: 4,
+    fontSize: 15,
+    color: colors.ink,
+    lineHeight: 20,
+  },
+  sourceLink: { marginTop: spacing.md, alignSelf: 'flex-start' },
+  sourceLinkText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  ourPrice: {
+    marginTop: 8,
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  ourSuffix: { fontSize: 13, fontWeight: '600', color: colors.inkMuted },
+  ourRetail: { marginTop: 4, fontSize: 13, color: colors.inkMuted },
+  priceNote: {
+    marginTop: spacing.sm,
+    fontSize: 12,
+    color: colors.inkFaint,
+    lineHeight: 17,
+  },
+  distribHead: { marginBottom: spacing.sm },
+  distribSub: {
+    marginTop: 4,
+    fontSize: 13,
+    color: colors.inkMuted,
+    lineHeight: 18,
+  },
+  refreshRow: {
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  asOf: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.inkMuted,
+  },
+  refreshBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primaryMid,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  refreshBtnDisabled: { opacity: 0.6 },
+  refreshBtnText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
+  loading: {
+    marginTop: spacing.md,
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  loadingText: { color: colors.inkMuted, fontSize: 14 },
+  errorBox: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.dangerSoft,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    gap: spacing.sm,
+  },
+  errorText: { color: colors.danger, fontSize: 13, lineHeight: 18 },
+  errorRetry: { color: colors.primary, fontWeight: '700', fontSize: 14 },
+  compCard: {
+    marginBottom: spacing.sm,
+    backgroundColor: colors.bgElevated,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: spacing.md,
+  },
+  compHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  compTitle: { fontSize: 16, fontWeight: '700', color: colors.ink, flex: 1 },
+  compAvail: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.primary,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  matched: { marginTop: 6, fontSize: 13, color: colors.inkMuted },
+  matchedMuted: { marginTop: 6, fontSize: 13, color: colors.inkFaint },
+  compPrice: {
+    marginTop: spacing.sm,
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  compShelf: { marginTop: 2, fontSize: 13, color: colors.inkMuted },
+  lastUpdated: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.inkMuted,
+  },
+  placeholder: {
+    marginTop: spacing.sm,
+    fontSize: 13,
+    color: colors.inkFaint,
+    fontStyle: 'italic',
+  },
+  linkBtn: {
+    marginTop: spacing.md,
+    alignSelf: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primaryMid,
+  },
+  linkBtnText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
+  footerNote: {
+    marginTop: spacing.md,
+    fontSize: 12,
+    color: colors.inkFaint,
+    lineHeight: 17,
+  },
+});

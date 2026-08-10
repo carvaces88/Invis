@@ -436,6 +436,26 @@ export const en = {
   byIngredient: 'By ingredient',
   azName: 'A–Z name',
   addToDb: 'Add to DB',
+  catalogDetailTitle: 'Product',
+  catalogDetailMissing: 'This product is no longer in the catalog.',
+  catalogDetailBack: 'Back',
+  catalogDetailEmDash: '—',
+  catalogDetailUnit: 'Unit',
+  catalogDetailPackSize: 'Pack size',
+  catalogDetailEan: 'EAN',
+  catalogDetailProductCode: 'Product code',
+  catalogDetailAliases: 'Also known as',
+  catalogDetailOpenSource: 'Open product source',
+  catalogDetailOurPrice: 'Inventory price',
+  catalogDetailPriceNote:
+    'Stored at 0% ALV. “With ALV” uses the 14% food VAT rate for shelf-equivalent display only.',
+  catalogDetailDistributors: 'Distributor & retail prices',
+  catalogDetailDistributorsSub:
+    'Last looked-up prices from each source when available. Sources without a match stay as open links until live data exists.',
+  catalogDetailLastUpdated: 'Looked up {date}',
+  catalogDetailNoDistributorPrice: 'No price from this source yet',
+  catalogDetailFooter:
+    'Catalog stores a single inventory unit price. Multi-source € comes from live/seed lookups — not a permanent price history per distributor.',
 
   // Stack titles / common actions
   confirm: 'Confirm',

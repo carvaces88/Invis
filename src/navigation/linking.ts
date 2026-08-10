@@ -1,0 +1,44 @@
+import type { LinkingOptions } from '@react-navigation/native';
+import type { RootStackParamList } from '../data/types';
+
+/**
+ * URL / browser-history linking for React Navigation.
+ * On web this pushes a history entry on each stack (and tab) change so the
+ * Android/Chrome hardware back button pops in-app instead of leaving the site.
+ */
+export const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: ['invis://'],
+  config: {
+    screens: {
+      MainTabs: {
+        path: '',
+        screens: {
+          Home: '',
+          Inventaario: 'inventory',
+          Scan: 'scan',
+          Catalog: 'catalog',
+          More: 'more',
+        },
+      },
+      RecordInventory: 'record',
+      ProductScan: 'product-scan',
+      KuormaScan: 'delivery-scan',
+      HavikkiScan: 'waste-scan',
+      Confirm: 'confirm',
+      BarcodeScan: 'barcode',
+      BatchConfirm: 'batch-confirm',
+      FridgeReview: 'fridge-review',
+      AddProduct: 'add-product',
+      ReportsChat: 'reports',
+      HavikkiLog: 'waste-log',
+      RecentActivity: 'activity',
+      VerifyAmounts: 'verify',
+      ExportPreview: 'export',
+      VideoDemo: 'video-demo',
+      UnitsGuide: 'units',
+      ProductDetail: 'catalog/:productId',
+      PriceComparison: 'prices',
+      Places: 'places',
+    },
+  },
+};

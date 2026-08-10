@@ -1,3 +1,5 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
 /** Finnish kitchen units from inventaariopohja sheets */
 export type UnitCode =
   | 'L'
@@ -285,12 +287,7 @@ export type MainTabParamList = {
 };
 
 export type RootStackParamList = {
-  MainTabs:
-    | {
-        screen?: keyof MainTabParamList;
-        params?: MainTabParamList[keyof MainTabParamList];
-      }
-    | undefined;
+  MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   Confirm: {
     extract: VisionExtract;
     imageUri?: string;
@@ -342,6 +339,8 @@ export type RootStackParamList = {
   Places: undefined;
   RecentActivity: undefined;
   ExportPreview: undefined;
+  /** Catalog product detail (identity + inventory price + distributor lookups) */
+  ProductDetail: { productId: string };
   /** Compare inventory 0% ALV vs competitor / distributor shelf prices */
   PriceComparison: undefined;
   /** Swipe-verify counted amounts (boxes vs pieces, etc.) */

@@ -16,7 +16,7 @@ import { useInventory } from '../data/store';
 import type { IngredientType, RootStackParamList } from '../data/types';
 import { INGREDIENT_TYPE_LABELS } from '../data/units';
 import { useI18n } from '../i18n';
-import { colors, radius, spacing } from '../theme/colors';
+import { colors, radius, shadows, spacing, surfaces } from '../theme/colors';
 
 const TYPES = Object.keys(INGREDIENT_TYPE_LABELS) as IngredientType[];
 
@@ -28,6 +28,10 @@ export function CatalogScreen() {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [typeFilter, setTypeFilter] = useState<IngredientType | 'all'>('all');
   const [browseMode, setBrowseMode] = useState<'type' | 'az'>('type');
+
+  const openProduct = (productId: string) => {
+    navigation.navigate('ProductDetail', { productId });
+  };
 
   const filtered = useMemo(() => {
     let list =
@@ -60,7 +64,7 @@ export function CatalogScreen() {
       <View style={{ paddingHorizontal: spacing.lg }}>
         <ProductSearchInput
           products={products}
-          onSelect={() => {}}
+          onSelect={(match) => openProduct(match.product.id)}
           placeholder={t('catalogSearchPlaceholder')}
         />
       </View>
@@ -167,8 +171,17 @@ export function CatalogScreen() {
             paddingHorizontal: spacing.lg,
             paddingBottom: insets.bottom + 100,
           }}
+          keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => (
-            <View style={styles.card}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.card,
+                pressed && styles.cardPressed,
+              ]}
+              onPress={() => openProduct(item.id)}
+              accessibilityRole="button"
+              accessibilityLabel={item.officialName}
+            >
               <View style={styles.cardRow}>
                 <ProductThumb product={item} size={56} />
                 <View style={{ flex: 1 }}>
@@ -183,7 +196,7 @@ export function CatalogScreen() {
                   </Text>
                 </View>
               </View>
-            </View>
+            </Pressable>
           )}
         />
       </View>
@@ -217,13 +230,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: radius.pill,
     backgroundColor: colors.bgElevated,
-    borderWidth: 1,
-    borderColor: colors.line,
+    ...shadows.soft,
   },
-  chipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipOn: { backgroundColor: colors.primary },
   chipText: { fontSize: 13, color: colors.inkMuted, fontWeight: '600' },
   chipTextOn: { color: '#fff' },
-  addChip: { marginLeft: 'auto', borderColor: colors.primarySoft },
+  addChip: { marginLeft: 'auto', backgroundColor: colors.primarySoft },
   addChipText: { color: colors.primary },
   typeScroll: {
     flexGrow: 0,
@@ -243,7 +255,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.primarySoft,
   },
-  typePillOn: { backgroundColor: colors.primaryMid },
+  typePillOn: { backgroundColor: colors.primary },
   typePillText: { fontSize: 12, color: colors.primary, fontWeight: '600' },
   typePillTextOn: { color: '#fff' },
   /** Scopes FlatList absolute-fill so it cannot cover filters above. */
@@ -254,13 +266,11 @@ const styles = StyleSheet.create({
   },
   list: { flex: 1 },
   card: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.md,
+    ...surfaces.cardTight,
     padding: spacing.md,
     marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.line,
   },
+  cardPressed: { opacity: 0.88 },
   cardRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   cardName: { fontSize: 15, fontWeight: '600', color: colors.ink },
   cardMeta: { fontSize: 12, color: colors.inkMuted, marginTop: 4 },

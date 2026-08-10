@@ -429,6 +429,26 @@ export const fi: Messages = {
   byIngredient: 'Ainesosan mukaan',
   azName: 'A–Ö nimi',
   addToDb: 'Lisää DB:hen',
+  catalogDetailTitle: 'Tuote',
+  catalogDetailMissing: 'Tätä tuotetta ei ole enää katalogissa.',
+  catalogDetailBack: 'Takaisin',
+  catalogDetailEmDash: '—',
+  catalogDetailUnit: 'Yksikkö',
+  catalogDetailPackSize: 'Pakkauskoko',
+  catalogDetailEan: 'EAN',
+  catalogDetailProductCode: 'Tuotekoodi',
+  catalogDetailAliases: 'Tunnetaan myös',
+  catalogDetailOpenSource: 'Avaa tuotteen lähde',
+  catalogDetailOurPrice: 'Inventaariohinta',
+  catalogDetailPriceNote:
+    'Tallennettu 0 % ALV:lla. “ALV:n kanssa” käyttää 14 % elintarvike-ALV:a vain hyllyvastaavuuden näyttöön.',
+  catalogDetailDistributors: 'Jakelijoiden ja kaupan hinnat',
+  catalogDetailDistributorsSub:
+    'Viimeksi haetut hinnat kustakin lähteestä, jos saatavilla. Ilman osumaa lähde jää avattavaksi linkiksi.',
+  catalogDetailLastUpdated: 'Haettu {date}',
+  catalogDetailNoDistributorPrice: 'Ei vielä hintaa tästä lähteestä',
+  catalogDetailFooter:
+    'Katalogissa on yksi inventaarioyksikköhinta. Usean lähteen € tulee live-/seed-hauista — ei pysyvää hintahistoriaa jakelijaa kohti.',
 
   confirm: 'Vahvista',
   confirmLines: 'Vahvista rivit',

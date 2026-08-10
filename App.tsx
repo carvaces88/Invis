@@ -30,6 +30,7 @@ import { KuormaScanScreen } from './src/screens/KuormaScanScreen';
 import { MoreScreen } from './src/screens/MoreScreen';
 import { PlacesScreen } from './src/screens/PlacesScreen';
 import { PriceComparisonScreen } from './src/screens/PriceComparisonScreen';
+import { ProductDetailScreen } from './src/screens/ProductDetailScreen';
 import { ProductScanScreen } from './src/screens/ProductScanScreen';
 import { RecordInventoryScreen } from './src/screens/RecordInventoryScreen';
 import { RecentActivityScreen } from './src/screens/RecentActivityScreen';
@@ -38,6 +39,7 @@ import { ScanScreen } from './src/screens/ScanScreen';
 import { UnitsGuideScreen } from './src/screens/UnitsGuideScreen';
 import { VerifyAmountsScreen } from './src/screens/VerifyAmountsScreen';
 import { VideoDemoScreen } from './src/screens/VideoDemoScreen';
+import { linking } from './src/navigation/linking';
 import { colors } from './src/theme/colors';
 
 /**
@@ -50,6 +52,10 @@ import { colors } from './src/theme/colors';
 if (Platform.OS === 'web') {
   enableScreens(true);
 }
+
+const linkingFallback = (
+  <View style={{ flex: 1, backgroundColor: colors.bg }} />
+);
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -96,7 +102,8 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
       style={{
         fontSize: 11,
         fontWeight: focused ? '700' : '500',
-        color: focused ? colors.primary : colors.inkFaint,
+        color: focused ? colors.primary : colors.inkMuted,
+        letterSpacing: focused ? -0.1 : 0,
       }}
     >
       {label}
@@ -109,15 +116,28 @@ function MainTabs() {
   return (
     <Tab.Navigator
       initialRouteName="Home"
+      // On web, keep full tab history so Chrome back matches prior tab visits.
+      backBehavior={Platform.OS === 'web' ? 'fullHistory' : 'firstRoute'}
       screenOptions={{
         headerShown: false,
         sceneStyle: { flex: 1, backgroundColor: colors.bg },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.inkMuted,
         tabBarStyle: {
           backgroundColor: colors.bgElevated,
-          borderTopColor: colors.line,
+          borderTopWidth: 0,
           height: 64,
           paddingBottom: 8,
           paddingTop: 8,
+          // Soft lift above content (Finnish blue ink, low opacity)
+          shadowColor: colors.ink,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          elevation: 8,
+          ...(Platform.OS === 'web'
+            ? { boxShadow: '0 -2px 12px rgba(11, 31, 51, 0.06)' }
+            : {}),
         },
         tabBarShowLabel: false,
       }}
@@ -175,7 +195,11 @@ function MainTabs() {
 function RootNavigator() {
   const { t } = useI18n();
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer
+      linking={linking}
+      fallback={linkingFallback}
+      theme={navTheme}
+    >
       <StatusBar style="dark" />
       <Stack.Navigator>
         <Stack.Screen
@@ -325,6 +349,15 @@ function RootNavigator() {
           component={UnitsGuideScreen}
           options={{
             title: t('unitsGuide'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="ProductDetail"
+          component={ProductDetailScreen}
+          options={{
+            title: t('catalogDetailTitle'),
             headerTintColor: colors.primary,
             headerStyle: { backgroundColor: colors.bg },
           }}
