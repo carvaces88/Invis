@@ -72,12 +72,36 @@ export interface Product {
 /** Optional place kind — UI may ignore; names stay free-form */
 export type PlaceKind = 'kitchen' | 'freezer' | 'pantry' | 'other';
 
+/**
+ * Storage category for Inventory filter/group.
+ * Prefer this over PlaceKind for spreadsheet filtering.
+ */
+export type StorageType =
+  | 'dry_storage'
+  | 'freezer'
+  | 'prep_fridge'
+  | 'drawers';
+
 /** Named storage within a site (e.g. Downstairs kitchen, Freezer 1) */
 export interface Place {
   id: string;
   name: string;
   kind?: PlaceKind;
+  /** Filter/group category on the Inventory spreadsheet */
+  storageType?: StorageType;
   sortOrder: number;
+}
+
+/**
+ * Local-first month compare: opening qty at the start of `currentMonth`
+ * (= closing counts from the previous calendar month).
+ */
+export interface InventoryPeriodSnapshot {
+  /** YYYY-MM — openingQuantities are the opening for this month */
+  currentMonth: string;
+  capturedAt: string;
+  /** `${productId}::${placeId}` → quantity at month start */
+  openingQuantities: Record<string, number | null>;
 }
 
 /** Final amount check — swipe verify before trusting totals */
@@ -318,6 +342,8 @@ export type RootStackParamList = {
   Places: undefined;
   RecentActivity: undefined;
   ExportPreview: undefined;
+  /** Compare inventory 0% ALV vs competitor / distributor shelf prices */
+  PriceComparison: undefined;
   /** Swipe-verify counted amounts (boxes vs pieces, etc.) */
   VerifyAmounts:
     | {

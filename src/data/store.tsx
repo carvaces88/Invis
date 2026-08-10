@@ -17,17 +17,25 @@ import {
   SEED_PLACES,
   SEED_SITE_NAME,
 } from '../data/seedPlaces';
+import {
+  ensurePeriodSnapshot,
+  isPeriodSnapshot,
+  openingQtyForLine,
+} from '../data/periodSnapshot';
 import { DEFAULT_PORTION_ERROR_PERCENT, SEED_RECIPES } from '../data/seedRecipes';
+import { isStorageType, storageTypeFromKind } from '../data/storageTypes';
 import type {
   HavikkiEntry,
   InventoryActivityEntry,
   InventoryLine,
+  InventoryPeriodSnapshot,
   InventorySession,
   Place,
   Product,
   Recipe,
   StockMovement,
   StockMovementType,
+  StorageType,
   UnitCode,
 } from '../data/types';
 
@@ -37,6 +45,10 @@ const PACK_EXTRAS_KEY = 'invis.productPackExtras';
 const LAST_UNIT_KEY = 'invis.lastRecordUnit';
 const ACTIVITY_KEY = 'invis.recentActivity';
 const SESSION_KEY = 'invis.inventorySession';
+const PLACES_KEY = 'invis.places';
+const SITE_NAME_KEY = 'invis.siteName';
+const ACTIVE_PLACE_KEY = 'invis.activePlaceId';
+const PERIOD_SNAPSHOT_KEY = 'invis.periodSnapshot';
 /** Once set, never re-inject SEED_QTY on startup — stay empty until user records */
 const INVENTORY_CLEARED_KEY = 'invis.inventoryCleared';
 /** Soft prompt window when adding the same product+place again */
@@ -120,13 +132,28 @@ type Store = {
   places: Place[];
   /** Place used for new inventory counts */
   activePlaceId: string;
+  /**
+   * Opening quantities for the current calendar month
+   * (closing counts from last month after rollover).
+   */
+  periodSnapshot: InventoryPeriodSnapshot | null;
+  /** Opening / last-month qty for a product+place line */
+  getOpeningQuantity: (
+    productId: string,
+    placeId: string,
+  ) => number | null | undefined;
   /** Last unit chosen when recording / creating a product */
   lastRecordUnit: UnitCode;
   setLastRecordUnit: (unit: UnitCode) => void;
   setSiteName: (name: string) => void;
   setActivePlaceId: (placeId: string) => void;
-  addPlace: (name: string, kind?: Place['kind']) => Place | null;
+  addPlace: (
+    name: string,
+    kind?: Place['kind'],
+    storageType?: StorageType,
+  ) => Place | null;
   renamePlace: (placeId: string, name: string) => void;
+  setPlaceStorageType: (placeId: string, storageType: StorageType) => void;
   /** Returns error key when blocked, else null */
   deletePlace: (placeId: string) => 'last' | 'has_stock' | 'not_found' | null;
   /** Global default portioning error (0–1), used when recipe has none */
@@ -221,6 +248,44 @@ function todayIsoDate() {
 
 function sortedPlaces(places: Place[]) {
   return [...places].sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function migratePlace(place: Place): Place {
+  if (place.storageType && isStorageType(place.storageType)) {
+    return place;
+  }
+  const seed = SEED_PLACES.find((s) => s.id === place.id);
+  return {
+    ...place,
+    storageType:
+      seed?.storageType ?? storageTypeFromKind(place.kind) ?? 'dry_storage',
+  };
+}
+
+function parsePlaces(raw: string | null): Place[] | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    const places: Place[] = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object') continue;
+      const p = item as Place;
+      if (typeof p.id !== 'string' || typeof p.name !== 'string') continue;
+      places.push(
+        migratePlace({
+          id: p.id,
+          name: p.name,
+          kind: p.kind,
+          storageType: p.storageType,
+          sortOrder: typeof p.sortOrder === 'number' ? p.sortOrder : places.length,
+        }),
+      );
+    }
+    return places.length > 0 ? places : null;
+  } catch {
+    return null;
+  }
 }
 
 function applyAliasExtras(p: Product, extras: AliasExtras): Product {
@@ -325,6 +390,9 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const [places, setPlaces] = useState<Place[]>(SEED_PLACES);
   const [activePlaceId, setActivePlaceIdState] =
     useState<string>(DEFAULT_PLACE_ID);
+  const [periodSnapshot, setPeriodSnapshot] =
+    useState<InventoryPeriodSnapshot | null>(null);
+  const [placesReady, setPlacesReady] = useState(false);
   const [session, setSession] = useState<InventorySession>(() => ({
     id: 'session-demo',
     title: 'Inventory sheet RR',
@@ -357,6 +425,10 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           activityRaw,
           sessionRaw,
           clearedRaw,
+          placesRaw,
+          siteRaw,
+          activeRaw,
+          snapshotRaw,
         ] = await Promise.all([
           AsyncStorage.getItem(CUSTOM_PRODUCTS_KEY),
           AsyncStorage.getItem(ALIAS_EXTRAS_KEY),
@@ -365,6 +437,10 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(ACTIVITY_KEY),
           AsyncStorage.getItem(SESSION_KEY),
           AsyncStorage.getItem(INVENTORY_CLEARED_KEY),
+          AsyncStorage.getItem(PLACES_KEY),
+          AsyncStorage.getItem(SITE_NAME_KEY),
+          AsyncStorage.getItem(ACTIVE_PLACE_KEY),
+          AsyncStorage.getItem(PERIOD_SNAPSHOT_KEY),
         ]);
         if (cancelled) return;
         let customs: Product[] = [];
@@ -397,7 +473,19 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         setPackExtras(packs);
         setProducts(merged);
 
+        const loadedPlaces = parsePlaces(placesRaw) ?? SEED_PLACES.map(migratePlace);
+        setPlaces(loadedPlaces);
+        if (siteRaw && siteRaw.trim()) {
+          setSiteNameState(siteRaw.trim());
+        }
+        if (activeRaw && loadedPlaces.some((p) => p.id === activeRaw)) {
+          setActivePlaceIdState(activeRaw);
+        } else {
+          setActivePlaceIdState(loadedPlaces[0]?.id ?? DEFAULT_PLACE_ID);
+        }
+
         const cleared = clearedRaw === '1';
+        const defaultPlaceId = loadedPlaces[0]?.id ?? DEFAULT_PLACE_ID;
         let restored: InventorySession | null = null;
         if (sessionRaw) {
           try {
@@ -407,34 +495,59 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
             restored = null;
           }
         }
+        let linesForSnapshot: InventoryLine[];
         if (restored) {
-          setSession({
+          const nextSession = {
             ...restored,
             status: restored.status === 'done' ? 'done' : 'in_progress',
-            lines: reconcileSessionLines(
-              restored.lines,
-              merged,
-              DEFAULT_PLACE_ID,
-            ),
-          });
+            lines: reconcileSessionLines(restored.lines, merged, defaultPlaceId),
+          } as InventorySession;
+          setSession(nextSession);
+          linesForSnapshot = nextSession.lines;
         } else if (cleared) {
-          setSession({
+          const nextSession: InventorySession = {
             id: `session-${Date.now()}`,
             title: 'Inventory sheet RR',
             date: todayIsoDate(),
             status: 'in_progress',
-            lines: createInitialSessionLines(merged, DEFAULT_PLACE_ID, {
+            lines: createInitialSessionLines(merged, defaultPlaceId, {
               seeded: false,
             }),
-          });
+          };
+          setSession(nextSession);
+          linesForSnapshot = nextSession.lines;
+        } else {
+          // Keep in-memory seed session; refresh catalog lines onto default place.
+          setSession((prev) => ({
+            ...prev,
+            lines: reconcileSessionLines(prev.lines, merged, defaultPlaceId),
+          }));
+          linesForSnapshot = createInitialSessionLines(merged, defaultPlaceId);
         }
-        // else: keep in-memory seed session from useState initializer
+
+        let savedSnapshot: InventoryPeriodSnapshot | null = null;
+        if (snapshotRaw) {
+          try {
+            const parsed = JSON.parse(snapshotRaw) as unknown;
+            if (isPeriodSnapshot(parsed)) savedSnapshot = parsed;
+          } catch {
+            savedSnapshot = null;
+          }
+        }
+        setPeriodSnapshot(ensurePeriodSnapshot(savedSnapshot, linesForSnapshot));
       } catch {
         // keep seed catalog / session
+        setPeriodSnapshot(
+          ensurePeriodSnapshot(
+            null,
+            createInitialSessionLines(SEED_PRODUCTS, DEFAULT_PLACE_ID),
+          ),
+        );
       } finally {
         if (!cancelled) {
           setCatalogReady(true);
           setSessionReady(true);
+          setPlacesReady(true);
         }
       }
     })();
@@ -482,6 +595,40 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     );
   }, [session, sessionReady]);
 
+  useEffect(() => {
+    if (!placesReady) return;
+    void AsyncStorage.setItem(PLACES_KEY, JSON.stringify(places)).catch(
+      () => {},
+    );
+  }, [places, placesReady]);
+
+  useEffect(() => {
+    if (!placesReady) return;
+    void AsyncStorage.setItem(SITE_NAME_KEY, siteName).catch(() => {});
+  }, [siteName, placesReady]);
+
+  useEffect(() => {
+    if (!placesReady) return;
+    void AsyncStorage.setItem(ACTIVE_PLACE_KEY, activePlaceId).catch(() => {});
+  }, [activePlaceId, placesReady]);
+
+  useEffect(() => {
+    if (!placesReady || !periodSnapshot) return;
+    void AsyncStorage.setItem(
+      PERIOD_SNAPSHOT_KEY,
+      JSON.stringify(periodSnapshot),
+    ).catch(() => {});
+  }, [periodSnapshot, placesReady]);
+
+  /** Rollover opening snapshot when the calendar month advances while running. */
+  useEffect(() => {
+    if (!sessionReady || !periodSnapshot) return;
+    const next = ensurePeriodSnapshot(periodSnapshot, session.lines);
+    if (next !== periodSnapshot) {
+      setPeriodSnapshot(next);
+    }
+  }, [session.lines, sessionReady, periodSnapshot]);
+
   const pushActivity = useCallback((entry: InventoryActivityEntry) => {
     setRecentActivity((prev) => [entry, ...prev].slice(0, MAX_ACTIVITY));
   }, []);
@@ -505,22 +652,34 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     [places],
   );
 
-  const addPlace = useCallback((name: string, kind?: Place['kind']) => {
-    const trimmed = name.trim();
-    if (!trimmed) return null;
-    let created: Place | null = null;
-    setPlaces((prev) => {
-      const maxOrder = prev.reduce((m, p) => Math.max(m, p.sortOrder), -1);
-      created = {
-        id: `place-${Date.now()}`,
-        name: trimmed,
-        kind,
-        sortOrder: maxOrder + 1,
-      };
-      return [...prev, created];
-    });
-    return created;
-  }, []);
+  const getOpeningQuantity = useCallback(
+    (productId: string, placeId: string) =>
+      openingQtyForLine(periodSnapshot, productId, placeId),
+    [periodSnapshot],
+  );
+
+  const addPlace = useCallback(
+    (name: string, kind?: Place['kind'], storageType?: StorageType) => {
+      const trimmed = name.trim();
+      if (!trimmed) return null;
+      let created: Place | null = null;
+      setPlaces((prev) => {
+        const maxOrder = prev.reduce((m, p) => Math.max(m, p.sortOrder), -1);
+        const resolvedType =
+          storageType ?? storageTypeFromKind(kind) ?? 'dry_storage';
+        created = {
+          id: `place-${Date.now()}`,
+          name: trimmed,
+          kind,
+          storageType: resolvedType,
+          sortOrder: maxOrder + 1,
+        };
+        return [...prev, created];
+      });
+      return created;
+    },
+    [],
+  );
 
   const renamePlace = useCallback((placeId: string, name: string) => {
     const trimmed = name.trim();
@@ -529,6 +688,15 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       prev.map((p) => (p.id === placeId ? { ...p, name: trimmed } : p)),
     );
   }, []);
+
+  const setPlaceStorageType = useCallback(
+    (placeId: string, storageType: StorageType) => {
+      setPlaces((prev) =>
+        prev.map((p) => (p.id === placeId ? { ...p, storageType } : p)),
+      );
+    },
+    [],
+  );
 
   const deletePlace = useCallback(
     (placeId: string): 'last' | 'has_stock' | 'not_found' | null => {
@@ -1065,12 +1233,15 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       siteName,
       places: sortedPlaces(places),
       activePlaceId,
+      periodSnapshot,
+      getOpeningQuantity,
       lastRecordUnit,
       setLastRecordUnit,
       setSiteName,
       setActivePlaceId,
       addPlace,
       renamePlace,
+      setPlaceStorageType,
       deletePlace,
       defaultPortionErrorPercent,
       setDefaultPortionErrorPercent,
@@ -1098,12 +1269,15 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       siteName,
       places,
       activePlaceId,
+      periodSnapshot,
+      getOpeningQuantity,
       lastRecordUnit,
       setLastRecordUnit,
       setSiteName,
       setActivePlaceId,
       addPlace,
       renamePlace,
+      setPlaceStorageType,
       deletePlace,
       defaultPortionErrorPercent,
       addProduct,

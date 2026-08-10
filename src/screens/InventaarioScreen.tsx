@@ -12,9 +12,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExportColumnsSheet } from '../components/ExportColumnsSheet';
 import { PlaceSelect } from '../components/PlaceSelect';
+import { StorageTypeSelect } from '../components/StorageTypeSelect';
 import { UnitColumnLegend } from '../components/UnitColumnLegend';
 import { lineTotal, sessionTotals, useInventory } from '../data/store';
-import type { InventoryLine, RootStackParamList } from '../data/types';
+import { resolveStorageType } from '../data/storageTypes';
+import type {
+  InventoryLine,
+  RootStackParamList,
+  StorageType,
+} from '../data/types';
 import { useI18n } from '../i18n';
 import { alertAck, alertConfirm, alertInfo } from '../lib/alertAck';
 import { exportSessionDocx } from '../lib/export/docx';
@@ -131,10 +137,27 @@ export function InventaarioScreen() {
     recipes,
     updateLineQuantity,
     clearAllInventory,
+    getOpeningQuantity,
   } = useInventory();
   const { t, strings, locale } = useI18n();
   const { displayUnit, toDisplayQty, toStorageQty, formatQty } = useUnitSystem();
+  const [storageFilter, setStorageFilter] = useState<StorageType | 'all'>(
+    'all',
+  );
   const [placeFilter, setPlaceFilter] = useState<string | 'all'>('all');
+  const [compareMonths, setCompareMonths] = useState(false);
+  const placesForFilter = useMemo(() => {
+    if (storageFilter === 'all') return places;
+    return places.filter((p) => resolveStorageType(p) === storageFilter);
+  }, [places, storageFilter]);
+
+  useEffect(() => {
+    if (placeFilter === 'all') return;
+    if (!placesForFilter.some((p) => p.id === placeFilter)) {
+      setPlaceFilter('all');
+    }
+  }, [placeFilter, placesForFilter]);
+
   const placeIdForTotals = placeFilter === 'all' ? null : placeFilter;
   const totals = useMemo(
     () => sessionTotals(session, placeIdForTotals),
@@ -246,18 +269,26 @@ export function InventaarioScreen() {
   const alvPercentLabel = String(Math.round(FOOD_ALV_RATE * 100));
 
   const recordedCount = useMemo(() => {
-    const lines =
-      placeFilter === 'all'
-        ? session.lines
-        : session.lines.filter((l) => l.placeId === placeFilter);
+    let lines = session.lines;
+    if (storageFilter !== 'all') {
+      const ids = new Set(placesForFilter.map((p) => p.id));
+      lines = lines.filter((l) => ids.has(l.placeId));
+    }
+    if (placeFilter !== 'all') {
+      lines = lines.filter((l) => l.placeId === placeFilter);
+    }
     return lines.filter((l) => l.quantity != null).length;
-  }, [session.lines, placeFilter]);
+  }, [session.lines, placeFilter, storageFilter, placesForFilter]);
 
   const visibleLines = useMemo(() => {
-    const lines =
-      placeFilter === 'all'
-        ? session.lines
-        : session.lines.filter((l) => l.placeId === placeFilter);
+    let lines = session.lines;
+    if (storageFilter !== 'all') {
+      const ids = new Set(placesForFilter.map((p) => p.id));
+      lines = lines.filter((l) => ids.has(l.placeId));
+    }
+    if (placeFilter !== 'all') {
+      lines = lines.filter((l) => l.placeId === placeFilter);
+    }
     const sorted = [...lines].sort((a, b) => {
       const aSet = a.quantity != null ? 0 : 1;
       const bSet = b.quantity != null ? 0 : 1;
@@ -290,10 +321,17 @@ export function InventaarioScreen() {
     session.lines,
     showFullSheet,
     placeFilter,
+    storageFilter,
+    placesForFilter,
     placeById,
     productById,
     searchQuery,
   ]);
+
+  const needsHScrollEffective =
+    needsHScroll || compareMonths || columns.length > 4;
+  const minTableWidthEffective =
+    minTableWidth + (compareMonths ? 120 : 0);
 
   const searchActive = searchQuery.trim().length > 0;
 
@@ -339,6 +377,11 @@ export function InventaarioScreen() {
     }
   }
 
+  function formatLineQty(unit: InventoryLine['unit'], qty: number | null | undefined) {
+    if (qty == null) return '—';
+    return formatQty(toDisplayQty(unit, qty)).replace('.', ',');
+  }
+
   function renderQtyEditor(item: InventoryLine, editing: boolean) {
     return (
       <View style={styles.colQty}>
@@ -364,14 +407,20 @@ export function InventaarioScreen() {
           />
         ) : (
           <Text style={[styles.td, styles.num]}>
-            {item.quantity == null
-              ? '—'
-              : formatQty(toDisplayQty(item.unit, item.quantity)).replace(
-                  '.',
-                  ',',
-                )}
+            {formatLineQty(item.unit, item.quantity)}
           </Text>
         )}
+      </View>
+    );
+  }
+
+  function renderLastMonthQty(item: InventoryLine) {
+    const opening = getOpeningQuantity(item.productId, item.placeId);
+    return (
+      <View style={styles.colQty}>
+        <Text style={[styles.td, styles.num, styles.lastMonthQty]}>
+          {formatLineQty(item.unit, opening ?? null)}
+        </Text>
       </View>
     );
   }
@@ -426,8 +475,15 @@ export function InventaarioScreen() {
           </Text>
         );
       case 'qty':
-        return <View key={col}>{renderQtyEditor(item, editing)}</View>;
       case 'closingStock':
+        if (compareMonths) {
+          return (
+            <React.Fragment key={col}>
+              {renderLastMonthQty(item)}
+              {renderQtyEditor(item, editing)}
+            </React.Fragment>
+          );
+        }
         return <View key={col}>{renderQtyEditor(item, editing)}</View>;
       case 'price':
         return (
@@ -472,10 +528,31 @@ export function InventaarioScreen() {
 
   const tableHead = (
     <View style={styles.tableHead}>
-      {columns.map((col) =>
-        col === 'unit' ? (
-          <UnitColumnLegend key={col} />
-        ) : (
+      {columns.map((col) => {
+        if (col === 'unit') {
+          return <UnitColumnLegend key={col} />;
+        }
+        if (compareMonths && (col === 'qty' || col === 'closingStock')) {
+          return (
+            <React.Fragment key={col}>
+              <Text
+                style={[styles.th, styles.colQty]}
+                numberOfLines={2}
+                accessibilityLabel={t('inventoryLastMonth')}
+              >
+                {t('inventoryLastMonth')}
+              </Text>
+              <Text
+                style={[styles.th, styles.colQty]}
+                numberOfLines={2}
+                accessibilityLabel={t('inventoryThisMonth')}
+              >
+                {t('inventoryThisMonth')}
+              </Text>
+            </React.Fragment>
+          );
+        }
+        return (
           <Text
             key={col}
             style={[styles.th, colStyle(col)]}
@@ -485,8 +562,8 @@ export function InventaarioScreen() {
               finnishRestolution: Boolean(viewProfile.finnishExportHeaders),
             })}
           </Text>
-        ),
-      )}
+        );
+      })}
     </View>
   );
 
@@ -586,16 +663,31 @@ export function InventaarioScreen() {
           </View>
         ) : null}
 
-        {places.length > 1 ? (
-          <PlaceSelect
-            places={places}
-            selectedId={placeFilter}
-            onSelect={setPlaceFilter}
-            includeAll
-            allLabel={t('placesAll')}
-            label={t('placesFilter')}
-            compact
-          />
+        {places.length > 0 ? (
+          <View style={styles.filterSelects}>
+            <View style={styles.filterSelectHalf}>
+              <StorageTypeSelect
+                selected={storageFilter}
+                onSelect={setStorageFilter}
+                flush
+                compact
+              />
+            </View>
+            {placesForFilter.length > 1 || storageFilter !== 'all' ? (
+              <View style={styles.filterSelectHalf}>
+                <PlaceSelect
+                  places={placesForFilter}
+                  selectedId={placeFilter}
+                  onSelect={setPlaceFilter}
+                  includeAll
+                  allLabel={t('placesAll')}
+                  label={t('placesFilter')}
+                  flush
+                  compact
+                />
+              </View>
+            ) : null}
+          </View>
         ) : null}
 
         <ScrollView
@@ -629,6 +721,22 @@ export function InventaarioScreen() {
               ]}
             >
               {t('showFullSheet')}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setCompareMonths((v) => !v)}
+            style={[styles.filterChip, compareMonths && styles.filterChipOn]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: compareMonths }}
+            accessibilityHint={t('inventoryCompareHint')}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                compareMonths && styles.filterChipTextOn,
+              ]}
+            >
+              {t('inventoryCompareMonths')}
             </Text>
           </Pressable>
           {showPriceCols ? (
@@ -805,16 +913,18 @@ export function InventaarioScreen() {
         }}
       >
         <ScrollView
-          horizontal={needsHScroll}
+          horizontal={needsHScrollEffective}
           nestedScrollEnabled
-          showsHorizontalScrollIndicator={needsHScroll}
+          showsHorizontalScrollIndicator={needsHScrollEffective}
           style={[
             styles.tableScroll,
             listHeight > 0 ? { height: listHeight } : null,
           ]}
           contentContainerStyle={[
             styles.tableScrollContent,
-            needsHScroll ? { minWidth: minTableWidth } : { flexGrow: 1 },
+            needsHScrollEffective
+              ? { minWidth: minTableWidthEffective }
+              : { flexGrow: 1 },
             listHeight > 0 ? { height: listHeight } : null,
             Platform.OS === 'web' && listHeight <= 0
               ? ({ height: '100%' } as object)
@@ -824,7 +934,9 @@ export function InventaarioScreen() {
           <View
             style={[
               styles.tableInner,
-              needsHScroll ? { minWidth: minTableWidth } : { flex: 1 },
+              needsHScrollEffective
+                ? { minWidth: minTableWidthEffective }
+                : { flex: 1 },
               listHeight > 0 ? { height: listHeight } : null,
             ]}
           >
@@ -873,6 +985,17 @@ export function InventaarioScreen() {
                             </Text>
                           );
                         case 'qty':
+                        case 'closingStock':
+                          if (compareMonths) {
+                            return (
+                              <React.Fragment key={col}>
+                                <View style={styles.colQty} />
+                                <Text key={`${col}-this`} style={styles.footerQty}>
+                                  {String(totals.quantity).replace('.', ',')}
+                                </Text>
+                              </React.Fragment>
+                            );
+                          }
                           return (
                             <Text key={col} style={styles.footerQty}>
                               {String(totals.quantity).replace('.', ',')}
@@ -907,6 +1030,16 @@ const styles = StyleSheet.create({
     zIndex: 2,
     backgroundColor: colors.bg,
     paddingBottom: spacing.xs,
+  },
+  filterSelects: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
+  },
+  filterSelectHalf: {
+    flex: 1,
+    minWidth: 0,
   },
   titleRow: {
     flexDirection: 'row',
@@ -1190,7 +1323,8 @@ const styles = StyleSheet.create({
   },
   colName: { flex: 1.6, minWidth: 160, paddingRight: 4 },
   colUnit: { width: 64, textAlign: 'center', paddingTop: 1 },
-  colQty: { width: 48, alignItems: 'flex-end', paddingTop: 1 },
+  colQty: { width: 56, alignItems: 'flex-end', paddingTop: 1 },
+  lastMonthQty: { color: colors.inkMuted },
   colPrice: { width: 52, textAlign: 'right', paddingTop: 1 },
   colTotal: { width: 52, textAlign: 'right', paddingTop: 1 },
   colDate: { width: 88, textAlign: 'left', paddingTop: 1, paddingRight: 4 },

@@ -10,7 +10,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { storageTypeLabelKey } from '../components/StorageTypeSelect';
 import { useInventory } from '../data/store';
+import { STORAGE_TYPES, resolveStorageType } from '../data/storageTypes';
+import type { StorageType } from '../data/types';
 import { useI18n } from '../i18n';
 import { alertInfo } from '../lib/alertAck';
 import { colors, radius, spacing } from '../theme/colors';
@@ -25,6 +28,7 @@ export function PlacesScreen() {
     setSiteName,
     addPlace,
     renamePlace,
+    setPlaceStorageType,
     deletePlace,
     activePlaceId,
     setActivePlaceId,
@@ -32,6 +36,8 @@ export function PlacesScreen() {
 
   const [siteDraft, setSiteDraft] = useState(siteName);
   const [newName, setNewName] = useState('');
+  const [newStorageType, setNewStorageType] =
+    useState<StorageType>('dry_storage');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
 
@@ -45,12 +51,13 @@ export function PlacesScreen() {
   }
 
   function onAdd() {
-    const created = addPlace(newName);
+    const created = addPlace(newName, undefined, newStorageType);
     if (!created) {
       alertInfo(t('placesAdd'), t('placesNameRequired'));
       return;
     }
     setNewName('');
+    setNewStorageType('dry_storage');
   }
 
   function startRename(placeId: string, current: string) {
@@ -100,6 +107,12 @@ export function PlacesScreen() {
     return t('placesStockCount').replace('{count}', String(counted));
   }
 
+  function cycleStorageType(placeId: string, current: StorageType) {
+    const idx = STORAGE_TYPES.indexOf(current);
+    const next = STORAGE_TYPES[(idx + 1) % STORAGE_TYPES.length]!;
+    setPlaceStorageType(placeId, next);
+  }
+
   return (
     <ScrollView
       style={styles.root}
@@ -134,8 +147,12 @@ export function PlacesScreen() {
       {places.map((place) => {
         const editing = editingId === place.id;
         const isActive = activePlaceId === place.id;
+        const storage = resolveStorageType(place);
         return (
-          <View key={place.id} style={[styles.placeCard, isActive && styles.placeCardActive]}>
+          <View
+            key={place.id}
+            style={[styles.placeCard, isActive && styles.placeCardActive]}
+          >
             {editing ? (
               <TextInput
                 value={editDraft}
@@ -149,6 +166,8 @@ export function PlacesScreen() {
               <Pressable onPress={() => setActivePlaceId(place.id)}>
                 <Text style={styles.placeName}>{place.name}</Text>
                 <Text style={styles.placeMeta}>
+                  {t(storageTypeLabelKey(storage))}
+                  {' · '}
                   {stockHint(place.id)}
                   {isActive ? ` · ${t('placesActive')}` : ''}
                 </Text>
@@ -173,6 +192,16 @@ export function PlacesScreen() {
                 </Pressable>
               )}
               <Pressable
+                onPress={() => cycleStorageType(place.id, storage)}
+                style={styles.actionBtn}
+                accessibilityRole="button"
+                accessibilityLabel={t('placesStorageType')}
+              >
+                <Text style={styles.actionText}>
+                  {t(storageTypeLabelKey(storage))}
+                </Text>
+              </Pressable>
+              <Pressable
                 onPress={() => confirmDelete(place.id, place.name)}
                 style={styles.actionBtnDanger}
                 accessibilityRole="button"
@@ -194,6 +223,31 @@ export function PlacesScreen() {
           style={styles.input}
           onSubmitEditing={onAdd}
         />
+        <Text style={styles.storageLabel}>{t('placesStorageType')}</Text>
+        <Text style={styles.cardSub}>{t('placesStorageHint')}</Text>
+        <View style={styles.storageRow}>
+          {STORAGE_TYPES.map((type) => {
+            const on = newStorageType === type;
+            return (
+              <Pressable
+                key={type}
+                onPress={() => setNewStorageType(type)}
+                style={[styles.storageChip, on && styles.storageChipOn]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: on }}
+              >
+                <Text
+                  style={[
+                    styles.storageChipText,
+                    on && styles.storageChipTextOn,
+                  ]}
+                >
+                  {t(storageTypeLabelKey(type))}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
         <Pressable
           style={styles.addBtn}
           onPress={onAdd}
@@ -237,7 +291,12 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
   },
   cardTitle: { fontSize: 16, fontWeight: '700', color: colors.ink },
-  cardSub: { marginTop: 4, marginBottom: spacing.sm, color: colors.inkMuted, fontSize: 13 },
+  cardSub: {
+    marginTop: 4,
+    marginBottom: spacing.sm,
+    color: colors.inkMuted,
+    fontSize: 13,
+  },
   section: {
     fontSize: 13,
     fontWeight: '700',
@@ -256,6 +315,36 @@ const styles = StyleSheet.create({
     color: colors.ink,
     backgroundColor: colors.bg,
   },
+  storageLabel: {
+    marginTop: spacing.md,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  storageRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  storageChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.bg,
+  },
+  storageChipOn: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  storageChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.inkMuted,
+  },
+  storageChipTextOn: { color: colors.primary },
   placeCard: {
     backgroundColor: colors.bgElevated,
     borderRadius: radius.lg,
@@ -272,6 +361,7 @@ const styles = StyleSheet.create({
   placeMeta: { marginTop: 2, fontSize: 12, color: colors.inkMuted },
   placeActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     marginTop: spacing.sm,
   },

@@ -10,7 +10,15 @@
       "maxDuration": 30,
       "memory": 512
     },
+    "api/skaupat-lookup.js": {
+      "maxDuration": 15,
+      "memory": 256
+    },
     "api/transcribe.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "api/remove-bg.js": {
       "maxDuration": 60,
       "memory": 1024
     }

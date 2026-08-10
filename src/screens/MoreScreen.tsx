@@ -39,6 +39,11 @@ export function MoreScreen() {
       route: 'UnitsGuide' as const,
     },
     {
+      title: t('priceCompareTitle'),
+      subtitle: t('priceCompareSub'),
+      route: 'PriceComparison' as const,
+    },
+    {
       title: t('reportsChat'),
       subtitle: t('reportsChatSub'),
       route: 'ReportsChat' as const,

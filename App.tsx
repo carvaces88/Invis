@@ -29,6 +29,7 @@ import { InventaarioScreen } from './src/screens/InventaarioScreen';
 import { KuormaScanScreen } from './src/screens/KuormaScanScreen';
 import { MoreScreen } from './src/screens/MoreScreen';
 import { PlacesScreen } from './src/screens/PlacesScreen';
+import { PriceComparisonScreen } from './src/screens/PriceComparisonScreen';
 import { ProductScanScreen } from './src/screens/ProductScanScreen';
 import { RecordInventoryScreen } from './src/screens/RecordInventoryScreen';
 import { RecentActivityScreen } from './src/screens/RecentActivityScreen';
@@ -324,6 +325,15 @@ function RootNavigator() {
           component={UnitsGuideScreen}
           options={{
             title: t('unitsGuide'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="PriceComparison"
+          component={PriceComparisonScreen}
+          options={{
+            title: t('priceCompareTitle'),
             headerTintColor: colors.primary,
             headerStyle: { backgroundColor: colors.bg },
           }}
