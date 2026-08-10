@@ -247,11 +247,16 @@ async function fetchJson(
 async function searchViaProxy(
   query: string,
   limit: number,
+  preferLive = false,
 ): Promise<KruokaHit[]> {
   const base = proxyBase();
   if (!base) return [];
-  const url = `${base}?q=${encodeURIComponent(query)}&limit=${limit}&storeId=${encodeURIComponent(storeId())}`;
-  const json = await fetchJson(url);
+  const bust = preferLive ? `&_t=${Date.now()}` : '';
+  const url = `${base}?q=${encodeURIComponent(query)}&limit=${limit}&storeId=${encodeURIComponent(storeId())}${bust}`;
+  const json = await fetchJson(
+    url,
+    preferLive ? { cache: 'no-store' } : undefined,
+  );
   if (!json || typeof json !== 'object') return [];
   const root = json as {
     products?: KruokaHit[];
@@ -440,20 +445,23 @@ function hitToProduct(hit: KruokaHit): Product {
 
 /**
  * Search K-Ruoka (and fallbacks) by free-text and/or EAN.
+ * When `preferLive`, skip seed-first shortcuts and bust proxy cache.
  */
 export async function lookupKruokaProducts(opts: {
   query?: string;
   ean?: string | null;
   limit?: number;
+  preferLive?: boolean;
 }): Promise<KruokaHit[]> {
   const limit = opts.limit ?? 8;
+  const preferLive = Boolean(opts.preferLive);
   const ean = opts.ean?.replace(/\D/g, '') || null;
   const rawQuery = (opts.query ?? '').trim();
   const query = isUsableLookupQuery(rawQuery) ? rawQuery : '';
   if (!query && !ean) return [];
 
-  // Instant offline hit when seed already knows this EAN
-  if (ean) {
+  // Instant offline hit when seed already knows this EAN (skip on refresh)
+  if (!preferLive && ean) {
     const seedHit = searchSeed(query || ean, ean);
     if (seedHit.length && seedHit[0].ean === ean) {
       return seedHit;
@@ -465,7 +473,7 @@ export async function lookupKruokaProducts(opts: {
   );
 
   for (const q of searches) {
-    const viaProxy = await searchViaProxy(q, limit);
+    const viaProxy = await searchViaProxy(q, limit, preferLive);
     if (viaProxy.length) return viaProxy.slice(0, limit);
 
     const viaLive = await searchDirectKruoka(q, limit);

@@ -328,6 +328,11 @@ export const fi: Messages = {
   priceCompareAlv0: '0 % ALV',
   priceCompareOurPriceWithAlv: 'Hyllyvastaavuus {pct} % ALV:lla: {amount}',
   priceCompareLookingUp: 'Haetaan kilpailijahintoja…',
+  priceCompareRefresh: 'Päivitä hinnat',
+  priceCompareRefreshing: 'Päivitetään hintoja…',
+  priceCompareAsOf: 'Tilanne {date}',
+  priceCompareRefreshError:
+    'Hintojen päivitys epäonnistui. Yritä uudelleen — emme keksi puuttuvia euroja.',
   priceCompareSourceKruoka: 'K-Ruoka',
   priceCompareSourceSkaupat: 'S-Kaupat',
   priceCompareSourceLidl: 'Lidl',

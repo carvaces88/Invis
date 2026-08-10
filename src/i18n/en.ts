@@ -332,6 +332,11 @@ export const en = {
   priceCompareAlv0: '0% ALV',
   priceCompareOurPriceWithAlv: 'Shelf equivalent with {pct}% ALV: {amount}',
   priceCompareLookingUp: 'Looking up competitor prices…',
+  priceCompareRefresh: 'Refresh prices',
+  priceCompareRefreshing: 'Refreshing prices…',
+  priceCompareAsOf: 'As of {date}',
+  priceCompareRefreshError:
+    'Could not refresh prices. Try again — we will not invent missing €.',
   priceCompareSourceKruoka: 'K-Ruoka',
   priceCompareSourceSkaupat: 'S-Kaupat',
   priceCompareSourceLidl: 'Lidl',

@@ -58,6 +58,16 @@ function availabilityLabel(
   }
 }
 
+function formatAsOfDate(iso: string, locale: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return iso;
+  return d.toLocaleDateString(locale === 'fi' ? 'fi-FI' : 'en-GB', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 function applyManualOverrides(
   base: PriceComparisonResult,
   drafts: Partial<Record<CompetitorSourceId, string>>,
@@ -118,12 +128,14 @@ function DiffLine({
 
 export function PriceComparisonScreen() {
   const insets = useSafeAreaInsets();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { products } = useInventory();
   const alvPct = foodAlvPercentLabel();
 
   const [selected, setSelected] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const [baseResult, setBaseResult] = useState<PriceComparisonResult | null>(
     null,
   );
@@ -134,13 +146,26 @@ export function PriceComparisonScreen() {
   useEffect(() => {
     if (!selected) {
       setBaseResult(null);
+      setError(null);
       return;
     }
     let cancelled = false;
     setLoading(true);
-    compareProductPrices(selected)
+    setError(null);
+    const forceRefresh = refreshNonce > 0;
+    compareProductPrices(
+      selected,
+      undefined,
+      forceRefresh ? { forceRefresh: true } : undefined,
+    )
       .then((r) => {
         if (!cancelled) setBaseResult(r);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          // Keep prior rows if any — never invent replacement prices
+          setError(t('priceCompareRefreshError'));
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -148,7 +173,7 @@ export function PriceComparisonScreen() {
     return () => {
       cancelled = true;
     };
-  }, [selected]);
+  }, [selected, refreshNonce, t]);
 
   const result = useMemo(
     () => (baseResult ? applyManualOverrides(baseResult, manualDraft) : null),
@@ -157,6 +182,12 @@ export function PriceComparisonScreen() {
 
   const openUrl = (url: string) => {
     void Linking.openURL(url);
+  };
+
+  const onRefresh = () => {
+    if (!selected || loading) return;
+    setManualDraft({});
+    setRefreshNonce((n) => n + 1);
   };
 
   return (
@@ -180,6 +211,8 @@ export function PriceComparisonScreen() {
         onSelect={(match) => {
           setSelected(match.product);
           setManualDraft({});
+          setRefreshNonce(0);
+          setError(null);
         }}
       />
 
@@ -202,6 +235,8 @@ export function PriceComparisonScreen() {
                 setSelected(null);
                 setBaseResult(null);
                 setManualDraft({});
+                setRefreshNonce(0);
+                setError(null);
               }}
               accessibilityRole="button"
             >
@@ -228,17 +263,63 @@ export function PriceComparisonScreen() {
                 )}
             </Text>
           </View>
+
+          <View style={styles.refreshRow}>
+            {baseResult?.comparedAt ? (
+              <Text style={styles.asOf}>
+                {t('priceCompareAsOf').replace(
+                  '{date}',
+                  formatAsOfDate(baseResult.comparedAt, locale),
+                )}
+              </Text>
+            ) : (
+              <View style={{ flex: 1 }} />
+            )}
+            <Pressable
+              style={[styles.refreshBtn, loading && styles.refreshBtnDisabled]}
+              onPress={onRefresh}
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel={t('priceCompareRefresh')}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.primary} size="small" />
+              ) : (
+                <Text style={styles.refreshBtnText}>
+                  {t('priceCompareRefresh')}
+                </Text>
+              )}
+            </Pressable>
+          </View>
         </View>
       )}
 
-      {selected && loading ? (
+      {selected && loading && !result ? (
         <View style={styles.loading}>
           <ActivityIndicator color={colors.primary} />
           <Text style={styles.loadingText}>{t('priceCompareLookingUp')}</Text>
         </View>
       ) : null}
 
-      {result && !loading
+      {selected && loading && result ? (
+        <View style={styles.loadingInline}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={styles.loadingText}>{t('priceCompareRefreshing')}</Text>
+        </View>
+      ) : null}
+
+      {error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
+          {selected ? (
+            <Pressable onPress={onRefresh} accessibilityRole="button">
+              <Text style={styles.errorRetry}>{t('priceCompareRefresh')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
+      {result
         ? result.rows.map((row) => (
             <View key={row.id} style={styles.compCard}>
               <View style={styles.compHead}>
@@ -382,12 +463,59 @@ const styles = StyleSheet.create({
   },
   ourSuffix: { fontSize: 13, fontWeight: '600', color: colors.inkMuted },
   ourRetail: { marginTop: 4, fontSize: 13, color: colors.inkMuted },
+  refreshRow: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  asOf: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.inkMuted,
+  },
+  refreshBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primaryMid,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  refreshBtnDisabled: { opacity: 0.6 },
+  refreshBtnText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
   loading: {
     marginTop: spacing.lg,
     alignItems: 'center',
     gap: spacing.sm,
   },
+  loadingInline: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
   loadingText: { color: colors.inkMuted, fontSize: 14 },
+  errorBox: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.dangerSoft,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    gap: spacing.sm,
+  },
+  errorText: { color: colors.danger, fontSize: 13, lineHeight: 18 },
+  errorRetry: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
   compCard: {
     marginTop: spacing.md,
     backgroundColor: colors.bgElevated,

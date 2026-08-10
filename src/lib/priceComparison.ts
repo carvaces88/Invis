@@ -42,7 +42,14 @@ export type PriceComparisonResult = {
   product: Product;
   ourAlv0: number;
   ourWithAlv: number;
+  /** ISO timestamp when competitor prices were fetched */
+  comparedAt: string;
   rows: CompetitorRow[];
+};
+
+export type CompareProductPricesOptions = {
+  /** Prefer live/proxy over seed-first shortcuts; bust HTTP caches */
+  forceRefresh?: boolean;
 };
 
 export function buildSearchQuery(product: Product): string {
@@ -83,18 +90,21 @@ export function retailShelfFromAlv0(alv0: number): number {
 
 /**
  * Look up live/seed competitors; wholesale sources stay link + optional manual paste.
+ * Does not invent prices — missing matches stay link-only with no €.
  */
 export async function compareProductPrices(
   product: Product,
   manualShelfBySource?: Partial<Record<CompetitorSourceId, number>>,
+  options?: CompareProductPricesOptions,
 ): Promise<PriceComparisonResult> {
   const query = buildSearchQuery(product);
   const ean = product.ean ?? null;
   const ourAlv0 = product.unitPriceAlv0 ?? 0;
+  const preferLive = Boolean(options?.forceRefresh);
 
   const [kruokaHits, skaupatHits] = await Promise.all([
-    lookupKruokaProducts({ query, ean, limit: 3 }),
-    lookupSkaupatProducts({ query, ean, limit: 3 }),
+    lookupKruokaProducts({ query, ean, limit: 3, preferLive }),
+    lookupSkaupatProducts({ query, ean, limit: 3, preferLive }),
   ]);
 
   const kruoka = kruokaHits[0];
@@ -178,6 +188,7 @@ export async function compareProductPrices(
     product,
     ourAlv0,
     ourWithAlv: retailShelfFromAlv0(ourAlv0),
+    comparedAt: new Date().toISOString(),
     rows,
   };
 }

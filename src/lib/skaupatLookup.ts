@@ -102,6 +102,7 @@ async function searchViaProxy(
   query: string,
   ean: string | null,
   limit: number,
+  preferLive = false,
 ): Promise<SkaupatHit[]> {
   const base = proxyBase();
   if (!base) return [];
@@ -110,8 +111,10 @@ async function searchViaProxy(
     if (query) params.set('q', query);
     if (ean) params.set('ean', ean);
     params.set('limit', String(limit));
+    if (preferLive) params.set('_t', String(Date.now()));
     const res = await fetch(`${base}?${params}`, {
       headers: { accept: 'application/json' },
+      ...(preferLive ? { cache: 'no-store' as RequestCache } : {}),
     });
     if (!res.ok) return [];
     const data = (await res.json()) as {
@@ -156,15 +159,23 @@ export async function lookupSkaupatProducts(opts: {
   query?: string;
   ean?: string | null;
   limit?: number;
+  preferLive?: boolean;
 }): Promise<SkaupatHit[]> {
   const limit = opts.limit ?? 5;
+  const preferLive = Boolean(opts.preferLive);
   const ean = opts.ean?.replace(/\D/g, '') || null;
   const rawQuery = (opts.query ?? '').trim();
   const query = isUsableLookupQuery(rawQuery) ? rawQuery : '';
   if (!query && !ean) return [];
 
-  const viaProxy = await searchViaProxy(query || ean || '', ean, limit);
+  const viaProxy = await searchViaProxy(
+    query || ean || '',
+    ean,
+    limit,
+    preferLive,
+  );
   if (viaProxy.length) return viaProxy.slice(0, limit);
 
+  // Seed is labeled offline data — not invented; used only when live/proxy empty
   return scoreSeed(query || ean || '', ean).slice(0, limit);
 }
