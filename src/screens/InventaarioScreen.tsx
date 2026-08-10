@@ -115,11 +115,11 @@ function tableMinWidth(columns: ExportColumnId[]): number {
   return columns.reduce((sum, col) => {
     switch (col) {
       case 'name':
-        return sum + 180;
+        return sum + 200;
       case 'unit':
         return sum + 64;
       case 'storage':
-        return sum + 88;
+        return sum + 100;
       case 'qty':
         return sum + 48;
       case 'closingStock':
@@ -361,16 +361,36 @@ export function InventaarioScreen() {
 
   const searchActive = searchQuery.trim().length > 0;
 
-  function aliasesLabel(productId: string, officialName: string): string | null {
+  function productAliases(
+    productId: string,
+    officialName: string,
+  ): string[] {
     const product = productById.get(productId);
-    if (!product?.aliases?.length) return null;
+    if (!product?.aliases?.length) return [];
     const officialLower = officialName.toLowerCase();
-    const shown = product.aliases
-      .filter((a) => a.trim() && a.toLowerCase() !== officialLower)
-      .slice(0, 4);
-    if (!shown.length) return null;
-    const more = product.aliases.length > shown.length ? '…' : '';
-    return `${t('alsoAs')} ${shown.join(', ')}${more}`;
+    return product.aliases.filter(
+      (a) => a.trim() && a.toLowerCase() !== officialLower,
+    );
+  }
+
+  /** One-line list preview (capped); full string for tooltip / long-press. */
+  function aliasesLabels(
+    productId: string,
+    officialName: string,
+  ): { preview: string; full: string } | null {
+    const aliases = productAliases(productId, officialName);
+    if (!aliases.length) return null;
+    const shown = aliases.slice(0, 4);
+    const more = aliases.length > shown.length ? '…' : '';
+    return {
+      preview: `${t('alsoAs')} ${shown.join(', ')}${more}`,
+      full: `${t('alsoAs')} ${aliases.join(', ')}`,
+    };
+  }
+
+  function webTitleProps(title: string | undefined) {
+    if (Platform.OS !== 'web' || !title) return undefined;
+    return { title } as { title: string };
   }
 
   function applyViewProfile(profileId: ExportProfileId) {
@@ -454,7 +474,7 @@ export function InventaarioScreen() {
   function renderCell(col: ExportColumnId, item: InventoryLine, editing: boolean) {
     switch (col) {
       case 'name': {
-        const alsoAs = aliasesLabel(item.productId, item.officialName);
+        const alsoAs = aliasesLabels(item.productId, item.officialName);
         const uncounted = item.quantity == null;
         const placeName =
           placeFilter === 'all'
@@ -462,18 +482,42 @@ export function InventaarioScreen() {
             : undefined;
         return (
           <View key={col} style={styles.colName}>
-            <Text style={styles.td} numberOfLines={2}>
+            <Text
+              style={styles.td}
+              numberOfLines={2}
+              accessibilityLabel={item.officialName}
+              {...webTitleProps(item.officialName)}
+            >
               {item.officialName}
             </Text>
             {placeName ? (
-              <Text style={styles.placeTag} numberOfLines={1}>
+              <Text
+                style={styles.placeTag}
+                numberOfLines={1}
+                {...webTitleProps(placeName)}
+              >
                 {placeName}
               </Text>
             ) : null}
             {alsoAs ? (
-              <Text style={styles.alias} numberOfLines={2}>
-                {alsoAs}
-              </Text>
+              <Pressable
+                onLongPress={
+                  Platform.OS !== 'web'
+                    ? () => alertInfo(item.officialName, alsoAs.full)
+                    : undefined
+                }
+                delayLongPress={350}
+                accessibilityRole="text"
+                accessibilityLabel={alsoAs.full}
+                accessibilityHint={
+                  Platform.OS !== 'web' ? alsoAs.full : undefined
+                }
+                {...webTitleProps(alsoAs.full)}
+              >
+                <Text style={styles.alias} numberOfLines={1}>
+                  {alsoAs.preview}
+                </Text>
+              </Pressable>
             ) : null}
             {uncounted ? (
               <Text style={styles.uncounted}>{t('notCountedYet')}</Text>
@@ -510,6 +554,7 @@ export function InventaarioScreen() {
             key={col}
             style={[styles.td, styles.colStorage, styles.storageCell]}
             numberOfLines={2}
+            {...webTitleProps(label)}
           >
             {label}
           </Text>
@@ -1295,6 +1340,7 @@ const styles = StyleSheet.create({
   tableHead: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-start',
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
     borderBottomWidth: 1,
@@ -1312,6 +1358,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    justifyContent: 'flex-start',
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -1351,13 +1398,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  colName: { flex: 1.6, minWidth: 160, paddingRight: 4 },
+  // Cap name growth so Storage (and following cols) sit beside content
+  // instead of after a wide empty flex void on wide screens.
+  colName: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 180,
+    minWidth: 160,
+    maxWidth: 340,
+    paddingRight: spacing.sm,
+  },
   colUnit: { width: 64, textAlign: 'center', paddingTop: 1 },
   colStorage: {
-    width: 88,
+    width: 100,
+    flexGrow: 0,
+    flexShrink: 0,
     textAlign: 'left',
     paddingTop: 1,
-    paddingRight: 4,
+    paddingRight: spacing.sm,
   },
   storageCell: {
     color: colors.inkMuted,
@@ -1388,12 +1446,22 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-start',
     paddingHorizontal: spacing.md,
     paddingVertical: 14,
     backgroundColor: colors.primarySoft,
     marginTop: spacing.sm,
   },
-  footerLabel: { flex: 1.6, fontWeight: '700', color: colors.ink, fontSize: 13 },
+  footerLabel: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 180,
+    minWidth: 160,
+    maxWidth: 340,
+    fontWeight: '700',
+    color: colors.ink,
+    fontSize: 13,
+  },
   footerQty: {
     width: 48,
     textAlign: 'right',
