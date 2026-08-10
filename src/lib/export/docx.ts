@@ -1,4 +1,5 @@
 import type {
+  InventoryPeriodSnapshot,
   InventorySession,
   Product,
   Recipe,
@@ -20,6 +21,7 @@ export type ExportDataContext = {
   movements?: StockMovement[];
   products?: Product[];
   recipes?: Recipe[];
+  periodSnapshot?: InventoryPeriodSnapshot | null;
 };
 
 /**

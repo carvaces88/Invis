@@ -1,10 +1,12 @@
 import type {
   InventoryLine,
+  InventoryPeriodSnapshot,
   InventorySession,
   Product,
   Recipe,
   StockMovement,
 } from '../../data/types';
+import { openingQtyForLine } from '../../data/periodSnapshot';
 import { lineTotal, sessionTotals } from '../../data/store';
 import type { Messages } from '../../i18n/en';
 import {
@@ -54,6 +56,8 @@ export type ExportCellContext = {
   movements?: StockMovement[];
   products?: Product[];
   recipes?: Recipe[];
+  /** Month opening stock for Restolution Alkuvarasto / usage math */
+  periodSnapshot?: InventoryPeriodSnapshot | null;
 };
 
 export const EXPORT_PROFILES: ExportProfile[] = [
@@ -178,8 +182,14 @@ function metricsFor(
   line: InventoryLine,
   ctx?: ExportCellContext,
 ) {
+  const periodOpening = openingQtyForLine(
+    ctx?.periodSnapshot,
+    line.productId,
+    line.placeId,
+  );
   return computeRestolutionMetrics(line, ctx?.movements ?? [], {
     recipes: ctx?.recipes,
+    periodOpening,
   });
 }
 

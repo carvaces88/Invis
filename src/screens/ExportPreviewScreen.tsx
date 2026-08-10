@@ -72,7 +72,8 @@ function tableMinWidth(columns: ExportColumnId[]): number {
  */
 export function ExportPreviewScreen() {
   const insets = useSafeAreaInsets();
-  const { session, products, movements, recipes, siteName } = useInventory();
+  const { session, products, movements, recipes, siteName, periodSnapshot } =
+    useInventory();
   const { t, strings } = useI18n();
   const [profileId, setProfileId] = useState<ExportProfileId>(
     DEFAULT_EXPORT_PROFILE,
@@ -89,8 +90,8 @@ export function ExportPreviewScreen() {
   const minWidth = tableMinWidth(columns);
 
   const cellCtx: ExportCellContext = useMemo(
-    () => ({ session, movements, products, recipes }),
-    [session, movements, products, recipes],
+    () => ({ session, movements, products, recipes, periodSnapshot }),
+    [session, movements, products, recipes, periodSnapshot],
   );
 
   const productById = useMemo(
@@ -131,7 +132,7 @@ export function ExportPreviewScreen() {
   async function runExport(kind: ExportKind, exportProfileId: ExportProfileId) {
     try {
       setExporting(true);
-      const ctx = { movements, products, recipes };
+      const ctx = { movements, products, recipes, periodSnapshot };
       if (kind === 'xlsx') {
         await exportSessionExcel(session, strings, exportProfileId, ctx);
       } else if (kind === 'pdf') {

@@ -156,6 +156,7 @@ export function InventaarioScreen() {
     siteName,
     movements,
     recipes,
+    periodSnapshot,
     updateLineQuantity,
     clearAllInventory,
     getOpeningQuantity,
@@ -193,8 +194,8 @@ export function InventaarioScreen() {
     [products],
   );
   const exportCtx = useMemo(
-    () => ({ movements, products, recipes }),
-    [movements, products, recipes],
+    () => ({ movements, products, recipes, periodSnapshot }),
+    [movements, products, recipes, periodSnapshot],
   );
   const cellCtx: ExportCellContext = useMemo(
     () => ({ session, ...exportCtx }),

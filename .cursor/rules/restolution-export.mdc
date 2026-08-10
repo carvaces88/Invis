@@ -32,7 +32,8 @@ Default export/view profile is `restolution`.
 
 - Ainekäyttö = Alkuvarasto + Ostot − Loppuvarasto
 - Ero = Ainekäyttö − Tarve
-- Varastonkiertonopeus = Ainekäyttö / ((Alku + Loppu) / 2) — **two decimal places**
+- Varastonkiertonopeus = Ainekäyttö / ((Alku + Loppu) / 2) — **two decimal places**; only when usage > 0 (0 when usage is 0; "—" when usage < 0 or incomplete period)
+- Incomplete period (no known Alkuvarasto and no Ostot): Ainekäyttö / Ero / Varastonkiertonopeus = "—" — do not treat missing opening as 0 and invent negative usage from ending stock alone
 
 ## Product code
 
