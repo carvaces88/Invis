@@ -5,10 +5,16 @@ import {
   SEED_MEAT_POULTRY,
 } from './seedBuffet';
 import {
+  EVENT_PRODUCT_PLACE,
+  EVENT_SEED_QTY,
+  SEED_EVENT_PRODUCTS,
+} from './seedEventMenu';
+import {
   INVENTAARIOPOHJA_SEED_QTY,
   SEED_INVENTAARIOPOHJA_PRODUCTS,
 } from './seedInventaariopohja';
 import { KRUOKA_SEED_QTY, SEED_KRUOKA_PRODUCTS } from './seedKruoka';
+import { DEFAULT_PLACE_ID, SEED_PLACES } from './seedPlaces';
 
 /**
  * Seeded from client inventaariopohja (RR) + Figaro kapris alias demo
@@ -271,6 +277,7 @@ export const SEED_PRODUCTS: Product[] = [
   ...SEED_MEAT_POULTRY,
   ...SEED_BUFFET_INGREDIENTS,
   ...SEED_KRUOKA_PRODUCTS,
+  ...SEED_EVENT_PRODUCTS,
   ...SEED_INVENTAARIOPOHJA_PRODUCTS,
 ];
 
@@ -304,32 +311,89 @@ export const SEED_QTY: Record<string, number> = {
   ...BUFFET_SEED_QTY,
   ...KRUOKA_SEED_QTY,
   ...INVENTAARIOPOHJA_SEED_QTY,
+  // 150-cover Skagen / lohikeitto / tiramisu — last wins
+  ...EVENT_SEED_QTY,
 };
 
-/** Session lines for the default place. Pass `seeded: false` for an empty sheet. */
+function seedPlaceForProduct(productId: string): string {
+  return EVENT_PRODUCT_PLACE[productId] ?? DEFAULT_PLACE_ID;
+}
+
+function makeSeedLine(
+  p: Product,
+  placeId: string,
+  quantity: number | null,
+) {
+  return {
+    id: `line-${p.id}-${placeId}`,
+    productId: p.id,
+    placeId,
+    quantity,
+    officialName: p.officialName,
+    unit: p.unit,
+    unitPriceAlv0: p.unitPriceAlv0,
+    countedAt: undefined as string | undefined,
+    lastUpdatedAt: undefined as string | undefined,
+    verificationStatus:
+      quantity != null && quantity > 0 ? ('correct' as const) : undefined,
+  };
+}
+
+/**
+ * Session lines: every product on the default place, plus event mise stock on
+ * the storage-typed place (freezer / prep fridge / dry / drawers) when different.
+ * Pass `seeded: false` for an empty sheet.
+ */
 export function createInitialSessionLines(
   products: Product[],
-  placeId: string,
+  placeId: string = DEFAULT_PLACE_ID,
   opts?: { seeded?: boolean },
 ) {
   const seeded = opts?.seeded !== false;
-  return products.map((p) => {
-    const quantity = seeded ? (SEED_QTY[p.id] ?? null) : null;
-    return {
-      id: `line-${p.id}-${placeId}`,
-      productId: p.id,
-      placeId,
-      quantity,
-      officialName: p.officialName,
-      unit: p.unit,
-      unitPriceAlv0: p.unitPriceAlv0,
-      countedAt: undefined as string | undefined,
-      lastUpdatedAt: undefined as string | undefined,
-      // Seed demo stock is pre-accepted; user counts start pending on add/edit
-      verificationStatus:
-        quantity != null && quantity > 0
-          ? ('correct' as const)
-          : undefined,
-    };
+  const knownPlaces = new Set(SEED_PLACES.map((p) => p.id));
+  const lines = products.map((p) => {
+    const preferred = seedPlaceForProduct(p.id);
+    const qtyOnDefault =
+      seeded && preferred === placeId ? (SEED_QTY[p.id] ?? null) : null;
+    return makeSeedLine(p, placeId, qtyOnDefault);
   });
+
+  if (!seeded) return lines;
+
+  for (const p of products) {
+    const preferred = seedPlaceForProduct(p.id);
+    if (preferred === placeId) continue;
+    if (!knownPlaces.has(preferred)) continue;
+    const qty = SEED_QTY[p.id] ?? null;
+    if (qty == null) continue;
+    lines.push(makeSeedLine(p, preferred, qty));
+  }
+  return lines;
+}
+
+/** Ensure event stock lines exist on preferred places after reconcile. */
+export function appendMissingEventPlaceLines(
+  existing: ReturnType<typeof createInitialSessionLines>,
+  products: Product[],
+  opts?: { seeded?: boolean },
+) {
+  if (opts?.seeded === false) return existing;
+  const have = new Set(existing.map((l) => `${l.productId}::${l.placeId}`));
+  const extras: typeof existing = [];
+  for (const p of products) {
+    const preferred = seedPlaceForProduct(p.id);
+    if (preferred === DEFAULT_PLACE_ID) continue;
+    const key = `${p.id}::${preferred}`;
+    if (have.has(key)) continue;
+    // Avoid doubling legacy seed that already lives on another place
+    const alreadyStocked = existing.some(
+      (l) =>
+        l.productId === p.id && l.quantity != null && l.quantity > 0,
+    );
+    if (alreadyStocked) continue;
+    const qty = SEED_QTY[p.id] ?? null;
+    if (qty == null) continue;
+    extras.push(makeSeedLine(p, preferred, qty));
+  }
+  return extras.length ? [...existing, ...extras] : existing;
 }
