@@ -590,17 +590,16 @@ export const en = {
 
   // Auth / feedback / admin deck (simple welcome gate — no passwords)
   gateTitle: 'Welcome to Invis',
-  gateSub:
-    'Kitchen inventory for Restolution — enter your name to continue. Cesar, Elena, Ivan, or Guest skip the extras.',
+  gateSub: 'Kitchen inventory — enter your name to continue.',
   gateName: 'Your name',
-  gateNamePlaceholder: 'e.g. Cesar or your first name',
+  gateNamePlaceholder: 'Your first name',
   gateVenue: 'Venue / site',
   gateVenuePlaceholder: 'e.g. Kamppi kitchen',
   gateEmail: 'Email',
   gateEmailRecommended: '(required for new testers)',
   gateEmailPlaceholder: 'you@company.com',
   gateTesterHint: 'We use your email only to follow up on the test — no password.',
-  gateKitchenHint: 'Kitchen login — you can enter without email or venue.',
+  gateKitchenHint: 'You can continue without email or venue.',
   gateSubmit: 'Continue',
   signInNotConfigured:
     'Supabase keys are missing. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to log visits.',

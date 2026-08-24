@@ -584,10 +584,9 @@ export const fi: Messages = {
 
   // Auth / feedback / admin deck (simple welcome gate — no passwords)
   gateTitle: 'Tervetuloa Invisiin',
-  gateSub:
-    'Keittiön inventaario Restolutionia varten — kirjoita nimesi jatkaaksesi. Cesar, Elena, Ivan tai Guest ohittavat lisätiedot.',
+  gateSub: 'Keittiön inventaario — kirjoita nimesi jatkaaksesi.',
   gateName: 'Nimesi',
-  gateNamePlaceholder: 'esim. Cesar tai etunimesi',
+  gateNamePlaceholder: 'Etunimesi',
   gateVenue: 'Toimipiste',
   gateVenuePlaceholder: 'esim. Kamppi',
   gateEmail: 'Sähköposti',
@@ -596,7 +595,7 @@ export const fi: Messages = {
   gateTesterHint:
     'Käytämme sähköpostia vain testin seurantaan — ei salasanaa.',
   gateKitchenHint:
-    'Keittiökirjautuminen — voit jatkaa ilman sähköpostia tai toimipistettä.',
+    'Voit jatkaa ilman sähköpostia tai toimipistettä.',
   gateSubmit: 'Jatka',
   signInNotConfigured:
     'Supabase-avaimet puuttuvat. Lisää EXPO_PUBLIC_SUPABASE_URL ja EXPO_PUBLIC_SUPABASE_ANON_KEY vierailulokia varten.',
