@@ -34,13 +34,17 @@ export function SignInScreen() {
   const onSubmit = async () => {
     setError(null);
     setBusy(true);
-    const result = await enter({ name, venue, email });
-    setBusy(false);
-    if (!result.ok) setError(result.message);
+    try {
+      const result = await enter({ name, venue, email });
+      if (!result.ok) setError(result.message);
+    } catch {
+      setError(t('gateEnterFailed'));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const canSubmit =
-    name.trim().length > 0 && (kitchen || email.trim().length > 0);
+  const canSubmit = name.trim().length > 0;
 
   return (
     <KeyboardAvoidingView

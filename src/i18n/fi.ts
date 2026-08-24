@@ -597,6 +597,7 @@ export const fi: Messages = {
   gateKitchenHint:
     'Voit jatkaa ilman sähköpostia tai toimipistettä.',
   gateSubmit: 'Jatka',
+  gateEnterFailed: 'Jatkaminen ei onnistunut — yritä uudelleen.',
   signInNotConfigured:
     'Supabase-avaimet puuttuvat. Lisää EXPO_PUBLIC_SUPABASE_URL ja EXPO_PUBLIC_SUPABASE_ANON_KEY vierailulokia varten.',
   signedInAs: 'Kirjautunut: {name}',

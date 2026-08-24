@@ -601,6 +601,7 @@ export const en = {
   gateTesterHint: 'We use your email only to follow up on the test — no password.',
   gateKitchenHint: 'You can continue without email or venue.',
   gateSubmit: 'Continue',
+  gateEnterFailed: 'Could not continue — try again.',
   signInNotConfigured:
     'Supabase keys are missing. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to log visits.',
   signedInAs: 'Signed in as {name}',

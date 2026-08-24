@@ -119,11 +119,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!email) {
         return {
           ok: false as const,
-          message: 'New testers need an email so we can follow up.',
+          message: 'Add your email so we can follow up — then tap Continue.',
         };
       }
       if (!isValidEmail(email)) {
-        return { ok: false as const, message: 'That email does not look valid.' };
+        return {
+          ok: false as const,
+          message: 'That email does not look valid.',
+        };
       }
     }
 
@@ -135,7 +138,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       enteredAt: new Date().toISOString(),
     };
 
-    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(next));
+    try {
+      await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(next));
+    } catch {
+      // Still allow entry if storage is blocked (private mode / web quirks).
+    }
     setSession(next);
     setJustSignedIn(true);
     void logEntry(next);
