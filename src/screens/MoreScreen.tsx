@@ -211,23 +211,25 @@ export function MoreScreen() {
         </Text>
       </Pressable>
 
-      <Pressable
-        style={({ pressed }) => [styles.signOutCard, pressed && styles.pressed]}
-        onPress={() => {
-          alertConfirm(t('signOut'), t('signOutConfirm'), {
-            confirmLabel: t('signOut'),
-            cancelLabel: t('cancel'),
-            onConfirm: () => {
-              void signOut();
-            },
-          });
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={t('signOut')}
-      >
-        <Text style={styles.cardTitle}>{t('signOut')}</Text>
-        <Text style={styles.cardSub}>{t('signOutSub')}</Text>
-      </Pressable>
+      {profile ? (
+        <Pressable
+          style={({ pressed }) => [styles.signOutCard, pressed && styles.pressed]}
+          onPress={() => {
+            alertConfirm(t('signOut'), t('signOutConfirm'), {
+              confirmLabel: t('signOut'),
+              cancelLabel: t('cancel'),
+              onConfirm: () => {
+                void signOut();
+              },
+            });
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t('signOut')}
+        >
+          <Text style={styles.cardTitle}>{t('signOut')}</Text>
+          <Text style={styles.cardSub}>{t('signOutSub')}</Text>
+        </Pressable>
+      ) : null}
 
       <InventoryValueModal
         visible={valueOpen}

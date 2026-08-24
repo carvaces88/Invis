@@ -13,6 +13,8 @@ import { enableScreens } from 'react-native-screens';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { ChefNudgeProvider } from './src/components/ChefNudge';
 import { FeedbackNudge } from './src/components/FeedbackNudge';
+import { WaitlistBanner } from './src/components/WaitlistBanner';
+import { VenueFromGate } from './src/components/VenueFromGate';
 import { InventoryProvider } from './src/data/store';
 import type { MainTabParamList, RootStackParamList } from './src/data/types';
 import { LocaleProvider, useI18n } from './src/i18n';
@@ -120,6 +122,7 @@ function MainTabs() {
   const { t } = useI18n();
   return (
     <>
+      <WaitlistBanner />
       <FeedbackNudge />
       <Tab.Navigator
       initialRouteName="Home"
@@ -413,7 +416,7 @@ function RootNavigator() {
 }
 
 function AuthGate() {
-  const { ready, session } = useAuth();
+  const { ready, session, configured } = useAuth();
 
   if (!ready) {
     return (
@@ -430,10 +433,16 @@ function AuthGate() {
     );
   }
 
+  // No Supabase env → skip auth so Vercel / local demos keep working.
+  if (!configured) {
+    return <RootNavigator />;
+  }
+
   if (!session) {
     return <SignInScreen />;
   }
 
+  // Soft gate: waitlisted users enter the app with WaitlistBanner.
   return <RootNavigator />;
 }
 
@@ -445,6 +454,7 @@ export default function App() {
           <AuthProvider>
             <InventoryProvider>
               <ChefNudgeProvider>
+                <VenueFromGate />
                 <AuthGate />
               </ChefNudgeProvider>
             </InventoryProvider>

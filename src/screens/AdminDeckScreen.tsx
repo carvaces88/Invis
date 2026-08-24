@@ -13,23 +13,18 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RootStackParamList } from '../data/types';
 import { useI18n } from '../i18n';
-import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { colors, radius, spacing, surfaces } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminDeck'>;
 
-type ProfileRow = {
-  username: string;
-  display_name: string;
-  email: string | null;
-  role: string;
-  last_seen_at: string | null;
-};
-
-type SignInRow = {
+type EntryRow = {
   id: string;
-  username: string | null;
-  signed_in_at: string;
+  name: string;
+  venue: string | null;
+  email: string | null;
+  kind: string;
+  created_at: string;
 };
 
 type FeedbackRow = {
@@ -55,38 +50,37 @@ export function AdminDeckScreen(_props: Props) {
   const insets = useSafeAreaInsets();
   const { t, locale } = useI18n();
   const [loading, setLoading] = useState(true);
-  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
-  const [signIns, setSignIns] = useState<SignInRow[]>([]);
+  const [entries, setEntries] = useState<EntryRow[]>([]);
   const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
-    const [p, s, f] = await Promise.all([
+    if (!isSupabaseConfigured) {
+      setError(t('signInNotConfigured'));
+      setLoading(false);
+      return;
+    }
+    const [e, f] = await Promise.all([
       supabase
-        .from('profiles')
-        .select('username, display_name, email, role, last_seen_at')
-        .order('username'),
-      supabase
-        .from('sign_ins')
-        .select('id, username, signed_in_at')
-        .order('signed_in_at', { ascending: false })
-        .limit(40),
+        .from('app_entries')
+        .select('id, name, venue, email, kind, created_at')
+        .order('created_at', { ascending: false })
+        .limit(80),
       supabase
         .from('feedback')
         .select('id, username, body, created_at')
         .order('created_at', { ascending: false })
         .limit(50),
     ]);
-    if (p.error || s.error || f.error) {
-      setError(p.error?.message || s.error?.message || f.error?.message || 'Load failed');
+    if (e.error || f.error) {
+      setError(e.error?.message || f.error?.message || 'Load failed');
     } else {
-      setProfiles(p.data ?? []);
-      setSignIns(s.data ?? []);
+      setEntries(e.data ?? []);
       setFeedback(f.data ?? []);
     }
     setLoading(false);
-  }, []);
+  }, [t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -111,35 +105,28 @@ export function AdminDeckScreen(_props: Props) {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Text style={styles.section}>{t('adminPeople')}</Text>
-      {loading && profiles.length === 0 ? (
+      {loading && entries.length === 0 ? (
         <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
+      ) : entries.length === 0 ? (
+        <Text style={styles.empty}>{t('adminEntriesEmpty')}</Text>
       ) : (
-        profiles.map((row) => (
-          <View key={row.username} style={styles.card}>
+        entries.map((row) => (
+          <View key={row.id} style={styles.card}>
             <View style={styles.rowTop}>
-              <Text style={styles.name}>{row.display_name}</Text>
+              <Text style={styles.name}>{row.name}</Text>
               <Text style={styles.badge}>
-                {row.role === 'admin' ? t('adminRoleAdmin') : t('adminRoleGuest')}
+                {row.kind === 'kitchen'
+                  ? t('adminRoleKitchen')
+                  : t('adminRoleTester')}
               </Text>
             </View>
-            <Text style={styles.meta}>
-              {row.username} · {row.email ?? '—'}
-            </Text>
-            <Text style={styles.meta}>
-              {t('adminLastSeen')}: {formatWhen(row.last_seen_at, locale)}
-            </Text>
-          </View>
-        ))
-      )}
-
-      <Text style={styles.section}>{t('adminSignIns')}</Text>
-      {signIns.length === 0 && !loading ? (
-        <Text style={styles.empty}>{t('adminSignInsEmpty')}</Text>
-      ) : (
-        signIns.map((row) => (
-          <View key={row.id} style={styles.slimCard}>
-            <Text style={styles.slimTitle}>{row.username ?? '—'}</Text>
-            <Text style={styles.meta}>{formatWhen(row.signed_in_at, locale)}</Text>
+            {row.venue ? (
+              <Text style={styles.meta}>
+                {t('adminVenue')}: {row.venue}
+              </Text>
+            ) : null}
+            {row.email ? <Text style={styles.meta}>{row.email}</Text> : null}
+            <Text style={styles.meta}>{formatWhen(row.created_at, locale)}</Text>
           </View>
         ))
       )}
@@ -184,24 +171,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
-  slimCard: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    marginBottom: 6,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  slimTitle: { fontWeight: '600', color: colors.ink },
   rowTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
   },
-  name: { fontSize: 16, fontWeight: '700', color: colors.ink },
+  name: { fontSize: 16, fontWeight: '700', color: colors.ink, flexShrink: 1 },
   badge: {
     fontSize: 11,
     fontWeight: '700',

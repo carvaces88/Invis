@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthContext';
 import type { RootStackParamList } from '../data/types';
 import { useI18n } from '../i18n';
-import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { colors, radius, spacing, surfaces } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Feedback'>;
@@ -31,12 +31,22 @@ export function FeedbackScreen({ navigation, route }: Props) {
 
   const submit = async () => {
     const trimmed = body.trim();
-    if (!trimmed || !user) return;
+    if (!trimmed) return;
     setBusy(true);
     setError(null);
+    if (!isSupabaseConfigured) {
+      setBusy(false);
+      setError(t('signInNotConfigured'));
+      return;
+    }
+    if (!user?.id) {
+      setBusy(false);
+      setError(t('signInNotConfigured'));
+      return;
+    }
     const { error: insertError } = await supabase.from('feedback').insert({
       user_id: user.id,
-      username: profile?.username ?? null,
+      username: profile?.displayName ?? profile?.username ?? null,
       body: trimmed,
     });
     setBusy(false);

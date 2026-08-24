@@ -513,7 +513,14 @@ export const fi: Messages = {
     '{name} · {pct} % sama tuote · varastossa: {qty} {unit}. Vahvista päivittääksesi määrän — ei tarvitse lisätä uudelleen.',
   confirmNotHaveTitle: 'Tuotetta ei ole vielä inventaariossa',
   confirmNotHaveBody:
-    'Ei vahvaa katalogiosumaa. Lisää tuote katalogiin, sitten vahvista määrä.',
+    'Ei vahvaa katalogiosumaa vielä. Kentät on esitäytetty skannauksesta — tarkista ja napauta Lisää katalogiin.',
+  confirmPrefillHint:
+    'Tarkista tuotenimi ja lisää. Viivakoodi näkyy toissijaisena tarkan osuman vuoksi.',
+  confirmProductName: 'Tuotenimi',
+  confirmProductNamePlaceholder: 'esim. Pirkka rasvaton maito 1 l',
+  confirmScannedBarcode: 'skannattu viivakoodi',
+  confirmSearchPlaceholder: 'Hae nimellä tai merkillä…',
+  confirmQtyHint: 'Montako pakkausta tai kappaletta lisätään (yleensä 1)',
   confirmAddToCatalog: 'Lisää katalogiin',
   confirmSuggestedMatches: 'Ehdotetut osumat',
   confirmSeeMoreSuggestions: 'Näytä lisää ehdotuksia',
@@ -575,23 +582,28 @@ export const fi: Messages = {
   barcodeScanForMatch: 'Skannaa viivakoodi tarkan osuman saamiseksi',
   all: 'Kaikki',
 
-  // Auth / feedback / admin deck
-  signInTitle: 'Kirjaudu',
-  signInSub:
-    'Keittiön käyttö Cesarille, Elenalle ja Ivanille — tai Guest kutsuttuna.',
-  signInUsername: 'Käyttäjänimi',
-  signInUsernamePlaceholder: 'Cesar, Elena, Ivan tai Guest',
-  signInPassword: 'Salasana',
-  signInPasswordPlaceholder: 'Salasana',
-  signInSubmit: 'Avaa Invis',
-  signInGuestHint:
-    'Vieraat: kirjoita Guest käyttäjänimeksi (salasana Cesarilta).',
+  // Auth / feedback / admin deck (simple welcome gate — no passwords)
+  gateTitle: 'Tervetuloa Invisiin',
+  gateSub:
+    'Keittiön inventaario Restolutionia varten — kirjoita nimesi jatkaaksesi. Cesar, Elena, Ivan tai Guest ohittavat lisätiedot.',
+  gateName: 'Nimesi',
+  gateNamePlaceholder: 'esim. Cesar tai etunimesi',
+  gateVenue: 'Toimipiste',
+  gateVenuePlaceholder: 'esim. Kamppi',
+  gateEmail: 'Sähköposti',
+  gateEmailRecommended: '(pakollinen uusille testaajille)',
+  gateEmailPlaceholder: 'sina@yritys.fi',
+  gateTesterHint:
+    'Käytämme sähköpostia vain testin seurantaan — ei salasanaa.',
+  gateKitchenHint:
+    'Keittiökirjautuminen — voit jatkaa ilman sähköpostia tai toimipistettä.',
+  gateSubmit: 'Avaa Invis',
   signInNotConfigured:
-    'Supabase-avaimet puuttuvat. Lisää EXPO_PUBLIC_SUPABASE_URL ja EXPO_PUBLIC_SUPABASE_ANON_KEY.',
+    'Supabase-avaimet puuttuvat. Lisää EXPO_PUBLIC_SUPABASE_URL ja EXPO_PUBLIC_SUPABASE_ANON_KEY vierailulokia varten.',
   signedInAs: 'Kirjautunut: {name}',
   signOut: 'Kirjaudu ulos',
-  signOutSub: 'Palaa kirjautumisnäyttöön.',
-  signOutConfirm: 'Kirjaudutaanko ulos Invisistä?',
+  signOutSub: 'Palaa tervetuloa-näyttöön.',
+  signOutConfirm: 'Poistutaanko Invisistä tervetuloa-näyttöön?',
   feedbackTitle: 'Palaute',
   feedbackMoreSub: 'Vapaaehtoinen — kommentit auttavat keittiötyökaluja.',
   feedbackSub: 'Kerro mikä toimii, mikä hämmentää tai mitä lisättäisiin.',
@@ -603,16 +615,14 @@ export const fi: Messages = {
   feedbackSkip: 'Ohita toistaiseksi',
   feedbackThanks: 'Kiitos — vastaanotettu.',
   adminDeckTitle: 'Ihmiset ja palaute',
-  adminDeckMoreSub: 'Kirjautuneet, vierailut ja kommentit.',
-  adminDeckSub:
-    'Kirjautuneet henkilöt, vierailuloki ja palaute. Vedä päivittääksesi.',
-  adminPeople: 'Ihmiset',
-  adminSignIns: 'Viimeisimmät kirjautumiset',
-  adminSignInsEmpty: 'Ei kirjautumisia vielä.',
+  adminDeckMoreSub: 'Tulijat, toimipisteet, sähköpostit ja kommentit.',
+  adminDeckSub: 'Porttikäynnit ja palaute. Vedä päivittääksesi.',
+  adminPeople: 'Tulijat',
+  adminEntriesEmpty: 'Ei kirjauksia vielä.',
   adminFeedback: 'Palaute',
   adminFeedbackEmpty: 'Ei palautetta vielä.',
-  adminLastSeen: 'Viimeksi nähty',
-  adminRoleAdmin: 'Admin',
-  adminRoleGuest: 'Vieras',
+  adminVenue: 'Toimipiste',
+  adminRoleKitchen: 'Keittiö',
+  adminRoleTester: 'Testaaja',
   adminRefresh: 'Päivitä',
 };
