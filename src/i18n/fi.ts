@@ -584,7 +584,7 @@ export const fi: Messages = {
 
   // Auth / feedback / admin deck (simple welcome gate — no passwords)
   gateTitle: 'Tervetuloa Invisiin',
-  gateSub: 'Keittiön inventaario — kirjoita nimesi jatkaaksesi.',
+  gateSub: 'Inventaario helpoksi.',
   gateName: 'Nimesi',
   gateNamePlaceholder: 'Etunimesi',
   gateVenue: 'Toimipiste',

@@ -590,7 +590,7 @@ export const en = {
 
   // Auth / feedback / admin deck (simple welcome gate — no passwords)
   gateTitle: 'Welcome to Invis',
-  gateSub: 'Kitchen inventory — enter your name to continue.',
+  gateSub: 'Inventory made simple.',
   gateName: 'Your name',
   gateNamePlaceholder: 'Your first name',
   gateVenue: 'Venue / site',
