@@ -13,8 +13,11 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RootStackParamList } from '../data/types';
+import { friendlyOptionForCode, COMMON_UNIT_OPTIONS } from '../data/units';
+import { useInventory } from '../data/store';
 import { useI18n } from '../i18n';
 import { alertInfo } from '../lib/alertAck';
+import { useUnitSystem } from '../lib/unitSystem';
 import {
   analyzeInventoryImage,
   isLiveVisionEnabled,
@@ -26,11 +29,24 @@ import { colors, radius, spacing } from '../theme/colors';
 export function ProductScanScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const { displayUnit } = useUnitSystem();
+  const { lastRecordUnit } = useInventory();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [uri, setUri] = useState<string | null>(null);
   const [hint, setHint] = useState('');
+  const [photoQty, setPhotoQty] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const unitHintCode =
+    friendlyOptionForCode(lastRecordUnit)?.code ??
+    COMMON_UNIT_OPTIONS.find((o) => o.id === 'piece')!.code;
+
+  function parsePhotoQty(): number | null {
+    const n = Number(photoQty.replace(',', '.'));
+    if (Number.isNaN(n) || n < 0 || photoQty.trim() === '') return null;
+    return n;
+  }
 
   async function pick(fromCamera: boolean) {
     const perm = fromCamera
@@ -63,8 +79,11 @@ export function ProductScanScreen() {
         uri ?? 'demo',
         hint || undefined,
       );
+      const preQty = parsePhotoQty();
+      const withQty =
+        preQty != null ? { ...extract, quantity: preQty } : extract;
       navigation.navigate('Confirm', {
-        extract,
+        extract: withQty,
         imageUri: uri ?? undefined,
       });
     } catch (e) {
@@ -97,6 +116,27 @@ export function ProductScanScreen() {
         )}
       </View>
 
+      <View style={styles.photoMeta}>
+        <Text style={styles.photoMetaLabel}>{t('photoAmountOnHand')}</Text>
+        <View style={styles.photoQtyRow}>
+          <TextInput
+            value={photoQty}
+            onChangeText={setPhotoQty}
+            keyboardType="decimal-pad"
+            placeholder={t('photoAmountPlaceholder')}
+            placeholderTextColor={colors.inkFaint}
+            style={[styles.input, styles.photoQtyInput]}
+            accessibilityLabel={t('photoAmountOnHand')}
+          />
+          <Text style={styles.photoUnitHint}>
+            {t('photoAmountUnitHint').replace(
+              '{unit}',
+              displayUnit(unitHintCode),
+            )}
+          </Text>
+        </View>
+      </View>
+
       <View style={styles.actions}>
         <Pressable style={styles.btnPrimary} onPress={() => pick(true)}>
           <Text style={styles.btnPrimaryText}>{t('camera')}</Text>
@@ -107,7 +147,12 @@ export function ProductScanScreen() {
       </View>
       <Pressable
         style={styles.barcodeBtn}
-        onPress={() => navigation.navigate('BarcodeScan', { purpose: 'confirm' })}
+        onPress={() =>
+          navigation.navigate('BarcodeScan', {
+            purpose: 'confirm',
+            quantity: parsePhotoQty(),
+          })
+        }
         accessibilityRole="button"
         accessibilityLabel={t('scanBarcode')}
       >
@@ -169,6 +214,32 @@ const styles = StyleSheet.create({
     color: colors.inkMuted,
     textAlign: 'center',
     paddingHorizontal: spacing.lg,
+  },
+  photoMeta: {
+    marginTop: spacing.sm,
+  },
+  photoMetaLabel: {
+    marginBottom: spacing.sm,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.inkMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  photoQtyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  photoQtyInput: {
+    flex: 1,
+    maxWidth: 120,
+  },
+  photoUnitHint: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.inkMuted,
   },
   actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   btnPrimary: {

@@ -91,17 +91,19 @@ export async function analyzeProductCloseups(
 
 export async function analyzeFridgePanoramaImage(
   imageUri: string,
+  hint?: string,
 ): Promise<DocumentExtract> {
+  const trimmed = hint?.trim() || undefined;
   if (isRealImageUri(imageUri)) {
     try {
-      return await analyzeFridgeShelfWithGemini(imageUri);
+      return await analyzeFridgeShelfWithGemini(imageUri, trimmed);
     } catch {
       // No key / proxy down — fall back to stub demos for fridge walkthroughs
-      return stubFridge(imageUri);
+      return stubFridge(imageUri, trimmed);
     }
   }
   // demo-fresh, cilantro, mayo demos, etc.
-  return stubFridge(imageUri);
+  return stubFridge(imageUri, trimmed);
 }
 
 export async function analyzeKuormaImage(

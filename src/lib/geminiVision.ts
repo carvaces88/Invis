@@ -688,6 +688,7 @@ function toDocumentExtract(
  */
 export async function analyzeFridgeShelfWithGemini(
   imageUri: string,
+  hint?: string,
 ): Promise<DocumentExtract> {
   if (!isRealImageUri(imageUri)) {
     throw new Error('No fridge photo to analyze');
@@ -696,12 +697,12 @@ export async function analyzeFridgeShelfWithGemini(
   const payload = await imageUriToPayload(imageUri);
   const apiKey = getGeminiApiKey();
   if (apiKey) {
-    return callGeminiFridgeDirect([payload], apiKey);
+    return callGeminiFridgeDirect([payload], apiKey, hint);
   }
 
   const proxyUrl = getVisionProxyUrl();
   if (proxyUrl) {
-    return callVisionFridgeProxy([payload], proxyUrl);
+    return callVisionFridgeProxy([payload], proxyUrl, hint);
   }
 
   throw new Error(
@@ -712,12 +713,14 @@ export async function analyzeFridgeShelfWithGemini(
 async function callVisionFridgeProxy(
   payloads: ImagePayload[],
   proxyUrl: string,
+  hint?: string,
 ): Promise<DocumentExtract> {
   const res = await fetch(proxyUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({
       mode: 'fridge',
+      hint: hint?.trim() || undefined,
       images: payloads.map((p) => ({
         mimeType: p.mimeType,
         base64: p.base64,
@@ -732,6 +735,8 @@ async function callVisionFridgeProxy(
   if (!Array.isArray(body.lines)) {
     throw new Error('Vision proxy returned an empty fridge extract');
   }
+  const note = hint?.trim();
+  const rawNotes = body.rawNotes ?? 'Live Gemini fridge (proxy)';
   return {
     kind: 'fridge',
     title: body.title ?? 'Fridge / shelf',
@@ -740,16 +745,23 @@ async function callVisionFridgeProxy(
       unit: (l.unit as VisionExtract['unit']) ?? null,
       quantity: l.quantity ?? 1,
       confidence: l.confidence ?? 0.5,
+      rawNotes: note
+        ? [l.rawNotes, note].filter(Boolean).join(' · ')
+        : l.rawNotes,
     })),
     confidence: body.confidence ?? 0.5,
-    rawNotes: body.rawNotes ?? 'Live Gemini fridge (proxy)',
+    rawNotes: note
+      ? [rawNotes, `Staff notes: ${note}`].filter(Boolean).join(' · ')
+      : rawNotes,
   };
 }
 
 async function callGeminiFridgeDirect(
   payloads: ImagePayload[],
   apiKey: string,
+  hint?: string,
 ): Promise<DocumentExtract> {
+  const note = hint?.trim();
   const parts: GeminiPart[] = [
     ...payloads.map((p) => ({
       inlineData: { mimeType: p.mimeType, data: p.base64 },
@@ -757,8 +769,11 @@ async function callGeminiFridgeDirect(
     {
       text: [
         FRIDGE_SYSTEM_PROMPT,
+        note ? `Optional staff notes (may be wrong): ${note}` : null,
         'Analyze this fridge/shelf panorama. List every distinct product with estimated count.',
-      ].join('\n'),
+      ]
+        .filter(Boolean)
+        .join('\n'),
     },
   ];
 
@@ -803,8 +818,19 @@ async function callGeminiFridgeDirect(
     throw new Error('Gemini returned non-JSON fridge vision result');
   }
 
-  return toDocumentExtract(
+  const doc = toDocumentExtract(
     parsed,
     `Live Gemini fridge (${model}) · ${payloads.length} photo(s)`,
   );
+  if (!note) return doc;
+  return {
+    ...doc,
+    rawNotes: [doc.rawNotes, `Staff notes: ${note}`]
+      .filter(Boolean)
+      .join(' · '),
+    lines: doc.lines.map((l) => ({
+      ...l,
+      rawNotes: [l.rawNotes, note].filter(Boolean).join(' · '),
+    })),
+  };
 }

@@ -238,6 +238,12 @@ export const fi: Messages = {
   recordPhotoModeFridge: 'Jääkaappi / hylly',
   recordPhotoFridgeHint:
     'Laaja tai panoraamakuva jääkaapista tai hyllystä — tekoäly listaa tunnistetut tuotteet',
+  photoAmountOnHand: 'Määrä varastossa',
+  photoAmountPlaceholder: 'esim. 2',
+  photoAmountUnitHint: 'Yksikkö: {unit}',
+  photoOptionalDetails: 'Valinnaiset tiedot',
+  photoOptionalDetailsPlaceholder:
+    'esim. ylähyly, vasen ovi, noin 3 majoneesia…',
   recordAnalyzePhoto: 'Analysoi kuva',
   recordAnalyzeDemo: 'Aja demo (AI → vahvistus)',
   recordAnalyzeFridge: 'Analysoi jääkaappi / hylly',
@@ -413,6 +419,42 @@ export const fi: Messages = {
   inventoryLastMonth: 'Edellinen kk',
   inventoryThisMonth: 'Tämä kk',
   inventoryCompareHint: 'Alkuvarasto (edellinen kk) vs nykyinen määrä',
+
+  monthWrapUpOpen: 'Päätä kuukausi',
+  monthWrapUpOpenSub: 'Kuukauden lopun inventaario · yhteenveto · Restolution-raportti',
+  monthWrapUpKicker: 'Kuukauden päätös',
+  monthWrapUpTitle: 'Päätä inventaario',
+  monthWrapUpSub:
+    'Pakkaa {month} kohteessa {site} — yhteenveto, jakson sulku ja raportin vienti.',
+  monthWrapUpSummaryTitle: 'Kuukauden yhteenveto',
+  monthWrapUpRecorded: 'Kirjatut rivit',
+  monthWrapUpUnset: 'Tyhjät (ei määrää)',
+  monthWrapUpClosingValue: 'Loppuvaraston arvo (0 % ALV)',
+  monthWrapUpPurchases: 'Ostot (määrä sisään)',
+  monthWrapUpUsage: 'Ainekäyttö (määrä)',
+  monthWrapUpValueHint:
+    'Hinnat säilyvät alv 0 %. Ainekäyttö tarvitsee alkuvaraston tai ostot Restolution-laskentaan.',
+  monthWrapUpFinalize: 'Päätä ja sulje kuukausi',
+  monthWrapUpFinalizeSub: 'Lukitse {month} loppuvarasto seuraavan kk alkuvarastoksi',
+  monthWrapUpConfirmTitle: 'Päätetäänkö tämä kuukausi?',
+  monthWrapUpConfirmBody:
+    'Nykyiset määrät tulevat seuraavan kuukauden alkuvarastoksi. Määriä voi edelleen muokata — vain jakson lähtötilanne etenee.',
+  monthWrapUpConfirmAction: 'Päätä kuukausi',
+  monthWrapUpDoneTitle: 'Kuukausi päätetty',
+  monthWrapUpDoneBody:
+    '{month} on suljettu. {next} alkuvarasto asetettiin tämän päivän määristä. Vie Restolution-raportti kun olet valmis.',
+  monthWrapUpAlreadyTitle: 'Jo päätetty',
+  monthWrapUpAlreadyBody:
+    '{month} päätettiin juuri. Vie raportti tai jatka uuden jakson laskentaa.',
+  monthWrapUpReportSection: 'Raportti',
+  monthWrapUpExport: 'Restolution-viennin esikatselu',
+  monthWrapUpExportSub: 'Excel / PDF / Word kuukauden taulukolle',
+  monthWrapUpAskReport: 'Kysy raporttia',
+  monthWrapUpAskReportSub: 'Varaston arvo, vähäinen saldo ym.',
+  monthWrapUpBeforeNote:
+    'Vinkki: viimeistele laskenta ja tarkista määrät ennen kuukauden päätöstä.',
+  monthWrapUpNextNote:
+    'Uusi jakso: {next}. ”Edellinen vs tämä kk” vertaa juuri lukittua alkuvarastoa.',
 
   capture: 'Kuvaus',
   scanHub: 'Skannaus',

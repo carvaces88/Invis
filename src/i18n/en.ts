@@ -241,6 +241,12 @@ export const en = {
   recordPhotoModeFridge: 'Fridge / shelf',
   recordPhotoFridgeHint:
     'Wide or panoramic shot of the fridge or shelf — AI lists every item it sees',
+  photoAmountOnHand: 'Amount on hand',
+  photoAmountPlaceholder: 'e.g. 2',
+  photoAmountUnitHint: 'Unit: {unit}',
+  photoOptionalDetails: 'Optional details',
+  photoOptionalDetailsPlaceholder:
+    'e.g. top shelf, left door, roughly 3 mayo…',
   recordAnalyzePhoto: 'Analyze photo',
   recordAnalyzeDemo: 'Run demo (AI → confirm)',
   recordAnalyzeFridge: 'Analyze fridge / shelf',
@@ -418,6 +424,41 @@ export const en = {
   inventoryLastMonth: 'Last month',
   inventoryThisMonth: 'This month',
   inventoryCompareHint: 'Opening (last month) vs current count',
+
+  monthWrapUpOpen: 'Finalize month',
+  monthWrapUpOpenSub: 'End-of-month count · summary · Restolution report',
+  monthWrapUpKicker: 'Month close',
+  monthWrapUpTitle: 'Finalize my inventory',
+  monthWrapUpSub: 'Wrap up {month} at {site} — summarize, close the period, then export the report.',
+  monthWrapUpSummaryTitle: 'Month summary',
+  monthWrapUpRecorded: 'Items recorded',
+  monthWrapUpUnset: 'Still empty (no qty)',
+  monthWrapUpClosingValue: 'Closing stock value (0% ALV)',
+  monthWrapUpPurchases: 'Purchases (qty in)',
+  monthWrapUpUsage: 'Usage (ainekäyttö qty)',
+  monthWrapUpValueHint:
+    'Prices stay at 0% ALV. Usage needs opening stock or deliveries for the Restolution math.',
+  monthWrapUpFinalize: 'Finalize & wrap up month',
+  monthWrapUpFinalizeSub: 'Lock {month} closing counts as next month’s opening',
+  monthWrapUpConfirmTitle: 'Finalize this month?',
+  monthWrapUpConfirmBody:
+    'Current counts become opening stock for the next month. You can still edit quantities afterward — only the period baseline advances.',
+  monthWrapUpConfirmAction: 'Finalize month',
+  monthWrapUpDoneTitle: 'Month wrapped up',
+  monthWrapUpDoneBody:
+    '{month} is closed. Opening stock for {next} is set from today’s counts. Export the Restolution report when ready.',
+  monthWrapUpAlreadyTitle: 'Already finalized',
+  monthWrapUpAlreadyBody:
+    '{month} was just wrapped up. Export the report or keep counting for the new period.',
+  monthWrapUpReportSection: 'Report',
+  monthWrapUpExport: 'Restolution export preview',
+  monthWrapUpExportSub: 'Excel / PDF / Word for the month sheet',
+  monthWrapUpAskReport: 'Ask a report',
+  monthWrapUpAskReportSub: 'Stock value, low stock, and more',
+  monthWrapUpBeforeNote:
+    'Tip: finish counting and verify amounts first, then finalize.',
+  monthWrapUpNextNote:
+    'New period: {next}. “Last vs this month” compares the opening you just locked.',
 
   // Scan hub
   capture: 'Capture',

@@ -91,6 +91,10 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
   const [photoMode, setPhotoMode] = useState<PhotoMode>(
     heroFridge ? 'fridge' : 'single',
   );
+  /** Qty under photo preview — prefills Confirm after analyze */
+  const [photoQty, setPhotoQty] = useState('');
+  /** Optional staff notes for fridge/shelf panorama analyze */
+  const [photoDetails, setPhotoDetails] = useState('');
 
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ProductMatch | null>(null);
@@ -139,6 +143,12 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
     }
   }
 
+  function parsePhotoQty(): number | null {
+    const n = Number(photoQty.replace(',', '.'));
+    if (Number.isNaN(n) || n < 0 || photoQty.trim() === '') return null;
+    return n;
+  }
+
   async function analyzePhoto(demoKind: 'default' | 'fresh' = 'default') {
     if (
       photoMode !== 'fridge' &&
@@ -158,7 +168,8 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
         const shelfUri =
           uri ??
           (demoKind === 'fresh' ? 'demo-fresh' : resolveDemoShelfUri('mayo1'));
-        const document = await analyzeFridgePanoramaImage(shelfUri);
+        const details = photoDetails.trim() || undefined;
+        const document = await analyzeFridgePanoramaImage(shelfUri, details);
         thinkingChef(false);
         yesChef();
         navigation.navigate('FridgeReview', {
@@ -172,10 +183,13 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
           ? query.trim() || 'cilantro'
           : query.trim() || undefined;
       const extract = await analyzeInventoryImage(uri ?? 'demo', hint);
+      const preQty = parsePhotoQty();
+      const withQty =
+        preQty != null ? { ...extract, quantity: preQty } : extract;
       thinkingChef(false);
       yesChef();
       navigation.navigate('Confirm', {
-        extract,
+        extract: withQty,
         imageUri: uri ?? undefined,
       });
     } catch (e) {
@@ -233,6 +247,8 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
     setQty('1');
     setQtyOther(false);
     setUri(null);
+    setPhotoQty('');
+    setPhotoDetails('');
     setUnitOption(defaultUnitOption());
     setPackCheck(null);
     setDidYouMean(null);
@@ -540,6 +556,43 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
           </Text>
         )}
       </View>
+      {photoMode === 'single' ? (
+        <View style={styles.photoMeta}>
+          <Text style={styles.photoMetaLabel}>{t('photoAmountOnHand')}</Text>
+          <View style={styles.photoQtyRow}>
+            <TextInput
+              value={photoQty}
+              onChangeText={setPhotoQty}
+              keyboardType="decimal-pad"
+              placeholder={t('photoAmountPlaceholder')}
+              placeholderTextColor={colors.inkFaint}
+              style={[styles.input, styles.photoQtyInput]}
+              accessibilityLabel={t('photoAmountOnHand')}
+            />
+            <Text style={styles.photoUnitHint}>
+              {t('photoAmountUnitHint').replace(
+                '{unit}',
+                displayUnit(unitOption.code),
+              )}
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.photoMeta}>
+          <Text style={styles.photoMetaLabel}>{t('photoOptionalDetails')}</Text>
+          <TextInput
+            value={photoDetails}
+            onChangeText={setPhotoDetails}
+            placeholder={t('photoOptionalDetailsPlaceholder')}
+            placeholderTextColor={colors.inkFaint}
+            style={[styles.input, styles.photoDetailsInput]}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+            accessibilityLabel={t('photoOptionalDetails')}
+          />
+        </View>
+      )}
       <View style={styles.row}>
         <Pressable style={styles.btnPrimary} onPress={() => pick(true)}>
           <Text style={styles.btnPrimaryText}>{t('camera')}</Text>
@@ -552,7 +605,10 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
         <Pressable
           style={styles.barcodeBtn}
           onPress={() =>
-            navigation.navigate('BarcodeScan', { purpose: 'confirm' })
+            navigation.navigate('BarcodeScan', {
+              purpose: 'confirm',
+              quantity: parsePhotoQty(),
+            })
           }
           accessibilityRole="button"
           accessibilityLabel={t('scanBarcode')}
@@ -905,6 +961,36 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: spacing.lg,
     fontSize: 14,
+  },
+  photoMeta: {
+    marginTop: spacing.sm,
+  },
+  photoMetaLabel: {
+    marginBottom: spacing.sm,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.inkMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  photoQtyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  photoQtyInput: {
+    flex: 1,
+    maxWidth: 120,
+  },
+  photoUnitHint: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.inkMuted,
+  },
+  photoDetailsInput: {
+    minHeight: 72,
+    paddingTop: 12,
   },
   row: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   btnPrimary: {

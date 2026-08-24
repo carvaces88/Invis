@@ -281,6 +281,7 @@ export async function analyzeProductCloseups(
  */
 export async function analyzeFridgePanoramaImage(
   imageUri: string,
+  staffHint?: string,
 ): Promise<DocumentExtract> {
   await delay(1100);
   const hint = imageUri.toLowerCase();
@@ -292,11 +293,18 @@ export async function analyzeFridgePanoramaImage(
     hint.includes('yogurt') ||
     hint.includes('jogurtti');
   const doc = useFreshDemo ? DEMO_FRIDGE_FRESH : DEMO_FRIDGE_PANORAMA;
+  const note = staffHint?.trim();
   return {
     ...doc,
+    rawNotes: note
+      ? [doc.rawNotes, `Staff notes: ${note}`].filter(Boolean).join(' · ')
+      : doc.rawNotes,
     lines: doc.lines.map((l) => ({
       ...l,
       crop: l.crop ? { ...l.crop } : undefined,
+      rawNotes: note
+        ? [l.rawNotes, note].filter(Boolean).join(' · ')
+        : l.rawNotes,
     })),
   };
 }

@@ -238,8 +238,11 @@ module.exports = async function handler(req, res) {
         text: isFridge
           ? [
               FRIDGE_SYSTEM_PROMPT,
+              hint ? `Optional staff notes (may be wrong): ${hint}` : null,
               'Analyze this fridge/shelf panorama. List every distinct product with estimated count.',
-            ].join('\n')
+            ]
+              .filter(Boolean)
+              .join('\n')
           : [
               SYSTEM_PROMPT,
               hint ? `Optional staff hint (may be wrong): ${hint}` : null,
