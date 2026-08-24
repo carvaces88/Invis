@@ -2,7 +2,17 @@
 
 Minimal kitchen inventory app for Finnish restaurants. Digital inventory sheet (Name · Unit · Qty · Price excl. VAT · Total) with **photo → AI extract → catalog match → confirm**.
 
-Local-first demo — no Supabase required. **Product photo analysis** uses **Gemini** via client key or production `/api/vision` (see `env.example`). Without a key, real photos stay unrecognized — they never invent a public K-Ruoka match.
+Local-first demo — no Supabase required for guest mode. **Product photo analysis** uses **Gemini** via client key or production `/api/vision` (see `env.example`). Without a key, real photos stay unrecognized — they never invent a public K-Ruoka match.
+
+### Multi-venue (auth + quotas)
+
+With Supabase configured (`EXPO_PUBLIC_SUPABASE_*` + server `SUPABASE_*`):
+
+- Sign up creates venue + owner via `create_venue_with_owner`
+- Inventory syncs under the existing store (AsyncStorage cache + RLS)
+- **`/api/vision` and `/api/kruoka-lookup` require Bearer session + `X-Venue-Id` and per-venue daily limits before Gemini / distributors** so concurrent venue onboarding cannot melt one shared key
+
+Schema: `supabase/migrations/20260824100000_multi_venue_tenancy.sql` · checks: `npm run test:venues`
 
 UI is English throughout. Catalog product official names may stay Finnish when they mirror real POS / distributor names.
 

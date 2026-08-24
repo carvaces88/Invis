@@ -14,8 +14,10 @@ import { ChefNudgeProvider } from './src/components/ChefNudge';
 import { InventoryProvider } from './src/data/store';
 import type { MainTabParamList, RootStackParamList } from './src/data/types';
 import { LocaleProvider, useI18n } from './src/i18n';
+import { AuthProvider, useAuth } from './src/lib/auth/AuthProvider';
 import { UnitSystemProvider } from './src/lib/unitSystem';
 import { AddProductScreen } from './src/screens/AddProductScreen';
+import { AuthScreen } from './src/screens/AuthScreen';
 import { BatchConfirmScreen } from './src/screens/BatchConfirmScreen';
 import { CatalogScreen } from './src/screens/CatalogScreen';
 import { ConfirmScreen } from './src/screens/ConfirmScreen';
@@ -335,13 +337,29 @@ export default function App() {
     <SafeAreaProvider>
       <LocaleProvider>
         <UnitSystemProvider>
-          <InventoryProvider>
-            <ChefNudgeProvider>
-              <RootNavigator />
-            </ChefNudgeProvider>
-          </InventoryProvider>
+          <AuthProvider>
+            <InventoryProvider>
+              <ChefNudgeProvider>
+                <AppGate />
+              </ChefNudgeProvider>
+            </InventoryProvider>
+          </AuthProvider>
         </UnitSystemProvider>
       </LocaleProvider>
     </SafeAreaProvider>
   );
+}
+
+function AppGate() {
+  const { ready, configured, guestMode, session } = useAuth();
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg }} />
+    );
+  }
+  // Cloud configured and user has not chosen guest → require sign-in / sign-up.
+  if (configured && !session && !guestMode) {
+    return <AuthScreen />;
+  }
+  return <RootNavigator />;
 }

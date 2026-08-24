@@ -175,9 +175,17 @@ async function searchOff(query, limit) {
     .filter(Boolean);
 }
 
+const {
+  requireVenueAuth,
+  readEanCache,
+  writeEanCache,
+  AUTH_CORS_HEADERS,
+} = require('./_lib/auth');
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', AUTH_CORS_HEADERS);
   if (req.method === 'OPTIONS') {
     res.status(204).end();
     return;
@@ -204,9 +212,33 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  // Auth + per-venue quota BEFORE upstream distributor / OFF calls.
+  const auth = await requireVenueAuth(req, 'kruoka-lookup');
+  if (!auth.ok) {
+    res.status(auth.status).json({ error: auth.error, products: [] });
+    return;
+  }
+
   try {
+    const eanQuery = /^\d{8,14}$/.test(q) ? q : null;
+    if (eanQuery) {
+      const cached = await readEanCache(req, eanQuery);
+      if (cached && cached.officialName) {
+        res.status(200).json({
+          products: [cached],
+          source: 'ean-cache',
+          storeId,
+        });
+        return;
+      }
+    }
+
     const live = await searchKruoka(q, storeId, limit);
     if (live.products.length) {
+      const first = live.products[0];
+      if (first?.ean) {
+        void writeEanCache(req, first.ean, first, 'kruoka');
+      }
       res.status(200).json({
         products: live.products,
         source: 'kruoka-live',
@@ -258,6 +290,11 @@ module.exports = async function handler(req, res) {
     }
     if (!products.length) {
       products = await searchOff(q, limit);
+    }
+
+    const cachedHit = products.find((p) => p?.ean);
+    if (cachedHit?.ean) {
+      void writeEanCache(req, cachedHit.ean, cachedHit, 'openfoodfacts');
     }
 
     res.status(200).json({

@@ -8,6 +8,7 @@ import { useInventory } from '../data/store';
 import type { RootStackParamList } from '../data/types';
 import { useI18n, type Locale } from '../i18n';
 import { alertAck, alertConfirm } from '../lib/alertAck';
+import { useAuth } from '../lib/auth/AuthProvider';
 import { useUnitSystem, type UnitSystem } from '../lib/unitSystem';
 import { colors, radius, spacing } from '../theme/colors';
 
@@ -20,7 +21,18 @@ export function MoreScreen() {
   const { t, locale, setLocale } = useI18n();
   const { unitSystem, setUnitSystem } = useUnitSystem();
   const { clearAllInventory } = useInventory();
+  const {
+    configured,
+    session,
+    venues,
+    activeVenueId,
+    isLocalOnly,
+    signOut,
+    exitGuestMode,
+  } = useAuth();
   const [valueOpen, setValueOpen] = useState(false);
+
+  const activeVenue = venues.find((v) => v.venueId === activeVenueId);
 
   const items = [
     {
@@ -77,6 +89,48 @@ export function MoreScreen() {
       <Text style={styles.title}>{t('moreTitle')}</Text>
       <Text style={styles.sub}>{t('moreSub')}</Text>
       <Text style={styles.credit}>{t('kruokaPhotoCredit')}</Text>
+
+      <View style={styles.langCard}>
+        <Text style={styles.cardTitle}>{t('accountTitle')}</Text>
+        {isLocalOnly ? (
+          <Text style={styles.cardSub}>{t('accountGuest')}</Text>
+        ) : (
+          <>
+            <Text style={styles.cardSub}>
+              {t('accountSignedInAs').replace(
+                '{email}',
+                session?.user?.email ?? '—',
+              )}
+            </Text>
+            {activeVenue ? (
+              <Text style={styles.cardSub}>
+                {t('accountVenue').replace('{name}', activeVenue.name)}
+              </Text>
+            ) : null}
+          </>
+        )}
+        {configured && session ? (
+          <Pressable
+            style={[styles.langBtn, styles.langBtnOn, { marginTop: spacing.sm }]}
+            onPress={() => void signOut()}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.langBtnText, styles.langBtnTextOn]}>
+              {t('accountSignOut')}
+            </Text>
+          </Pressable>
+        ) : configured ? (
+          <Pressable
+            style={[styles.langBtn, styles.langBtnOn, { marginTop: spacing.sm }]}
+            onPress={() => void exitGuestMode()}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.langBtnText, styles.langBtnTextOn]}>
+              {t('accountSignIn')}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
 
       <View style={styles.langCard}>
         <Text style={styles.cardTitle}>{t('language')}</Text>

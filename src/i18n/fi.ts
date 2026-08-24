@@ -428,4 +428,31 @@ export const fi: Messages = {
   camera: 'Kamera',
   library: 'Kirjasto',
   all: 'Kaikki',
+
+  authSignUpTitle: 'Luo keittiösi',
+  authSignInTitle: 'Tervetuloa takaisin',
+  authSignUpSub:
+    'Yksi toimipiste per rekisteröityminen. Kuva-analyysi ja haut rajoitetaan toimipisteittäin, jotta jaettu AI-kiintiö kestää.',
+  authSignInSub: 'Kirjaudu synkronoidaksesi varaston laitteiden välillä.',
+  authVenueName: 'Toimipisteen / ravintolan nimi',
+  authVenuePlaceholder: 'esim. Kamppi Kitchen',
+  authEmail: 'Sähköposti',
+  authPassword: 'Salasana',
+  authSignUp: 'Luo toimipiste',
+  authSignIn: 'Kirjaudu',
+  authHaveAccount: 'Onko sinulla jo tili? Kirjaudu',
+  authNeedAccount: 'Tarvitsetko tilin? Luo toimipiste',
+  authContinueGuest: 'Jatka vieraana (vain paikallinen)',
+  authQuotaNote:
+    'Kalliit API:t (visio / haku) vaativat kirjautuneen toimipisteistunnon ja päivittäiset rajat.',
+  authCloudNotConfigured:
+    'Supabase ei ole määritetty tässä buildissa. Käytä vierastilaa tai aseta EXPO_PUBLIC_SUPABASE_URL ja EXPO_PUBLIC_SUPABASE_ANON_KEY.',
+  authErrorCredentials: 'Anna kelvollinen sähköposti ja salasana (vähintään 6 merkkiä).',
+  authErrorVenueName: 'Anna toimipisteen nimi.',
+  accountTitle: 'Tili',
+  accountSignedInAs: 'Kirjautunut: {email}',
+  accountVenue: 'Aktiivinen toimipiste: {name}',
+  accountGuest: 'Vierastila — data pysyy tällä laitteella',
+  accountSignOut: 'Kirjaudu ulos',
+  accountSignIn: 'Kirjaudu / luo toimipiste',
 };
