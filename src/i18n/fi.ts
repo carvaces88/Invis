@@ -597,7 +597,7 @@ export const fi: Messages = {
     'Käytämme sähköpostia vain testin seurantaan — ei salasanaa.',
   gateKitchenHint:
     'Keittiökirjautuminen — voit jatkaa ilman sähköpostia tai toimipistettä.',
-  gateSubmit: 'Avaa Invis',
+  gateSubmit: 'Jatka',
   signInNotConfigured:
     'Supabase-avaimet puuttuvat. Lisää EXPO_PUBLIC_SUPABASE_URL ja EXPO_PUBLIC_SUPABASE_ANON_KEY vierailulokia varten.',
   signedInAs: 'Kirjautunut: {name}',

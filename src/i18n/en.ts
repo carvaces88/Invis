@@ -601,7 +601,7 @@ export const en = {
   gateEmailPlaceholder: 'you@company.com',
   gateTesterHint: 'We use your email only to follow up on the test — no password.',
   gateKitchenHint: 'Kitchen login — you can enter without email or venue.',
-  gateSubmit: 'Enter Invis',
+  gateSubmit: 'Continue',
   signInNotConfigured:
     'Supabase keys are missing. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to log visits.',
   signedInAs: 'Signed in as {name}',
