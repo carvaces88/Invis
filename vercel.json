@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npx expo export --platform web",
+  "buildCommand": "EXPO_PUBLIC_SUPABASE_URL=\"${EXPO_PUBLIC_SUPABASE_URL:-$NEXT_PUBLIC_SUPABASE_URL}\" EXPO_PUBLIC_SUPABASE_ANON_KEY=\"${EXPO_PUBLIC_SUPABASE_ANON_KEY:-$NEXT_PUBLIC_SUPABASE_ANON_KEY}\" npx expo export --platform web",
   "outputDirectory": "dist",
   "functions": {
     "api/vision.js": {
