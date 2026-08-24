@@ -22,6 +22,7 @@ import {
   friendlyOptionForCode,
   type FriendlyUnitOption,
 } from '../data/units';
+import { VoiceDictationBar } from '../components/VoiceDictationBar';
 import { useChefNudge } from '../components/ChefNudge';
 import { DidYouMeanModal } from '../components/DidYouMeanModal';
 import { PackCheckModal } from '../components/PackCheckModal';
@@ -568,6 +569,13 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
       ) : null}
 
       <View style={styles.divider} />
+
+      <VoiceDictationBar
+        onApplyToName={onQueryChange}
+        onReviewLines={(document) => {
+          navigation.navigate('FridgeReview', { document });
+        }}
+      />
 
       <Text style={styles.label}>{t('recordItemName')}</Text>
       <TextInput

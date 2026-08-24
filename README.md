@@ -16,6 +16,18 @@ Schema: `supabase/migrations/20260824100000_multi_venue_tenancy.sql` · checks: 
 
 UI is English throughout. Catalog product official names may stay Finnish when they mirror real POS / distributor names.
 
+## Live mic companion (shelf by shelf)
+
+Scan hub → **Live mic companion**, or Record inventory mic bar:
+
+1. Pick the place/shelf you’re counting  
+2. Hold **Mic** and describe what you see (“two mayo, three milk…”)  
+3. Preview catalog matches → **Save this shelf · next** (or review one shelf)  
+4. **Review all** → FridgeReview confirm → stock written  
+5. Voice walks open **Export** so you get the registered document  
+
+Web Speech API when available; otherwise MediaRecorder → `/api/transcribe` (same Gemini key, **venue auth + daily quota**).
+
 ## Live vision (Gemini)
 
 ### Local Expo

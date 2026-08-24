@@ -275,7 +275,18 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
       t('fridgeDoneBody')
         .replace('{confirmed}', String(confirmedCount))
         .replace('{pending}', String(pendingCount)),
-      () => navigation.navigate('VerifyAmounts', { mode: 'recent' }),
+      () => {
+        const fromVoice =
+          /voice|walk|companion|shelf/i.test(document.title ?? '') ||
+          document.lines.some((l) =>
+            (l.rawNotes ?? '').toLowerCase().includes('voice:'),
+          );
+        if (fromVoice && confirmedCount > 0) {
+          navigation.navigate('ExportPreview');
+        } else {
+          navigation.navigate('VerifyAmounts', { mode: 'recent' });
+        }
+      },
     );
   }
 
