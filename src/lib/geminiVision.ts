@@ -11,9 +11,16 @@ import type {
   VisionExtract,
 } from '../data/types';
 import { UNIT_CODES } from '../data/units';
+import { getProxyAuthHeaders } from './auth/sessionBridge';
 import { normalizeEanDigits } from './packaging';
 import { generateProductAliases, mergeAliasLists } from './productAliases';
 import { getGeminiApiKey, getGeminiModel, getVisionProxyUrl } from './visionConfig';
+
+/** Prefer authenticated proxy when signed in so per-venue Gemini quotas apply. */
+function preferVisionProxy(): boolean {
+  const headers = getProxyAuthHeaders();
+  return Boolean(headers.Authorization && headers['X-Venue-Id']);
+}
 
 const UNIT_SET = new Set<string>(UNIT_CODES);
 
@@ -370,12 +377,17 @@ export async function analyzeImagesWithGemini(
     payloads.push(await imageUriToPayload(uri));
   }
 
+  // Prefer proxy when authenticated so shared Gemini key is rate-limited per venue.
+  const proxyUrl = getVisionProxyUrl();
+  if (proxyUrl && preferVisionProxy()) {
+    return callVisionProxy(payloads, hint, proxyUrl);
+  }
+
   const apiKey = getGeminiApiKey();
   if (apiKey) {
     return callGeminiDirect(payloads, hint, apiKey);
   }
 
-  const proxyUrl = getVisionProxyUrl();
   if (proxyUrl) {
     return callVisionProxy(payloads, hint, proxyUrl);
   }
@@ -394,7 +406,11 @@ async function callVisionProxy(
   try {
     res = await fetch(proxyUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        accept: 'application/json',
+        ...getProxyAuthHeaders(),
+      },
       body: JSON.stringify({
         images: payloads.map((p) => ({
           mimeType: p.mimeType,
@@ -668,12 +684,16 @@ export async function analyzeFridgeShelfWithGemini(
   }
 
   const payload = await imageUriToPayload(imageUri);
+  const proxyUrl = getVisionProxyUrl();
+  if (proxyUrl && preferVisionProxy()) {
+    return callVisionFridgeProxy([payload], proxyUrl);
+  }
+
   const apiKey = getGeminiApiKey();
   if (apiKey) {
     return callGeminiFridgeDirect([payload], apiKey);
   }
 
-  const proxyUrl = getVisionProxyUrl();
   if (proxyUrl) {
     return callVisionFridgeProxy([payload], proxyUrl);
   }
@@ -689,7 +709,11 @@ async function callVisionFridgeProxy(
 ): Promise<DocumentExtract> {
   const res = await fetch(proxyUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+      ...getProxyAuthHeaders(),
+    },
     body: JSON.stringify({
       mode: 'fridge',
       images: payloads.map((p) => ({

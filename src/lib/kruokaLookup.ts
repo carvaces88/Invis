@@ -11,6 +11,7 @@
  */
 import { SEED_KRUOKA_PRODUCTS } from '../data/seedKruoka';
 import type { Product, UnitCode, VisionExtract } from '../data/types';
+import { getProxyAuthHeaders } from './auth/sessionBridge';
 import { FOOD_ALV_RATE } from './alv';
 import {
   bestExtractMatch,
@@ -251,7 +252,9 @@ async function searchViaProxy(
   const base = proxyBase();
   if (!base) return [];
   const url = `${base}?q=${encodeURIComponent(query)}&limit=${limit}&storeId=${encodeURIComponent(storeId())}`;
-  const json = await fetchJson(url);
+  const json = await fetchJson(url, {
+    headers: getProxyAuthHeaders(),
+  });
   if (!json || typeof json !== 'object') return [];
   const root = json as {
     products?: KruokaHit[];

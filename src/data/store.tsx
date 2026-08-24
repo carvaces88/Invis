@@ -4,9 +4,9 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createInitialSessionLines,
   SEED_PRODUCTS,
@@ -30,15 +30,35 @@ import type {
   StockMovementType,
   UnitCode,
 } from '../data/types';
+import { useAuth } from '../lib/auth/AuthProvider';
+import {
+  loadLocalSnapshot,
+  markInventoryCleared,
+  saveActivePlaceId,
+  saveActivity,
+  saveAliasExtras,
+  saveCustomProducts,
+  saveLastUnit,
+  savePackExtras,
+  savePlaces,
+  saveSession,
+  saveSiteName,
+  type AliasExtras,
+  type PackExtras,
+} from './repository/localRepository';
+import {
+  cloudPullVenue,
+  flushSyncQueue,
+  syncInsertHavikki,
+  syncInsertMovement,
+  syncRenameVenue,
+  syncUpsertLine,
+  syncUpsertPlace,
+  syncUpsertProduct,
+  syncUpsertSession,
+  type SyncContext,
+} from './repository/syncedRepository';
 
-const CUSTOM_PRODUCTS_KEY = 'invis.customProducts';
-const ALIAS_EXTRAS_KEY = 'invis.productAliasExtras';
-const PACK_EXTRAS_KEY = 'invis.productPackExtras';
-const LAST_UNIT_KEY = 'invis.lastRecordUnit';
-const ACTIVITY_KEY = 'invis.recentActivity';
-const SESSION_KEY = 'invis.inventorySession';
-/** Once set, never re-inject SEED_QTY on startup — stay empty until user records */
-const INVENTORY_CLEARED_KEY = 'invis.inventoryCleared';
 /** Soft prompt window when adding the same product+place again */
 export const RECENT_ADD_WINDOW_MS = 2 * 60 * 1000;
 const MAX_ACTIVITY = 20;
@@ -87,12 +107,6 @@ function reconcileSessionLines(
     });
   return [...kept, ...missing];
 }
-
-type AliasExtras = Record<string, string[]>;
-type PackExtras = Record<
-  string,
-  { unitsPerPack: number; packBaseUnit: UnitCode }
->;
 
 export type AddQuantityResult = {
   quantityBefore: number;
@@ -317,6 +331,16 @@ function isUnitCode(v: string): v is UnitCode {
 }
 
 export function InventoryProvider({ children }: { children: React.ReactNode }) {
+  const { isLocalOnly, activeVenueId } = useAuth();
+  const syncCtxRef = useRef<SyncContext>({
+    venueId: null,
+    cloudEnabled: false,
+  });
+  syncCtxRef.current = {
+    venueId: activeVenueId,
+    cloudEnabled: !isLocalOnly && Boolean(activeVenueId),
+  };
+
   const [products, setProducts] = useState<Product[]>(SEED_PRODUCTS);
   const [customProducts, setCustomProducts] = useState<Product[]>([]);
   const [aliasExtras, setAliasExtras] = useState<AliasExtras>({});
@@ -344,68 +368,50 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const [lastRecordUnit, setLastRecordUnitState] = useState<UnitCode>('KPL');
   const [catalogReady, setCatalogReady] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
+  const [placesReady, setPlacesReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [
-          customsRaw,
-          extrasRaw,
-          packRaw,
-          unitRaw,
-          activityRaw,
-          sessionRaw,
-          clearedRaw,
-        ] = await Promise.all([
-          AsyncStorage.getItem(CUSTOM_PRODUCTS_KEY),
-          AsyncStorage.getItem(ALIAS_EXTRAS_KEY),
-          AsyncStorage.getItem(PACK_EXTRAS_KEY),
-          AsyncStorage.getItem(LAST_UNIT_KEY),
-          AsyncStorage.getItem(ACTIVITY_KEY),
-          AsyncStorage.getItem(SESSION_KEY),
-          AsyncStorage.getItem(INVENTORY_CLEARED_KEY),
-        ]);
+        const snap = await loadLocalSnapshot();
         if (cancelled) return;
-        let customs: Product[] = [];
-        let extras: AliasExtras = {};
-        let packs: PackExtras = {};
-        if (customsRaw) {
-          const parsed = JSON.parse(customsRaw) as Product[];
-          if (Array.isArray(parsed)) customs = parsed;
+
+        const customs = snap.customProducts;
+        const extras = snap.aliasExtras;
+        const packs = snap.packExtras;
+        if (snap.lastRecordUnit && isUnitCode(snap.lastRecordUnit)) {
+          setLastRecordUnitState(snap.lastRecordUnit);
         }
-        if (extrasRaw) {
-          const parsed = JSON.parse(extrasRaw) as AliasExtras;
-          if (parsed && typeof parsed === 'object') extras = parsed;
+        if (snap.recentActivity.length) {
+          setRecentActivity(snap.recentActivity.slice(0, MAX_ACTIVITY));
         }
-        if (packRaw) {
-          const parsed = JSON.parse(packRaw) as PackExtras;
-          if (parsed && typeof parsed === 'object') packs = parsed;
+        if (snap.siteName?.trim()) {
+          setSiteNameState(snap.siteName.trim());
         }
-        if (unitRaw && isUnitCode(unitRaw)) {
-          setLastRecordUnitState(unitRaw);
+        const loadedPlaces =
+          snap.places && snap.places.length > 0 ? snap.places : SEED_PLACES;
+        setPlaces(loadedPlaces);
+        if (
+          snap.activePlaceId &&
+          loadedPlaces.some((p) => p.id === snap.activePlaceId)
+        ) {
+          setActivePlaceIdState(snap.activePlaceId);
+        } else {
+          setActivePlaceIdState(loadedPlaces[0]?.id ?? DEFAULT_PLACE_ID);
         }
-        if (activityRaw) {
-          const parsed = JSON.parse(activityRaw) as InventoryActivityEntry[];
-          if (Array.isArray(parsed)) {
-            setRecentActivity(parsed.slice(0, MAX_ACTIVITY));
-          }
-        }
+
         const merged = mergeCatalog(SEED_PRODUCTS, customs, extras, packs);
         setCustomProducts(customs);
         setAliasExtras(extras);
         setPackExtras(packs);
         setProducts(merged);
 
-        const cleared = clearedRaw === '1';
+        const defaultPlaceId = loadedPlaces[0]?.id ?? DEFAULT_PLACE_ID;
+        const cleared = snap.inventoryCleared;
         let restored: InventorySession | null = null;
-        if (sessionRaw) {
-          try {
-            const parsed = JSON.parse(sessionRaw) as unknown;
-            if (isInventorySession(parsed)) restored = parsed;
-          } catch {
-            restored = null;
-          }
+        if (snap.session && isInventorySession(snap.session)) {
+          restored = snap.session;
         }
         if (restored) {
           setSession({
@@ -414,7 +420,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
             lines: reconcileSessionLines(
               restored.lines,
               merged,
-              DEFAULT_PLACE_ID,
+              defaultPlaceId,
             ),
           });
         } else if (cleared) {
@@ -423,18 +429,18 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
             title: 'Inventory sheet RR',
             date: todayIsoDate(),
             status: 'in_progress',
-            lines: createInitialSessionLines(merged, DEFAULT_PLACE_ID, {
+            lines: createInitialSessionLines(merged, defaultPlaceId, {
               seeded: false,
             }),
           });
         }
-        // else: keep in-memory seed session from useState initializer
       } catch {
         // keep seed catalog / session
       } finally {
         if (!cancelled) {
           setCatalogReady(true);
           setSessionReady(true);
+          setPlacesReady(true);
         }
       }
     })();
@@ -443,44 +449,77 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Pull cloud snapshot when signed into a venue (merge custom products + places).
+  useEffect(() => {
+    if (isLocalOnly || !activeVenueId || !catalogReady) return;
+    let cancelled = false;
+    (async () => {
+      const remote = await cloudPullVenue(activeVenueId);
+      if (cancelled || !remote) return;
+      if (remote.places.length) {
+        setPlaces(remote.places);
+        void savePlaces(remote.places);
+      }
+      if (remote.products.length) {
+        setCustomProducts(remote.products);
+        setProducts((prev) => {
+          const byId = new Map(prev.map((p) => [p.id, p]));
+          for (const p of remote.products) byId.set(p.id, p);
+          return [...byId.values()];
+        });
+        void saveCustomProducts(remote.products);
+      }
+      if (remote.session) {
+        setSession(remote.session);
+        void saveSession(remote.session);
+      }
+      void flushSyncQueue();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLocalOnly, activeVenueId, catalogReady]);
+
   useEffect(() => {
     if (!catalogReady) return;
-    void AsyncStorage.setItem(
-      CUSTOM_PRODUCTS_KEY,
-      JSON.stringify(customProducts),
-    ).catch(() => {});
+    void saveCustomProducts(customProducts).catch(() => {});
   }, [customProducts, catalogReady]);
 
   useEffect(() => {
     if (!catalogReady) return;
-    void AsyncStorage.setItem(
-      ALIAS_EXTRAS_KEY,
-      JSON.stringify(aliasExtras),
-    ).catch(() => {});
+    void saveAliasExtras(aliasExtras).catch(() => {});
   }, [aliasExtras, catalogReady]);
 
   useEffect(() => {
     if (!catalogReady) return;
-    void AsyncStorage.setItem(
-      PACK_EXTRAS_KEY,
-      JSON.stringify(packExtras),
-    ).catch(() => {});
+    void savePackExtras(packExtras).catch(() => {});
   }, [packExtras, catalogReady]);
 
   useEffect(() => {
     if (!catalogReady) return;
-    void AsyncStorage.setItem(
-      ACTIVITY_KEY,
-      JSON.stringify(recentActivity),
-    ).catch(() => {});
+    void saveActivity(recentActivity).catch(() => {});
   }, [recentActivity, catalogReady]);
 
   useEffect(() => {
     if (!sessionReady) return;
-    void AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session)).catch(
-      () => {},
-    );
+    void saveSession(session).catch(() => {});
+    void syncUpsertSession(syncCtxRef.current, session);
   }, [session, sessionReady]);
+
+  useEffect(() => {
+    if (!placesReady) return;
+    void savePlaces(places).catch(() => {});
+  }, [places, placesReady]);
+
+  useEffect(() => {
+    if (!placesReady) return;
+    void saveSiteName(siteName).catch(() => {});
+  }, [siteName, placesReady]);
+
+  useEffect(() => {
+    if (!placesReady) return;
+    void saveActivePlaceId(activePlaceId).catch(() => {});
+  }, [activePlaceId, placesReady]);
 
   const pushActivity = useCallback((entry: InventoryActivityEntry) => {
     setRecentActivity((prev) => [entry, ...prev].slice(0, MAX_ACTIVITY));
@@ -488,12 +527,15 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
 
   const setLastRecordUnit = useCallback((unit: UnitCode) => {
     setLastRecordUnitState(unit);
-    void AsyncStorage.setItem(LAST_UNIT_KEY, unit).catch(() => {});
+    void saveLastUnit(unit).catch(() => {});
   }, []);
 
   const setSiteName = useCallback((name: string) => {
     const trimmed = name.trim();
-    if (trimmed) setSiteNameState(trimmed);
+    if (trimmed) {
+      setSiteNameState(trimmed);
+      void syncRenameVenue(syncCtxRef.current, trimmed);
+    }
   }, []);
 
   const setActivePlaceId = useCallback(
@@ -519,15 +561,23 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       };
       return [...prev, created];
     });
+    if (created) {
+      void syncUpsertPlace(syncCtxRef.current, created);
+    }
     return created;
   }, []);
 
   const renamePlace = useCallback((placeId: string, name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    setPlaces((prev) =>
-      prev.map((p) => (p.id === placeId ? { ...p, name: trimmed } : p)),
-    );
+    setPlaces((prev) => {
+      const next = prev.map((p) =>
+        p.id === placeId ? { ...p, name: trimmed } : p,
+      );
+      const updated = next.find((p) => p.id === placeId);
+      if (updated) void syncUpsertPlace(syncCtxRef.current, updated);
+      return next;
+    });
   }, []);
 
   const deletePlace = useCallback(
@@ -585,6 +635,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       };
       setCustomProducts((prev) => [...prev, product]);
       setProducts((prev) => [...prev, product]);
+      void syncUpsertProduct(syncCtxRef.current, product);
       setLastRecordUnit(input.unit);
       const placeId = activePlaceId;
       const qty =
@@ -592,23 +643,24 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           ? input.initialQuantity
           : null;
       const now = new Date().toISOString();
-      setSession((prev) => ({
-        ...prev,
-        lines: [
-          ...prev.lines,
-          {
-            id: `line-${product.id}-${placeId}`,
-            productId: product.id,
-            placeId,
-            quantity: qty,
-            officialName: product.officialName,
-            unit: product.unit,
-            unitPriceAlv0: product.unitPriceAlv0,
-            countedAt: qty != null ? now : undefined,
-            lastUpdatedAt: qty != null ? now : undefined,
-          },
-        ],
-      }));
+      const newLine: InventoryLine = {
+        id: `line-${product.id}-${placeId}`,
+        productId: product.id,
+        placeId,
+        quantity: qty,
+        officialName: product.officialName,
+        unit: product.unit,
+        unitPriceAlv0: product.unitPriceAlv0,
+        countedAt: qty != null ? now : undefined,
+        lastUpdatedAt: qty != null ? now : undefined,
+      };
+      setSession((prev) => {
+        void syncUpsertLine(syncCtxRef.current, prev.id, newLine);
+        return {
+          ...prev,
+          lines: [...prev.lines, newLine],
+        };
+      });
       if (qty != null) {
         const movement: StockMovement = {
           id: `mov-${Date.now()}-${product.id}`,
@@ -623,6 +675,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           source: 'product_scan',
         };
         setMovements((m) => [movement, ...m]);
+        void syncInsertMovement(syncCtxRef.current, movement);
         pushActivity({
           id: `act-${Date.now()}-${product.id}`,
           productId: product.id,
@@ -862,6 +915,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           unitPriceAlv0: line.unitPriceAlv0 || product.unitPriceAlv0,
           verificationStatus: 'pending',
         };
+        void syncUpsertLine(syncCtxRef.current, next.id, updated);
         return {
           ...next,
           lines: next.lines.map((l) =>
@@ -893,6 +947,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         source: args.source ?? 'product_scan',
       };
       setMovements((m) => [movement, ...m]);
+      void syncInsertMovement(syncCtxRef.current, movement);
       pushActivity({
         id: `act-${Date.now()}-${args.productId}`,
         productId: args.productId,
@@ -946,15 +1001,14 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         })),
       };
       // Persist immediately so a remount/refresh cannot reseed from SEED_QTY
-      void AsyncStorage.multiSet([
-        [SESSION_KEY, JSON.stringify(next)],
-        [INVENTORY_CLEARED_KEY, '1'],
-      ]).catch(() => {});
+      void saveSession(next).catch(() => {});
+      void markInventoryCleared().catch(() => {});
+      void syncUpsertSession(syncCtxRef.current, next);
       return next;
     });
     setMovements((m) => m.filter((x) => x.type !== 'inventory_count'));
     setRecentActivity([]);
-    void AsyncStorage.removeItem(ACTIVITY_KEY).catch(() => {});
+    void saveActivity([]).catch(() => {});
   }, []);
 
   const applyStockDelta = useCallback(
@@ -996,17 +1050,18 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           source: args.source,
         };
         setMovements((m) => [movement, ...m]);
+        void syncInsertMovement(syncCtxRef.current, movement);
+        const updatedLine: InventoryLine = {
+          ...line,
+          quantity: after,
+          countedAt: now,
+          lastUpdatedAt: now,
+        };
+        void syncUpsertLine(syncCtxRef.current, next.id, updatedLine);
         return {
           ...next,
           lines: next.lines.map((l) =>
-            lineMatches(l, args.productId, placeId)
-              ? {
-                  ...l,
-                  quantity: after,
-                  countedAt: now,
-                  lastUpdatedAt: now,
-                }
-              : l,
+            lineMatches(l, args.productId, placeId) ? updatedLine : l,
           ),
         };
       });
@@ -1036,6 +1091,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toISOString(),
       };
       setHavikkiLog((prev) => [entry, ...prev]);
+      void syncInsertHavikki(syncCtxRef.current, entry);
       applyStockDelta({
         productId: args.productId,
         delta: -Math.abs(args.quantity),

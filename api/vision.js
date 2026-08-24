@@ -172,10 +172,15 @@ function parseGeminiJson(text) {
   return JSON.parse(cleaned);
 }
 
+const {
+  requireVenueAuth,
+  AUTH_CORS_HEADERS,
+} = require('./_lib/auth');
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', AUTH_CORS_HEADERS);
   if (req.method === 'OPTIONS') {
     res.status(204).end();
     return;
@@ -185,17 +190,26 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const apiKey = (process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY || '').trim();
-  if (!apiKey) {
-    res.status(503).json({
-      error:
-        'Vision API not configured. Set GEMINI_API_KEY on the server (Vercel env).',
-    });
-    return;
-  }
-
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
+    req.body = body;
+
+    // Auth BEFORE Gemini — per-venue daily quota protects the shared key.
+    const auth = await requireVenueAuth(req, 'vision');
+    if (!auth.ok) {
+      res.status(auth.status).json({ error: auth.error });
+      return;
+    }
+
+    const apiKey = (process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY || '').trim();
+    if (!apiKey) {
+      res.status(503).json({
+        error:
+          'Vision API not configured. Set GEMINI_API_KEY on the server (Vercel env).',
+      });
+      return;
+    }
+
     const images = Array.isArray(body.images) ? body.images : [];
     const hint = typeof body.hint === 'string' ? body.hint.trim() : '';
     const model = (body.model || process.env.GEMINI_MODEL || DEFAULT_MODEL).trim();

@@ -1,15 +1,17 @@
 /**
  * Netlify function adapter for the same contract as /api/vision (Vercel).
  * POST /.netlify/functions/vision
+ * Forwards Authorization + X-Venue-Id so Gemini stays behind venue quotas.
  */
 const visionHandler = require('../../api/vision.js');
+const { AUTH_CORS_HEADERS } = require('../../api/_lib/auth');
 
 exports.handler = async (event) => {
   const headers = {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': AUTH_CORS_HEADERS,
   };
 
   if (event.httpMethod === 'OPTIONS') {
@@ -27,7 +29,12 @@ exports.handler = async (event) => {
     };
   }
 
-  const req = { method: event.httpMethod, body };
+  const req = {
+    method: event.httpMethod,
+    body,
+    headers: event.headers || {},
+    query: event.queryStringParameters || {},
+  };
   let statusCode = 200;
   let payload = {};
 

@@ -437,6 +437,34 @@ export const en = {
   camera: 'Camera',
   library: 'Library',
   all: 'All',
+
+  // Multi-venue auth
+  authSignUpTitle: 'Create your kitchen',
+  authSignInTitle: 'Welcome back',
+  authSignUpSub:
+    'One venue per signup. Photo vision and lookups are rate-limited per venue so shared AI quotas stay healthy.',
+  authSignInSub: 'Sign in to sync inventory across devices for your venue.',
+  authVenueName: 'Venue / restaurant name',
+  authVenuePlaceholder: 'e.g. Kamppi Kitchen',
+  authEmail: 'Email',
+  authPassword: 'Password',
+  authSignUp: 'Create venue',
+  authSignIn: 'Sign in',
+  authHaveAccount: 'Already have an account? Sign in',
+  authNeedAccount: 'Need an account? Create a venue',
+  authContinueGuest: 'Continue as guest (local only)',
+  authQuotaNote:
+    'Expensive APIs (vision / lookup) require a signed-in venue session and daily per-venue limits.',
+  authCloudNotConfigured:
+    'Supabase is not configured in this build. Use guest mode, or set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.',
+  authErrorCredentials: 'Enter a valid email and a password (min 6 characters).',
+  authErrorVenueName: 'Enter a venue name.',
+  accountTitle: 'Account',
+  accountSignedInAs: 'Signed in as {email}',
+  accountVenue: 'Active venue: {name}',
+  accountGuest: 'Guest mode — data stays on this device',
+  accountSignOut: 'Sign out',
+  accountSignIn: 'Sign in / create venue',
 } as const;
 
 export type MessageKey = keyof typeof en;
