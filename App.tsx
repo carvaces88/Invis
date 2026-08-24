@@ -403,7 +403,7 @@ function RootNavigator() {
           name="AdminDeck"
           component={AdminDeckScreen}
           options={{
-            title: t('adminDeckTitle'),
+            title: t('masterDeckTitle'),
             headerTintColor: colors.primary,
             headerStyle: { backgroundColor: colors.bg },
           }}

@@ -32,6 +32,11 @@ export function isAdminName(raw: string): boolean {
   return key === 'cesar' || key === 'elena' || key === 'ivan';
 }
 
+/** Cesar-only master dashboard (orange More button) */
+export function isMasterName(raw: string): boolean {
+  return normalizeGateName(raw).toLowerCase() === 'cesar';
+}
+
 export function displayKitchenName(raw: string): string {
   const account = resolveAuthAccount(raw);
   return account?.displayName ?? normalizeGateName(raw);

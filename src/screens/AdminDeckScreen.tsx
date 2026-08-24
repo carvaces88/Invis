@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,6 +11,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../auth/AuthContext';
 import type { RootStackParamList } from '../data/types';
 import { useI18n } from '../i18n';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
@@ -34,6 +35,13 @@ type FeedbackRow = {
   created_at: string;
 };
 
+type LocationRow = {
+  venue: string;
+  visits: number;
+  lastSeen: string;
+  people: string[];
+};
+
 function formatWhen(iso: string | null, locale: string) {
   if (!iso) return '—';
   try {
@@ -46,13 +54,49 @@ function formatWhen(iso: string | null, locale: string) {
   }
 }
 
+function buildLocations(entries: EntryRow[]): LocationRow[] {
+  const map = new Map<
+    string,
+    { venue: string; visits: number; lastSeen: string; people: Set<string> }
+  >();
+  for (const row of entries) {
+    const venue = row.venue?.trim();
+    if (!venue) continue;
+    const key = venue.toLowerCase();
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, {
+        venue,
+        visits: 1,
+        lastSeen: row.created_at,
+        people: new Set([row.name]),
+      });
+      continue;
+    }
+    existing.visits += 1;
+    existing.people.add(row.name);
+    if (row.created_at > existing.lastSeen) existing.lastSeen = row.created_at;
+  }
+  return [...map.values()]
+    .map((v) => ({
+      venue: v.venue,
+      visits: v.visits,
+      lastSeen: v.lastSeen,
+      people: [...v.people].sort((a, b) => a.localeCompare(b)),
+    }))
+    .sort((a, b) => b.visits - a.visits || a.venue.localeCompare(b.venue));
+}
+
 export function AdminDeckScreen(_props: Props) {
   const insets = useSafeAreaInsets();
   const { t, locale } = useI18n();
+  const { isMaster } = useAuth();
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<EntryRow[]>([]);
   const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const locations = useMemo(() => buildLocations(entries), [entries]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -61,12 +105,17 @@ export function AdminDeckScreen(_props: Props) {
       setLoading(false);
       return;
     }
+    if (!isMaster) {
+      setError(t('masterDeckDenied'));
+      setLoading(false);
+      return;
+    }
     const [e, f] = await Promise.all([
       supabase
         .from('app_entries')
         .select('id, name, venue, email, kind, created_at')
         .order('created_at', { ascending: false })
-        .limit(80),
+        .limit(200),
       supabase
         .from('feedback')
         .select('id, username, body, created_at')
@@ -80,7 +129,7 @@ export function AdminDeckScreen(_props: Props) {
       setFeedback(f.data ?? []);
     }
     setLoading(false);
-  }, [t]);
+  }, [isMaster, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -101,8 +150,32 @@ export function AdminDeckScreen(_props: Props) {
         <RefreshControl refreshing={loading} onRefresh={() => void load()} />
       }
     >
-      <Text style={styles.lead}>{t('adminDeckSub')}</Text>
+      <Text style={styles.lead}>{t('masterDeckSub')}</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      <Text style={styles.section}>{t('masterLocations')}</Text>
+      {loading && locations.length === 0 ? (
+        <ActivityIndicator color={colors.warning} style={{ marginVertical: 16 }} />
+      ) : locations.length === 0 ? (
+        <Text style={styles.empty}>{t('masterLocationsEmpty')}</Text>
+      ) : (
+        locations.map((loc) => (
+          <View key={loc.venue.toLowerCase()} style={styles.locationCard}>
+            <View style={styles.rowTop}>
+              <Text style={styles.name}>{loc.venue}</Text>
+              <Text style={styles.orangeBadge}>
+                {t('masterLocationVisits').replace('{n}', String(loc.visits))}
+              </Text>
+            </View>
+            <Text style={styles.meta}>
+              {t('masterLocationPeople')}: {loc.people.join(', ')}
+            </Text>
+            <Text style={styles.meta}>
+              {t('masterLocationLast')}: {formatWhen(loc.lastSeen, locale)}
+            </Text>
+          </View>
+        ))
+      )}
 
       <Text style={styles.section}>{t('adminPeople')}</Text>
       {loading && entries.length === 0 ? (
@@ -171,6 +244,14 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
+  locationCard: {
+    backgroundColor: colors.warningSoft,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#F0D9A8',
+  },
   rowTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -188,10 +269,20 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: radius.pill,
   },
+  orangeBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.warning,
+    backgroundColor: '#FFE4B8',
+    overflow: 'hidden',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
   meta: { marginTop: 4, color: colors.inkMuted, fontSize: 13 },
   body: { marginTop: 8, color: colors.ink, lineHeight: 21, fontSize: 15 },
   empty: { color: colors.inkFaint, marginBottom: spacing.md },
   error: { color: colors.danger, marginBottom: spacing.md },
   refreshBtn: { alignSelf: 'center', marginTop: spacing.lg, padding: 12 },
-  refreshText: { color: colors.primary, fontWeight: '700' },
+  refreshText: { color: colors.warning, fontWeight: '700' },
 });

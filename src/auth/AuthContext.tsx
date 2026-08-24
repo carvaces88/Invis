@@ -11,6 +11,7 @@ import {
   displayKitchenName,
   isAdminName,
   isKitchenName,
+  isMasterName,
   isValidEmail,
   normalizeGateName,
 } from '../lib/authAccounts';
@@ -43,6 +44,7 @@ type AuthContextValue = {
     role: 'admin' | 'guest';
   } | null;
   isAdmin: boolean;
+  isMaster: boolean;
   configured: boolean;
   justSignedIn: boolean;
   clearJustSignedIn: () => void;
@@ -165,6 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       profile,
       isAdmin: profile?.role === 'admin',
+      isMaster: session ? isMasterName(session.name) : false,
       configured: true,
       justSignedIn,
       clearJustSignedIn,

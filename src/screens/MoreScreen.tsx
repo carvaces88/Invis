@@ -21,7 +21,7 @@ export function MoreScreen() {
   const { t, locale, setLocale } = useI18n();
   const { unitSystem, setUnitSystem } = useUnitSystem();
   const { clearAllInventory } = useInventory();
-  const { profile, isAdmin, signOut } = useAuth();
+  const { profile, isMaster, signOut } = useAuth();
   const [valueOpen, setValueOpen] = useState(false);
 
   const items = [
@@ -99,14 +99,15 @@ export function MoreScreen() {
         <Text style={styles.cardSub}>{t('feedbackMoreSub')}</Text>
       </Pressable>
 
-      {isAdmin ? (
+      {isMaster ? (
         <Pressable
-          style={({ pressed }) => [styles.adminCard, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.masterCard, pressed && styles.pressed]}
           onPress={() => navigation.navigate('AdminDeck')}
           accessibilityRole="button"
+          accessibilityLabel={t('masterDeckTitle')}
         >
-          <Text style={styles.cardTitle}>{t('adminDeckTitle')}</Text>
-          <Text style={styles.cardSub}>{t('adminDeckMoreSub')}</Text>
+          <Text style={styles.masterTitle}>{t('masterDeckTitle')}</Text>
+          <Text style={styles.masterSub}>{t('masterDeckMoreSub')}</Text>
         </Pressable>
       ) : null}
 
@@ -319,6 +320,24 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: spacing.md,
     ...shadows.soft,
+  },
+  masterCard: {
+    backgroundColor: colors.warning,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.float,
+  },
+  masterTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.2,
+  },
+  masterSub: {
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.9)',
+    lineHeight: 20,
   },
   pressed: { opacity: 0.9 },
   dangerCard: {
