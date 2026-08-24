@@ -22,7 +22,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Feedback'>;
 export function FeedbackScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
   const nudged = route.params?.nudged === true;
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
@@ -39,13 +39,8 @@ export function FeedbackScreen({ navigation, route }: Props) {
       setError(t('signInNotConfigured'));
       return;
     }
-    if (!user?.id) {
-      setBusy(false);
-      setError(t('signInNotConfigured'));
-      return;
-    }
     const { error: insertError } = await supabase.from('feedback').insert({
-      user_id: user.id,
+      user_id: null,
       username: profile?.displayName ?? profile?.username ?? null,
       body: trimmed,
     });
