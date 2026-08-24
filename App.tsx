@@ -304,7 +304,7 @@ function RootNavigator() {
           name="VideoDemo"
           component={VideoDemoScreen}
           options={{
-            title: t('videoDemo'),
+            title: t('companionTitle'),
             headerTintColor: colors.primary,
             headerStyle: { backgroundColor: colors.bg },
           }}

@@ -48,6 +48,7 @@ function assertApiAuthGate() {
   const authLib = readFileSync(resolve(root, 'api/_lib/auth.js'), 'utf8');
   const vision = readFileSync(resolve(root, 'api/vision.js'), 'utf8');
   const kruoka = readFileSync(resolve(root, 'api/kruoka-lookup.js'), 'utf8');
+  const transcribe = readFileSync(resolve(root, 'api/transcribe.js'), 'utf8');
   if (!authLib.includes('requireVenueAuth')) {
     throw new Error('api/_lib/auth.js missing requireVenueAuth');
   }
@@ -60,13 +61,21 @@ function assertApiAuthGate() {
   if (!kruoka.includes("requireVenueAuth(req, 'kruoka-lookup')")) {
     throw new Error('api/kruoka-lookup.js must gate on requireVenueAuth');
   }
+  if (!transcribe.includes("requireVenueAuth(req, 'transcribe')")) {
+    throw new Error('api/transcribe.js must gate on requireVenueAuth before Gemini');
+  }
   // Ensure Gemini key is only used AFTER auth block in vision.js
   const authIdx = vision.indexOf("requireVenueAuth(req, 'vision')");
   const geminiIdx = vision.indexOf('generativelanguage.googleapis.com');
   if (authIdx < 0 || geminiIdx < 0 || authIdx > geminiIdx) {
     throw new Error('Auth must run before Gemini upstream call in api/vision.js');
   }
-  console.log('✓ Vision + lookup require session + per-venue quota before upstream');
+  const tAuth = transcribe.indexOf("requireVenueAuth(req, 'transcribe')");
+  const tGemini = transcribe.indexOf('generativelanguage.googleapis.com');
+  if (tAuth < 0 || tGemini < 0 || tAuth > tGemini) {
+    throw new Error('Auth must run before Gemini in api/transcribe.js');
+  }
+  console.log('✓ Vision + lookup + transcribe require session + per-venue quota before upstream');
 }
 
 async function liveSignupStorm() {
