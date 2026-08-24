@@ -580,6 +580,46 @@ export const en = {
   barcodeLookingUp: 'Looking up product…',
   barcodeScanForMatch: 'Scan barcode for exact match',
   all: 'All',
+
+  // Auth / feedback / admin deck
+  signInTitle: 'Sign in',
+  signInSub: 'Kitchen access for Cesar, Elena, Ivan — or Guest when invited.',
+  signInUsername: 'Username',
+  signInUsernamePlaceholder: 'Cesar, Elena, Ivan, or Guest',
+  signInPassword: 'Password',
+  signInPasswordPlaceholder: 'Password',
+  signInSubmit: 'Enter Invis',
+  signInGuestHint:
+    'Guests: type Guest as the username (password shared by Cesar).',
+  signInNotConfigured:
+    'Supabase keys are missing. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.',
+  signedInAs: 'Signed in as {name}',
+  signOut: 'Sign out',
+  signOutSub: 'Return to the sign-in screen.',
+  signOutConfirm: 'Sign out of Invis?',
+  feedbackTitle: 'Feedback',
+  feedbackMoreSub: 'Optional — comments help us improve the kitchen tools.',
+  feedbackSub: 'Tell us what works, what is confusing, or what to add next.',
+  feedbackNudgeTitle: 'Quick feedback?',
+  feedbackNudgeSub:
+    'Optional but appreciated — skip anytime. Your note lands on the admin deck.',
+  feedbackPlaceholder: 'Write a comment…',
+  feedbackSend: 'Send feedback',
+  feedbackSkip: 'Skip for now',
+  feedbackThanks: 'Thanks — got it.',
+  adminDeckTitle: 'People & feedback',
+  adminDeckMoreSub: 'Who signed in, recent visits, and comments.',
+  adminDeckSub:
+    'Signed-in people, visit log, and feedback. Pull to refresh.',
+  adminPeople: 'People',
+  adminSignIns: 'Recent sign-ins',
+  adminSignInsEmpty: 'No sign-ins logged yet.',
+  adminFeedback: 'Feedback',
+  adminFeedbackEmpty: 'No feedback yet.',
+  adminLastSeen: 'Last seen',
+  adminRoleAdmin: 'Admin',
+  adminRoleGuest: 'Guest',
+  adminRefresh: 'Refresh',
 } as const;
 
 export type MessageKey = keyof typeof en;

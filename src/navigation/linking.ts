@@ -39,6 +39,8 @@ export const linking: LinkingOptions<RootStackParamList> = {
       ProductDetail: 'catalog/:productId',
       PriceComparison: 'prices',
       Places: 'places',
+      Feedback: 'feedback',
+      AdminDeck: 'admin',
     },
   },
 };

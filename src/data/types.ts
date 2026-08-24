@@ -339,6 +339,10 @@ export type RootStackParamList = {
   Places: undefined;
   RecentActivity: undefined;
   ExportPreview: undefined;
+  /** Optional feedback / comments (strongly nudged after sign-in) */
+  Feedback: { nudged?: boolean } | undefined;
+  /** Cesar / Elena / Ivan: people, sign-ins, feedback */
+  AdminDeck: undefined;
   /** Catalog product detail (identity + inventory price + distributor lookups) */
   ProductDetail: { productId: string };
   /** Compare inventory 0% ALV vs competitor / distributor shelf prices */

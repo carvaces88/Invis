@@ -574,4 +574,45 @@ export const fi: Messages = {
   barcodeLookingUp: 'Haetaan tuotetta…',
   barcodeScanForMatch: 'Skannaa viivakoodi tarkan osuman saamiseksi',
   all: 'Kaikki',
+
+  // Auth / feedback / admin deck
+  signInTitle: 'Kirjaudu',
+  signInSub:
+    'Keittiön käyttö Cesarille, Elenalle ja Ivanille — tai Guest kutsuttuna.',
+  signInUsername: 'Käyttäjänimi',
+  signInUsernamePlaceholder: 'Cesar, Elena, Ivan tai Guest',
+  signInPassword: 'Salasana',
+  signInPasswordPlaceholder: 'Salasana',
+  signInSubmit: 'Avaa Invis',
+  signInGuestHint:
+    'Vieraat: kirjoita Guest käyttäjänimeksi (salasana Cesarilta).',
+  signInNotConfigured:
+    'Supabase-avaimet puuttuvat. Lisää EXPO_PUBLIC_SUPABASE_URL ja EXPO_PUBLIC_SUPABASE_ANON_KEY.',
+  signedInAs: 'Kirjautunut: {name}',
+  signOut: 'Kirjaudu ulos',
+  signOutSub: 'Palaa kirjautumisnäyttöön.',
+  signOutConfirm: 'Kirjaudutaanko ulos Invisistä?',
+  feedbackTitle: 'Palaute',
+  feedbackMoreSub: 'Vapaaehtoinen — kommentit auttavat keittiötyökaluja.',
+  feedbackSub: 'Kerro mikä toimii, mikä hämmentää tai mitä lisättäisiin.',
+  feedbackNudgeTitle: 'Pikainen palaute?',
+  feedbackNudgeSub:
+    'Vapaaehtoinen mutta tervetullut — voit ohittaa. Viesti menee admin-näkymään.',
+  feedbackPlaceholder: 'Kirjoita kommentti…',
+  feedbackSend: 'Lähetä palaute',
+  feedbackSkip: 'Ohita toistaiseksi',
+  feedbackThanks: 'Kiitos — vastaanotettu.',
+  adminDeckTitle: 'Ihmiset ja palaute',
+  adminDeckMoreSub: 'Kirjautuneet, vierailut ja kommentit.',
+  adminDeckSub:
+    'Kirjautuneet henkilöt, vierailuloki ja palaute. Vedä päivittääksesi.',
+  adminPeople: 'Ihmiset',
+  adminSignIns: 'Viimeisimmät kirjautumiset',
+  adminSignInsEmpty: 'Ei kirjautumisia vielä.',
+  adminFeedback: 'Palaute',
+  adminFeedbackEmpty: 'Ei palautetta vielä.',
+  adminLastSeen: 'Viimeksi nähty',
+  adminRoleAdmin: 'Admin',
+  adminRoleGuest: 'Vieras',
+  adminRefresh: 'Päivitä',
 };

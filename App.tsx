@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Text, View } from 'react-native';
 import {
   NavigationContainer,
   DefaultTheme,
@@ -10,16 +10,20 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { enableScreens } from 'react-native-screens';
+import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { ChefNudgeProvider } from './src/components/ChefNudge';
+import { FeedbackNudge } from './src/components/FeedbackNudge';
 import { InventoryProvider } from './src/data/store';
 import type { MainTabParamList, RootStackParamList } from './src/data/types';
 import { LocaleProvider, useI18n } from './src/i18n';
 import { UnitSystemProvider } from './src/lib/unitSystem';
 import { AddProductScreen } from './src/screens/AddProductScreen';
+import { AdminDeckScreen } from './src/screens/AdminDeckScreen';
 import { BarcodeScanScreen } from './src/screens/BarcodeScanScreen';
 import { BatchConfirmScreen } from './src/screens/BatchConfirmScreen';
 import { CatalogScreen } from './src/screens/CatalogScreen';
 import { ConfirmScreen } from './src/screens/ConfirmScreen';
+import { FeedbackScreen } from './src/screens/FeedbackScreen';
 import { FridgeReviewScreen } from './src/screens/FridgeReviewScreen';
 import { HavikkiLogScreen } from './src/screens/HavikkiLogScreen';
 import { HavikkiScanScreen } from './src/screens/HavikkiScanScreen';
@@ -36,6 +40,7 @@ import { RecordInventoryScreen } from './src/screens/RecordInventoryScreen';
 import { RecentActivityScreen } from './src/screens/RecentActivityScreen';
 import { ReportsChatScreen } from './src/screens/ReportsChatScreen';
 import { ScanScreen } from './src/screens/ScanScreen';
+import { SignInScreen } from './src/screens/SignInScreen';
 import { UnitsGuideScreen } from './src/screens/UnitsGuideScreen';
 import { VerifyAmountsScreen } from './src/screens/VerifyAmountsScreen';
 import { VideoDemoScreen } from './src/screens/VideoDemoScreen';
@@ -114,7 +119,9 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
 function MainTabs() {
   const { t } = useI18n();
   return (
-    <Tab.Navigator
+    <>
+      <FeedbackNudge />
+      <Tab.Navigator
       initialRouteName="Home"
       // On web, keep full tab history so Chrome back matches prior tab visits.
       backBehavior={Platform.OS === 'web' ? 'fullHistory' : 'firstRoute'}
@@ -189,6 +196,7 @@ function MainTabs() {
         }}
       />
     </Tab.Navigator>
+    </>
   );
 }
 
@@ -380,9 +388,53 @@ function RootNavigator() {
             headerStyle: { backgroundColor: colors.bg },
           }}
         />
+        <Stack.Screen
+          name="Feedback"
+          component={FeedbackScreen}
+          options={{
+            title: t('feedbackTitle'),
+            presentation: 'modal',
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="AdminDeck"
+          component={AdminDeckScreen}
+          options={{
+            title: t('adminDeckTitle'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
+}
+
+function AuthGate() {
+  const { ready, session } = useAuth();
+
+  if (!ready) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.bg,
+        }}
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!session) {
+    return <SignInScreen />;
+  }
+
+  return <RootNavigator />;
 }
 
 export default function App() {
@@ -390,11 +442,13 @@ export default function App() {
     <SafeAreaProvider>
       <LocaleProvider>
         <UnitSystemProvider>
-          <InventoryProvider>
-            <ChefNudgeProvider>
-              <RootNavigator />
-            </ChefNudgeProvider>
-          </InventoryProvider>
+          <AuthProvider>
+            <InventoryProvider>
+              <ChefNudgeProvider>
+                <AuthGate />
+              </ChefNudgeProvider>
+            </InventoryProvider>
+          </AuthProvider>
         </UnitSystemProvider>
       </LocaleProvider>
     </SafeAreaProvider>
