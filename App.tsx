@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, Platform, Text, View } from 'react-native';
 import {
   NavigationContainer,
   DefaultTheme,
   useIsFocused,
+  type NavigationContainerRef,
 } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -12,7 +13,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { enableScreens } from 'react-native-screens';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { ChefNudgeProvider } from './src/components/ChefNudge';
-import { FeedbackNudge } from './src/components/FeedbackNudge';
 import { VenueFromGate } from './src/components/VenueFromGate';
 import { InventoryProvider } from './src/data/store';
 import type { MainTabParamList, RootStackParamList } from './src/data/types';
@@ -71,6 +71,29 @@ const linkingFallback = (
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+/** Opens pitch deck for investors (or feedback for others) after gate sign-in. */
+function PostSignInRouter({
+  navRef,
+}: {
+  navRef: React.RefObject<NavigationContainerRef<RootStackParamList> | null>;
+}) {
+  const { justSignedIn, clearJustSignedIn, isInvestor } = useAuth();
+
+  useEffect(() => {
+    if (!justSignedIn) return;
+    clearJustSignedIn();
+    const timer = setTimeout(() => {
+      if (isInvestor) {
+        navRef.current?.navigate('PitchDeck');
+      } else {
+        navRef.current?.navigate('Feedback', { nudged: true });
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [justSignedIn, clearJustSignedIn, isInvestor, navRef]);
+
+  return null;
+}
 /** Belt-and-suspenders hide for web if screens path is skipped. */
 function WebTabScene({ children }: { children: React.ReactNode }) {
   const focused = useIsFocused();
@@ -125,8 +148,6 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
 function MainTabs() {
   const { t } = useI18n();
   return (
-    <>
-      <FeedbackNudge />
       <Tab.Navigator
       initialRouteName="Home"
       // On web, keep full tab history so Chrome back matches prior tab visits.
@@ -202,18 +223,20 @@ function MainTabs() {
         }}
       />
     </Tab.Navigator>
-    </>
   );
 }
 
 function RootNavigator() {
   const { t } = useI18n();
+  const navRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   return (
     <NavigationContainer
+      ref={navRef}
       linking={linking}
       fallback={linkingFallback}
       theme={navTheme}
     >
+      <PostSignInRouter navRef={navRef} />
       <StatusBar style="dark" />
       <Stack.Navigator>
         <Stack.Screen
