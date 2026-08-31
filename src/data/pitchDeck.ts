@@ -54,10 +54,20 @@ export const pitchMarket = {
   fiQualifiedRestaurants: 3500,
   fiTargetAccounts: 400,
   arpuEurMonth: 79,
+  /** FI + SE + NO + DK kitchen target after Finland SOM */
+  nordicsTargetAccounts: 1200,
 };
 
 export function finlandSomArrEur(m = pitchMarket): number {
   return m.fiTargetAccounts * m.arpuEurMonth * 12;
+}
+
+export function nordicsArrEur(m = pitchMarket): number {
+  return m.nordicsTargetAccounts * m.arpuEurMonth * 12;
+}
+
+export function projectionArrEur(kitchens: number, m = pitchMarket): number {
+  return kitchens * m.arpuEurMonth * 12;
 }
 
 /**
@@ -122,49 +132,78 @@ export const finlandRestaurantRegions = [
   },
 ] as const;
 
-export type PitchHorizonId = 'now' | '6m' | '1y' | '5y';
+export type PitchHorizonId = 'now' | '6m' | '1y' | '5y' | 'nordics';
+export type PitchRegionScope = 'finland' | 'nordics';
 
 /** Account / ARR projections by horizon (editable) */
 export const pitchProjections: {
   id: PitchHorizonId;
   label: string;
+  /** Short label for compact chips */
+  shortLabel: string;
   kitchens: number;
-  /** Share of Finland SOM target (400) for rose chart fill 0–100 */
+  /** Ring fill vs Nordics target (visual growth through Scandinavia) */
+  ofNordicsPct: number;
+  /** Ring fill vs Finland SOM (400) — useful for FI-only framing */
   ofSomPct: number;
   mrrEur: number;
+  scope: PitchRegionScope;
   note: string;
 }[] = [
   {
     id: 'now',
     label: 'Now',
+    shortLabel: 'Now',
     kitchens: 3,
+    ofNordicsPct: 1,
     ofSomPct: 1,
     mrrEur: 3 * pitchMarket.arpuEurMonth,
-    note: 'Design partners & kitchen pilots',
+    scope: 'finland',
+    note: 'Design partners & kitchen pilots in Finland',
   },
   {
     id: '6m',
     label: '6 months',
+    shortLabel: '6 mo',
     kitchens: 40,
+    ofNordicsPct: 3,
     ofSomPct: 10,
     mrrEur: 40 * pitchMarket.arpuEurMonth,
+    scope: 'finland',
     note: 'Helsinki metro + Tampere beachhead',
   },
   {
     id: '1y',
     label: '1 year',
+    shortLabel: '1 yr',
     kitchens: 120,
+    ofNordicsPct: 10,
     ofSomPct: 30,
     mrrEur: 120 * pitchMarket.arpuEurMonth,
-    note: 'Multi-city FI · first Pro seats',
+    scope: 'finland',
+    note: 'Multi-city Finland · first Pro seats',
   },
   {
     id: '5y',
     label: '5 years',
+    shortLabel: '5 yr FI',
     kitchens: 400,
+    ofNordicsPct: 33,
     ofSomPct: 100,
     mrrEur: 400 * pitchMarket.arpuEurMonth,
-    note: 'Finland SOM · Nordics next',
+    scope: 'finland',
+    note: 'Finland SOM locked — ready for Scandinavia',
+  },
+  {
+    id: 'nordics',
+    label: 'Nordics',
+    shortLabel: 'Nordics',
+    kitchens: pitchMarket.nordicsTargetAccounts,
+    ofNordicsPct: 100,
+    ofSomPct: 100,
+    mrrEur: pitchMarket.nordicsTargetAccounts * pitchMarket.arpuEurMonth,
+    scope: 'nordics',
+    note: 'Expand to Sweden, Norway & Denmark after Finland proof',
   },
 ];
 
@@ -260,7 +299,7 @@ export const pitchAsk = {
   bullets: [
     'Finland beachhead with real kitchen workflows',
     'Pro tools: live walkthrough + deeper POS sync',
-    'Nordics after 400-kitchen ARR proof',
+    'Nordics after Finland SOM · Scandinavia ARR path',
   ],
   founderQuote:
     'Built by a chef who lived the clipboard inventaario every month — so the product starts where the kitchen actually works.',

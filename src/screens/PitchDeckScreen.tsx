@@ -14,6 +14,7 @@ import type { RootStackParamList } from '../data/types';
 import {
   finlandRestaurantRegions,
   finlandSomArrEur,
+  nordicsArrEur,
   pitchApproach,
   pitchAsk,
   pitchBusinessModel,
@@ -257,28 +258,77 @@ function HexPillars() {
   );
 }
 
-function RoseChart({ pct, size = 88 }: { pct: number; size?: number }) {
-  const clamped = Math.max(2, Math.min(100, pct));
-  const r = size / 2 - 4;
+/** Donut progress with € ARR in the center and kitchens under the ring */
+function GrowthRing({
+  pct,
+  size = 88,
+  arrLabel,
+  kitchensLabel,
+  accent = T.insight,
+  active = false,
+  compact = false,
+}: {
+  pct: number;
+  size?: number;
+  arrLabel: string;
+  kitchensLabel: string;
+  accent?: string;
+  active?: boolean;
+  compact?: boolean;
+}) {
+  const clamped = Math.max(1.5, Math.min(100, pct));
+  const stroke = Math.max(7, Math.round(size * 0.09));
+  const r = size / 2 - stroke;
   const cx = size / 2;
   const cy = size / 2;
-  const start = -Math.PI / 2;
-  const end = start + (clamped / 100) * Math.PI * 2;
-  const large = clamped > 50 ? 1 : 0;
-  const x1 = cx + r * Math.cos(start);
-  const y1 = cy + r * Math.sin(start);
-  const x2 = cx + r * Math.cos(end);
-  const y2 = cy + r * Math.sin(end);
-  const wedge = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+  const c = 2 * Math.PI * r;
+  const dash = (clamped / 100) * c;
 
   return (
-    <Svg width={size} height={size}>
-      <Circle cx={cx} cy={cy} r={r} fill="#E5E7EB" />
-      <Circle cx={cx} cy={cy} r={r * 0.72} fill="#F3F4F6" />
-      <Circle cx={cx} cy={cy} r={r * 0.48} fill="#E5E7EB" />
-      <Path d={wedge} fill={T.insight} opacity={0.95} />
-      <Circle cx={cx} cy={cy} r={r * 0.28} fill={T.white} />
-    </Svg>
+    <View style={{ alignItems: 'center', width: size + (compact ? 8 : 24) }}>
+      <View style={{ width: size, height: size }}>
+        <Svg width={size} height={size}>
+          <Circle
+            cx={cx}
+            cy={cy}
+            r={r}
+            stroke="#E2E8F0"
+            strokeWidth={stroke}
+            fill={active ? '#F0F9FF' : T.white}
+          />
+          <Circle
+            cx={cx}
+            cy={cy}
+            r={r}
+            stroke={accent}
+            strokeWidth={stroke}
+            fill="none"
+            strokeDasharray={`${dash} ${Math.max(0.01, c - dash)}`}
+            strokeLinecap="round"
+            transform={`rotate(-90 ${cx} ${cy})`}
+          />
+        </Svg>
+        <View style={styles.ringCenter} pointerEvents="none">
+          <Text
+            style={[
+              styles.ringArr,
+              compact && styles.ringArrCompact,
+              active && { color: accent },
+            ]}
+            numberOfLines={1}
+          >
+            {arrLabel}
+          </Text>
+          {!compact ? <Text style={styles.ringArrCap}>ARR</Text> : null}
+        </View>
+      </View>
+      <Text
+        style={[styles.ringKits, active && { color: accent, fontWeight: '800' }]}
+        numberOfLines={1}
+      >
+        {kitchensLabel}
+      </Text>
+    </View>
   );
 }
 
@@ -348,6 +398,9 @@ function FinlandInsight() {
   const active =
     pitchProjections.find((p) => p.id === horizon) ?? pitchProjections[2];
   const arr = active.mrrEur * 12;
+  const isNordics = active.scope === 'nordics';
+  const accent = isNordics ? T.teal : T.insight;
+  const eurPerKitchenYear = pitchMarket.arpuEurMonth * 12;
 
   return (
     <View>
@@ -362,10 +415,20 @@ function FinlandInsight() {
             </Text>
           </Text>
           <Text style={styles.insightMetricLine}>
-            <Text style={styles.badgeInline}> SOM </Text>
+            <Text style={styles.badgeInline}> FI SOM </Text>
             {'  '}
             <Text style={styles.insightStrong}>
               {formatEur(finlandSomArrEur())} ARR
+            </Text>
+          </Text>
+          <Text style={styles.insightMetricLine}>
+            <Text style={[styles.badgeInline, { backgroundColor: T.teal }]}>
+              {' '}
+              Nordics{' '}
+            </Text>
+            {'  '}
+            <Text style={styles.insightStrong}>
+              {formatEur(nordicsArrEur())} ARR
             </Text>
           </Text>
         </View>
@@ -378,51 +441,105 @@ function FinlandInsight() {
           >
             {pitchProjections.map((p) => {
               const on = p.id === horizon;
+              const nordicTab = p.scope === 'nordics';
               return (
                 <Pressable
                   key={p.id}
                   onPress={() => setHorizon(p.id)}
-                  style={[styles.tab, on && styles.tabOn]}
+                  style={[
+                    styles.tab,
+                    on && styles.tabOn,
+                    on && nordicTab && styles.tabOnNordics,
+                    !on && nordicTab && styles.tabNordics,
+                  ]}
                 >
-                  <Text style={[styles.tabText, on && styles.tabTextOn]}>
-                    {p.label}
+                  <Text
+                    style={[
+                      styles.tabText,
+                      on && styles.tabTextOn,
+                      !on && nordicTab && { color: T.tealDeep },
+                    ]}
+                  >
+                    {p.shortLabel}
                   </Text>
                 </Pressable>
               );
             })}
           </ScrollView>
 
-          <View style={styles.roseGrid}>
-            {pitchProjections.map((p) => (
-              <Pressable
-                key={p.id}
-                style={styles.roseCard}
-                onPress={() => setHorizon(p.id)}
-              >
-                <RoseChart
-                  pct={p.ofSomPct}
-                  size={p.id === horizon ? 96 : 80}
-                />
-                <View style={[styles.rosePill, p.id === horizon && styles.rosePillOn]}>
-                  <Text
-                    style={[
-                      styles.rosePillText,
-                      p.id === horizon && styles.rosePillTextOn,
-                    ]}
-                  >
-                    {p.kitchens} kitchens
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
+          <View
+            style={[
+              styles.heroGrowthCard,
+              isNordics && styles.heroGrowthCardNordics,
+            ]}
+          >
+            <Text style={[styles.heroStage, { color: accent }]}>
+              {isNordics
+                ? 'Scandinavia expansion · SE · NO · DK'
+                : 'Finland beachhead'}
+            </Text>
+            <View style={styles.heroGrowthRow}>
+              <GrowthRing
+                pct={active.ofNordicsPct}
+                size={132}
+                arrLabel={formatEur(arr)}
+                kitchensLabel={`${active.kitchens.toLocaleString('en-GB')} kitchens`}
+                accent={accent}
+                active
+              />
+              <View style={styles.heroGrowthMeta}>
+                <Text style={styles.heroBigNum}>{formatEur(arr)}</Text>
+                <Text style={styles.heroMetaCap}>projected ARR</Text>
+                <View style={styles.heroMetaDivider} />
+                <Text style={styles.heroMetaLine}>
+                  {active.kitchens.toLocaleString('en-GB')} restaurants
+                </Text>
+                <Text style={styles.heroMetaSub}>
+                  × €{eurPerKitchenYear.toLocaleString('en-GB')}/yr each
+                </Text>
+                <Text style={styles.insightNote}>{active.note}</Text>
+              </View>
+            </View>
           </View>
 
-          <Text style={styles.insightMetricLine}>
-            Projected <Text style={styles.badgeInline}> ARR </Text>
-            {'  '}
-            <Text style={styles.insightStrong}>{formatEur(arr)}</Text>
-          </Text>
-          <Text style={styles.insightNote}>{active.note}</Text>
+          <Text style={styles.growthStripTitle}>Growth path · € with kitchens</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.growthStrip}
+          >
+            {pitchProjections.map((p, i) => {
+              const on = p.id === horizon;
+              const pArr = p.mrrEur * 12;
+              const pAccent = p.scope === 'nordics' ? T.teal : T.insight;
+              return (
+                <View key={p.id} style={styles.growthStep}>
+                  <Pressable onPress={() => setHorizon(p.id)}>
+                    <GrowthRing
+                      pct={p.ofNordicsPct}
+                      size={on ? 78 : 68}
+                      arrLabel={formatEur(pArr)}
+                      kitchensLabel={`${p.kitchens}`}
+                      accent={pAccent}
+                      active={on}
+                      compact
+                    />
+                    <Text
+                      style={[
+                        styles.growthStepLabel,
+                        on && { color: pAccent, fontWeight: '800' },
+                      ]}
+                    >
+                      {p.shortLabel}
+                    </Text>
+                  </Pressable>
+                  {i < pitchProjections.length - 1 ? (
+                    <Text style={styles.growthArrow}>→</Text>
+                  ) : null}
+                </View>
+              );
+            })}
+          </ScrollView>
         </View>
       </View>
 
@@ -549,7 +666,7 @@ export function PitchDeckScreen(_props: Props) {
       </Slide>
 
       {/* Finland map + projection tabs */}
-      <Slide title="Finland kitchen insight" tealTitle band>
+      <Slide title="Finland → Scandinavia path" tealTitle band>
         <FinlandInsight />
       </Slide>
 
@@ -1037,29 +1154,111 @@ const styles = StyleSheet.create({
     borderColor: T.line,
   },
   tabOn: { backgroundColor: T.insight, borderColor: T.insight },
+  tabNordics: { borderColor: T.tealMid, backgroundColor: T.tealPale },
+  tabOnNordics: { backgroundColor: T.teal, borderColor: T.teal },
   tabText: { color: T.muted, fontWeight: '700', fontSize: 13 },
   tabTextOn: { color: T.white },
-  roseGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+  heroGrowthCard: {
     marginTop: spacing.md,
-    marginBottom: spacing.sm,
-    gap: 8,
-  },
-  roseCard: { width: '47%', alignItems: 'center', marginBottom: 8 },
-  rosePill: {
-    marginTop: 8,
     backgroundColor: T.white,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: T.line,
+    padding: 14,
   },
-  rosePillOn: { borderColor: T.insight, backgroundColor: '#EFF6FF' },
-  rosePillText: { color: T.ink, fontWeight: '700', fontSize: 12 },
-  rosePillTextOn: { color: T.insight },
+  heroGrowthCardNordics: {
+    borderColor: T.tealMid,
+    backgroundColor: T.tealPale,
+  },
+  heroStage: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+  heroGrowthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  heroGrowthMeta: { flex: 1, minWidth: 140 },
+  heroBigNum: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: T.ink,
+    letterSpacing: -0.5,
+  },
+  heroMetaCap: {
+    color: T.muted,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  heroMetaDivider: {
+    height: 1,
+    backgroundColor: T.line,
+    marginVertical: 10,
+  },
+  heroMetaLine: { color: T.ink, fontSize: 15, fontWeight: '700' },
+  heroMetaSub: { color: T.muted, fontSize: 12, marginTop: 2, marginBottom: 6 },
+  ringCenter: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ringArr: {
+    color: T.ink,
+    fontWeight: '800',
+    fontSize: 16,
+    letterSpacing: -0.3,
+  },
+  ringArrCompact: { fontSize: 12 },
+  ringArrCap: {
+    color: T.muted,
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  ringKits: {
+    marginTop: 6,
+    color: T.ink,
+    fontWeight: '700',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  growthStripTitle: {
+    marginTop: spacing.md,
+    marginBottom: 8,
+    color: T.muted,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  growthStrip: {
+    alignItems: 'flex-end',
+    gap: 2,
+    paddingBottom: 4,
+  },
+  growthStep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  growthStepLabel: {
+    marginTop: 4,
+    textAlign: 'center',
+    color: T.muted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  growthArrow: {
+    color: T.line,
+    fontSize: 16,
+    fontWeight: '700',
+    marginHorizontal: 2,
+    marginBottom: 18,
+  },
   regionLegend: {
     flexDirection: 'row',
     flexWrap: 'wrap',
