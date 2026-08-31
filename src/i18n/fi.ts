@@ -508,16 +508,18 @@ export const fi: Messages = {
   sheetImportNothingSelected: 'Valitse vähintään yksi rivi.',
   sheetImportUnmatchedTitle: 'Tuntemattomat tuotteet',
   sheetImportUnmatchedBody:
-    '{count} rivi(ä) ei ole katalogissa. Lisätäänkö uusina ja kirjoitetaan määrät?',
+    '{count} valittua riviä ei ole katalogissa. OK = lisää uutena ja kirjoita määrät. Peruuta = kirjoita vain osumat.',
   sheetImportCreateMissing: 'Lisää ja kirjoita',
+  sheetImportWriteMatchedOnly: 'Vain osumat',
   sheetImportWrite: 'Kirjoita inventaarioon',
-  sheetImportWriteSub: 'Asettaa absoluuttiset määrät valittuun paikkaan (hinnat 0 % ALV)',
+  sheetImportWriteSub:
+    'Kirjoittaa valitut rivit paikkaan · absoluuttinen määrä jos täytetty · tyhjä määrä ei nollaa · hinnat 0 % ALV',
   sheetImportDoneTitle: 'Tuotteet lisätty, chef!',
   sheetImportDoneBody:
-    '{written} määrää kirjoitettu · {created} uutta katalogituotetta. Palataan kotiin, jotta et napauta Write kahdesti.',
+    '{written} määrää kirjoitettu · {created} uutta katalogituotetta · {skipped} riviä ilman määrää (varasto ennallaan). Avataan inventaario.',
   sheetImportAlreadyTitle: 'Jo kirjoitettu',
   sheetImportAlreadyBody:
-    'Nämä lomakemäärät on jo kirjoitettu. Palataan kotiin, jotta et lisää niitä kahdesti.',
+    'Nämä lomakemäärät on jo kirjoitettu. Avataan inventaario, jotta et lisää niitä kahdesti.',
 
   inventoryPhotosTitle: 'Inventaariokuvat',
   inventoryPhotosOpen: 'Inventaariokuvat',

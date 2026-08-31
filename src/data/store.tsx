@@ -222,9 +222,29 @@ type Store = {
     productCode?: string;
     imageUrl?: string;
     sourceUrl?: string;
-    /** When set, also write this count on the active place */
+    /** When set, also write this count on placeId (or active place) */
     initialQuantity?: number;
+    /** Override active place for the optional opening count line */
+    placeId?: string;
   }) => Product;
+  /**
+   * Atomic sheet / prior-list write: create missing catalog products and set
+   * absolute counts for one place. Empty quantity does not wipe existing stock.
+   */
+  importStockListCounts: (args: {
+    placeId: string;
+    notes?: string;
+    rows: Array<{
+      productId: string | null;
+      name: string;
+      unit: UnitCode;
+      quantity: number | null;
+      unitPriceAlv0?: number | null;
+      packSize?: string;
+      aliases?: string[];
+      ingredientType?: Product['ingredientType'];
+    }>;
+  }) => { written: number; created: number; skippedNoQty: number };
   /** Append a searchable alias on an existing product. Returns false if duplicate/empty. */
   addProductAlias: (productId: string, alias: string) => boolean;
   /** Persist pack → inner-unit multiplier (e.g. 6 bunches per box). */
@@ -921,9 +941,10 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       imageUrl?: string;
       sourceUrl?: string;
       initialQuantity?: number;
+      placeId?: string;
     }) => {
       const product: Product = {
-        id: `custom-${Date.now()}`,
+        id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         officialName: input.officialName.trim(),
         unit: input.unit,
         packSize: input.packSize,
@@ -939,7 +960,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       setCustomProducts((prev) => [...prev, product]);
       setProducts((prev) => [...prev, product]);
       setLastRecordUnit(input.unit);
-      const placeId = activePlaceId;
+      const placeId = input.placeId ?? activePlaceId;
       const qty =
         input.initialQuantity != null && !Number.isNaN(input.initialQuantity)
           ? input.initialQuantity
@@ -990,6 +1011,180 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       return product;
     },
     [activePlaceId, setLastRecordUnit, pushActivity],
+  );
+
+  const importStockListCounts = useCallback(
+    (args: {
+      placeId: string;
+      notes?: string;
+      rows: Array<{
+        productId: string | null;
+        name: string;
+        unit: UnitCode;
+        quantity: number | null;
+        unitPriceAlv0?: number | null;
+        packSize?: string;
+        aliases?: string[];
+        ingredientType?: Product['ingredientType'];
+      }>;
+    }) => {
+      setActivePlaceIdState(args.placeId);
+      const now = new Date().toISOString();
+      const stamp = Date.now();
+      const createdProducts: Product[] = [];
+      let written = 0;
+      let created = 0;
+      let skippedNoQty = 0;
+
+      type Resolved = {
+        product: Product;
+        quantity: number | null;
+        unitPriceAlv0?: number;
+      };
+      const resolved: Resolved[] = [];
+      const known = new Map(products.map((p) => [p.id, p]));
+
+      args.rows.forEach((row, i) => {
+        let product =
+          row.productId && known.has(row.productId)
+            ? known.get(row.productId)!
+            : undefined;
+        if (!product) {
+          product = {
+            id: `custom-${stamp}-${i}-${Math.random().toString(36).slice(2, 8)}`,
+            officialName: row.name.trim() || `Product ${i + 1}`,
+            unit: row.unit,
+            packSize: row.packSize,
+            unitPriceAlv0:
+              row.unitPriceAlv0 != null && Number.isFinite(row.unitPriceAlv0)
+                ? Math.round(row.unitPriceAlv0 * 100) / 100
+                : 0,
+            ingredientType: row.ingredientType ?? 'other',
+            aliases: (row.aliases ?? []).map((a) => a.trim()).filter(Boolean),
+            lowStockThreshold: 1,
+          };
+          createdProducts.push(product);
+          known.set(product.id, product);
+          created += 1;
+        }
+        const qty =
+          row.quantity != null &&
+          Number.isFinite(row.quantity) &&
+          row.quantity >= 0
+            ? row.quantity
+            : null;
+        if (qty == null) skippedNoQty += 1;
+        const price =
+          row.unitPriceAlv0 != null && Number.isFinite(row.unitPriceAlv0)
+            ? Math.round(row.unitPriceAlv0 * 100) / 100
+            : undefined;
+        resolved.push({ product, quantity: qty, unitPriceAlv0: price });
+      });
+
+      if (createdProducts.length) {
+        setCustomProducts((prev) => [...prev, ...createdProducts]);
+        setProducts((prev) => [...prev, ...createdProducts]);
+      }
+
+      const applyRows = (baseLines: InventoryLine[]) => {
+        const lines = [...baseLines];
+        const movements: StockMovement[] = [];
+        const activities: Parameters<typeof pushActivity>[0][] = [];
+        let writeCount = 0;
+
+        for (const r of resolved) {
+          const idx = lines.findIndex(
+            (l) =>
+              l.productId === r.product.id && l.placeId === args.placeId,
+          );
+          const existing = idx >= 0 ? lines[idx] : null;
+          const price =
+            r.unitPriceAlv0 != null
+              ? r.unitPriceAlv0
+              : existing?.unitPriceAlv0 || r.product.unitPriceAlv0;
+
+          if (r.quantity == null) {
+            if (!existing) {
+              lines.push({
+                id: `line-${r.product.id}-${args.placeId}-${stamp}`,
+                productId: r.product.id,
+                placeId: args.placeId,
+                quantity: null,
+                officialName: r.product.officialName,
+                unit: r.product.unit,
+                unitPriceAlv0: price,
+                notes: args.notes,
+              });
+            } else if (r.unitPriceAlv0 != null) {
+              lines[idx] = { ...existing, unitPriceAlv0: price };
+            }
+            continue;
+          }
+
+          const before = existing?.quantity ?? 0;
+          const updated: InventoryLine = {
+            id:
+              existing?.id ??
+              `line-${r.product.id}-${args.placeId}-${stamp}-${writeCount}`,
+            productId: r.product.id,
+            placeId: args.placeId,
+            quantity: r.quantity,
+            officialName: r.product.officialName,
+            unit: r.product.unit,
+            unitPriceAlv0: price,
+            countedAt: now,
+            lastUpdatedAt: now,
+            notes: args.notes ?? existing?.notes,
+            expiryDate: existing?.expiryDate,
+            verificationStatus: 'pending',
+          };
+          if (idx >= 0) lines[idx] = updated;
+          else lines.push(updated);
+
+          movements.push({
+            id: `mov-${stamp}-${writeCount}-${r.product.id}`,
+            type: 'inventory_count',
+            productId: r.product.id,
+            officialName: r.product.officialName,
+            unit: r.product.unit,
+            quantityDelta: r.quantity - before,
+            quantityAfter: r.quantity,
+            createdAt: now,
+            notes: args.notes,
+            station: args.placeId,
+            source: 'product_scan',
+          });
+          activities.push({
+            id: `act-${stamp}-${writeCount}-${r.product.id}`,
+            productId: r.product.id,
+            placeId: args.placeId,
+            officialName: r.product.officialName,
+            unit: r.product.unit,
+            delta: r.quantity - before,
+            quantityAfter: r.quantity,
+            createdAt: now,
+          });
+          writeCount += 1;
+        }
+        return { lines, movements, activities, writeCount };
+      };
+
+      // Compute once against current session for movements/counts, then merge
+      // onto whatever is pending via functional update.
+      const first = applyRows(session.lines);
+      written = first.writeCount;
+      setSession((prev) => {
+        const next = applyRows(prev.lines);
+        return { ...prev, lines: next.lines };
+      });
+      if (first.movements.length) {
+        setMovements((m) => [...first.movements, ...m]);
+      }
+      for (const act of first.activities) pushActivity(act);
+
+      return { written, created, skippedNoQty };
+    },
+    [products, session.lines, pushActivity],
   );
 
   const addProductAlias = useCallback(
@@ -1535,6 +1730,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       setLineVerification,
       updateLineCountDetails,
       upsertCountedProduct,
+      importStockListCounts,
       addQuantity,
       getRecentAddWarning,
       clearAllInventory,
@@ -1578,6 +1774,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       setLineVerification,
       updateLineCountDetails,
       upsertCountedProduct,
+      importStockListCounts,
       addQuantity,
       getRecentAddWarning,
       clearAllInventory,

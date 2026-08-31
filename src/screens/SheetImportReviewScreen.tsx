@@ -410,8 +410,7 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
     places,
     activePlaceId,
     setActivePlaceId,
-    upsertCountedProduct,
-    addProduct,
+    importStockListCounts,
     savePriorStockList,
   } = useInventory();
 
@@ -547,8 +546,8 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
     setSortMode(mode);
   }
 
-  function goHomeAfterWrite() {
-    navigation.navigate('MainTabs', { screen: 'Home' });
+  function goInventoryAfterWrite() {
+    navigation.navigate('MainTabs', { screen: 'Inventaario' });
   }
 
   function writeInventory(createMissing: boolean) {
@@ -557,7 +556,7 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
         t('sheetImportAlreadyTitle'),
         t('sheetImportAlreadyBody'),
       );
-      goHomeAfterWrite();
+      goInventoryAfterWrite();
       return;
     }
 
@@ -577,76 +576,68 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
         ),
         {
           confirmLabel: t('sheetImportCreateMissing'),
-          cancelLabel: t('cancel'),
+          cancelLabel: t('sheetImportWriteMatchedOnly'),
           onConfirm: () => writeInventory(true),
+          onCancel: () => writeInventoryMatchedOnly(),
         },
       );
       return;
     }
 
+    applyWrite(selected, createMissing);
+  }
+
+  /** Cancel on unmatched dialog → still write checked rows that already match. */
+  function writeInventoryMatchedOnly() {
+    const matchedSelected = drafts.filter((d) => d.included && d.match);
+    if (!matchedSelected.length) {
+      alertInfo(t('sheetImportReviewTitle'), t('sheetImportNothingSelected'));
+      return;
+    }
+    applyWrite(matchedSelected, false);
+  }
+
+  function applyWrite(selected: DraftRow[], createMissing: boolean) {
+    if (writeDone || writingRef.current || busy) return;
+
     writingRef.current = true;
     setBusy(true);
     try {
       setActivePlaceId(placeId);
-      let written = 0;
-      let created = 0;
-      const snapshotLines: {
-        name: string;
-        quantity: number | null;
-        unit: UnitCode | null;
-        aliases?: string[];
-        matchedProductId?: string | null;
-      }[] = [];
 
-      for (const d of selected) {
-        const qty = parseFiNumber(d.qty);
-        const price = parseFiNumber(d.price);
-        const unit = d.unit;
-        let productId = d.match?.product.id;
+      const rows = selected
+        .filter((d) => createMissing || d.match)
+        .map((d) => ({
+          productId: d.match?.product.id ?? null,
+          name:
+            formatProductDisplayName(d.name) ||
+            formatProductDisplayName(d.extract.suggestedName),
+          unit: d.unit,
+          quantity: parseFiNumber(d.qty),
+          unitPriceAlv0: parseFiNumber(d.price),
+          packSize: d.extract.packSize ?? undefined,
+          aliases: d.extract.aliases ?? [],
+          ingredientType: d.extract.ingredientType ?? undefined,
+        }));
 
-        if (!productId && createMissing) {
-          const product = addProduct({
-            officialName:
-              formatProductDisplayName(d.name) ||
-              formatProductDisplayName(d.extract.suggestedName),
-            unit,
-            unitPriceAlv0: price ?? undefined,
-            packSize: d.extract.packSize ?? undefined,
-            aliases: d.extract.aliases ?? [],
-            ingredientType: d.extract.ingredientType ?? undefined,
-          });
-          productId = product.id;
-          created += 1;
-        }
-        if (!productId) {
-          snapshotLines.push({
-            name: formatProductDisplayName(d.name) || d.extract.suggestedName,
-            quantity: qty,
-            unit,
-            aliases: d.extract.aliases,
-            matchedProductId: null,
-          });
-          continue;
-        }
-
-        if (qty != null && qty >= 0) {
-          upsertCountedProduct({
-            productId,
-            quantity: qty,
-            placeId,
-            notes: document.title,
-            unitPriceAlv0: price ?? undefined,
-          });
-          written += 1;
-        }
-        snapshotLines.push({
-          name: formatProductDisplayName(d.name) || d.extract.suggestedName,
-          quantity: qty,
-          unit,
-          aliases: d.extract.aliases,
-          matchedProductId: productId,
-        });
+      if (!rows.length) {
+        alertInfo(t('sheetImportReviewTitle'), t('sheetImportNothingSelected'));
+        return;
       }
+
+      const { written, created, skippedNoQty } = importStockListCounts({
+        placeId,
+        notes: document.title,
+        rows,
+      });
+
+      const snapshotLines = rows.map((r) => ({
+        name: r.name,
+        quantity: r.quantity,
+        unit: r.unit,
+        aliases: r.aliases,
+        matchedProductId: r.productId,
+      }));
 
       const sourceUris =
         imageUris?.filter(Boolean) ??
@@ -665,8 +656,9 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
         t('sheetImportDoneTitle'),
         t('sheetImportDoneBody')
           .replace('{written}', String(written))
-          .replace('{created}', String(created)),
-        goHomeAfterWrite,
+          .replace('{created}', String(created))
+          .replace('{skipped}', String(skippedNoQty)),
+        goInventoryAfterWrite,
       );
     } finally {
       writingRef.current = false;

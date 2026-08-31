@@ -513,16 +513,18 @@ export const en = {
   sheetImportNothingSelected: 'Select at least one row.',
   sheetImportUnmatchedTitle: 'Unmatched products',
   sheetImportUnmatchedBody:
-    '{count} row(s) are not in the catalog. Add them as new products, then write counts?',
+    '{count} checked row(s) are not in the catalog. OK = add them as new products and write counts. Cancel = write matched rows only.',
   sheetImportCreateMissing: 'Add & write',
+  sheetImportWriteMatchedOnly: 'Matched only',
   sheetImportWrite: 'Write to inventory',
-  sheetImportWriteSub: 'Sets absolute counts for the selected place (0% ALV prices)',
+  sheetImportWriteSub:
+    'Writes checked rows to the selected place · absolute qty when filled · empty qty skips stock (no wipe) · 0% ALV prices',
   sheetImportDoneTitle: 'Items added, chef!',
   sheetImportDoneBody:
-    '{written} count(s) written · {created} new catalog product(s). Heading home so you don’t double-tap Write.',
+    '{written} count(s) written · {created} new catalog product(s) · {skipped} row(s) without qty (stock unchanged). Opening Inventory.',
   sheetImportAlreadyTitle: 'Already applied',
   sheetImportAlreadyBody:
-    'These sheet counts were already written. Returning home so you don’t add them twice.',
+    'These sheet counts were already written. Opening Inventory so you don’t add them twice.',
 
   inventoryPhotosTitle: 'Inventory photos',
   inventoryPhotosOpen: 'Inventory photos',
