@@ -3,6 +3,7 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
+  Platform,
   StyleSheet,
   View,
 } from 'react-native';
@@ -18,7 +19,9 @@ const BODY_LEFT = 30;
 const BODY_WIDTH = 36;
 const BODY_TOP = 8;
 const BODY_HEIGHT = 56;
-const DOOR_W = 28;
+
+/** Closed → open: left-hinged swing toward camera / left. */
+const OPEN_ANGLE = '-75deg';
 
 type Props = {
   accessibilityLabel: string;
@@ -26,8 +29,8 @@ type Props = {
 };
 
 /**
- * Brand fridge mark with a subtle looping door open/close.
- * View-composed (RN Animated only) so web + native stay light.
+ * Brand fridge mark with a looping hinged door open/close.
+ * One door panel rotates on Y with left-edge hinge — normal fridge swing.
  */
 export function AnimatedFridgeLogo({
   accessibilityLabel,
@@ -39,26 +42,28 @@ export function AnimatedFridgeLogo({
     let cancelled = false;
     let loop: Animated.CompositeAnimation | null = null;
 
+    const doorEase = Easing.bezier(0.45, 0.05, 0.25, 1);
+
     const runLoop = () => {
       loop?.stop();
       open.setValue(1);
       loop = Animated.loop(
         Animated.sequence([
-          Animated.delay(2800),
+          Animated.delay(2600),
           Animated.timing(open, {
             toValue: 0,
-            duration: 920,
-            easing: Easing.inOut(Easing.cubic),
+            duration: 880,
+            easing: doorEase,
             useNativeDriver: true,
           }),
-          Animated.delay(1200),
+          Animated.delay(1600),
           Animated.timing(open, {
             toValue: 1,
-            duration: 800,
-            easing: Easing.inOut(Easing.cubic),
+            duration: 960,
+            easing: doorEase,
             useNativeDriver: true,
           }),
-          Animated.delay(3400),
+          Animated.delay(2200),
         ]),
       );
       loop.start();
@@ -95,24 +100,14 @@ export function AnimatedFridgeLogo({
     };
   }, [open]);
 
-  // Cover door: hinged at body left — scaleX 1 closed over interior, ~0 open.
-  const coverScaleX = open.interpolate({
+  const doorRotateY = open.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 0.04],
+    outputRange: ['0deg', OPEN_ANGLE],
   });
 
-  // Open door panel sits left of the hinge (brand pose); fades as it closes.
-  const openDoorOpacity = open.interpolate({
-    inputRange: [0, 0.35, 1],
-    outputRange: [0, 0.15, 1],
-  });
-  const openDoorX = open.interpolate({
-    inputRange: [0, 1],
-    outputRange: [10, 0],
-  });
-  const openDoorRotate = open.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['-4deg', '-12deg'],
+  const handleOpacity = open.interpolate({
+    inputRange: [0, 0.55, 1],
+    outputRange: [1, 0.85, 1],
   });
 
   const scale = size / SIZE;
@@ -137,37 +132,24 @@ export function AnimatedFridgeLogo({
           <View style={[styles.item, styles.tub]} />
         </View>
 
-        {/* Closing cover — pivot from left edge of body */}
         <Animated.View
           pointerEvents="none"
           style={[
-            styles.cover,
+            styles.door,
             {
-              // Pivot from left edge (hinge at body left)
+              // RN 0.86+ — hinge on left edge of the door
+              transformOrigin: 'left center',
               transform: [
-                { translateX: BODY_WIDTH / 2 },
-                { scaleX: coverScaleX },
-                { translateX: -BODY_WIDTH / 2 },
-              ],
-            },
-          ]}
-        />
-
-        {/* Brand open-door silhouette */}
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.openDoor,
-            {
-              opacity: openDoorOpacity,
-              transform: [
-                { translateX: openDoorX },
-                { rotate: openDoorRotate },
+                { perspective: 1100 },
+                { rotateY: doorRotateY },
               ],
             },
           ]}
         >
-          <View style={styles.openHandle} />
+          <View style={styles.doorEdge} />
+          <Animated.View
+            style={[styles.handle, { opacity: handleOpacity }]}
+          />
         </Animated.View>
       </View>
     </View>
@@ -181,6 +163,11 @@ const styles = StyleSheet.create({
   stage: {
     width: SIZE,
     height: SIZE,
+    overflow: 'visible',
+    ...Platform.select({
+      web: { perspective: 1100 } as object,
+      default: {},
+    }),
   },
   body: {
     position: 'absolute',
@@ -231,7 +218,7 @@ const styles = StyleSheet.create({
     height: 9,
     borderRadius: 2,
   },
-  cover: {
+  door: {
     position: 'absolute',
     left: BODY_LEFT,
     top: BODY_TOP,
@@ -239,17 +226,24 @@ const styles = StyleSheet.create({
     height: BODY_HEIGHT,
     borderRadius: 7,
     backgroundColor: INK,
+    backfaceVisibility: 'hidden',
+    zIndex: 2,
+    ...Platform.select({
+      web: { transformStyle: 'preserve-3d' } as object,
+      default: {},
+    }),
   },
-  openDoor: {
+  doorEdge: {
     position: 'absolute',
-    left: BODY_LEFT - DOOR_W + 2,
-    top: BODY_TOP,
-    width: DOOR_W,
-    height: BODY_HEIGHT,
-    borderRadius: 7,
-    backgroundColor: INK,
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: 3,
+    borderTopLeftRadius: 7,
+    borderBottomLeftRadius: 7,
+    backgroundColor: '#0D0D0D',
   },
-  openHandle: {
+  handle: {
     position: 'absolute',
     right: 7,
     top: 22,
