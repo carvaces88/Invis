@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -202,6 +202,8 @@ export function ProductDetailScreen({ route, navigation }: Props) {
   const [qtyDraft, setQtyDraft] = useState('1');
   const [placeId, setPlaceId] = useState(activePlaceId);
   const [imageBusy, setImageBusy] = useState(false);
+  const [addDone, setAddDone] = useState(false);
+  const addingRef = useRef(false);
 
   const alvPct = foodAlvPercentLabel();
 
@@ -276,11 +278,20 @@ export function ProductDetailScreen({ route, navigation }: Props) {
 
   function addToInventory() {
     if (!product) return;
+    if (addDone || addingRef.current) {
+      alertInfo(
+        t('catalogDetailAddAlreadyTitle'),
+        t('catalogDetailAddAlreadyBody'),
+      );
+      navigation.goBack();
+      return;
+    }
     const n = Number(qtyDraft.replace(',', '.'));
     if (!Number.isFinite(n) || n <= 0) {
       alertInfo(t('catalogDetailTitle'), t('catalogDetailAddNeedQty'));
       return;
     }
+    addingRef.current = true;
     setActivePlaceId(placeId);
     addQuantity({
       productId: product.id,
@@ -291,13 +302,16 @@ export function ProductDetailScreen({ route, navigation }: Props) {
     });
     const placeName =
       places.find((p) => p.id === placeId)?.name ?? placeId;
+    setAddDone(true);
     alertAck(
-      t('catalogDetailAddToInventory'),
+      t('catalogDetailAddDoneTitle'),
       t('catalogDetailAddDone')
         .replace('{qty}', String(n).replace('.', ','))
         .replace('{unit}', product.unit)
         .replace('{place}', placeName),
+      () => navigation.goBack(),
     );
+    addingRef.current = false;
   }
 
   if (!product) {
@@ -395,15 +409,20 @@ export function ProductDetailScreen({ route, navigation }: Props) {
         </View>
         <Pressable
           onPress={addToInventory}
+          disabled={addDone}
           style={({ pressed }) => [
             styles.addBtn,
             pressed && { opacity: 0.9 },
+            addDone && { opacity: 0.6 },
           ]}
           accessibilityRole="button"
         >
           <Text style={styles.addBtnText}>
-            {t('catalogDetailAddToInventory')}
-            {place ? ` · ${place.name}` : ''}
+            {addDone
+              ? t('catalogDetailAddDoneTitle')
+              : `${t('catalogDetailAddToInventory')}${
+                  place ? ` · ${place.name}` : ''
+                }`}
           </Text>
         </Pressable>
       </View>

@@ -497,9 +497,12 @@ export const en = {
   sheetImportCreateMissing: 'Add & write',
   sheetImportWrite: 'Write to inventory',
   sheetImportWriteSub: 'Sets absolute counts for the selected place (0% ALV prices)',
-  sheetImportDoneTitle: 'Sheet imported',
+  sheetImportDoneTitle: 'Items added, chef!',
   sheetImportDoneBody:
-    'Wrote {written} count(s). Added {created} new catalog product(s). Sort A–Z on Inventory anytime.',
+    '{written} count(s) written · {created} new catalog product(s). Heading home so you don’t double-tap Write.',
+  sheetImportAlreadyTitle: 'Already applied',
+  sheetImportAlreadyBody:
+    'These sheet counts were already written. Returning home so you don’t add them twice.',
 
   monthWrapUpOpen: 'Finalize month',
   monthWrapUpOpenSub: 'End-of-month count · summary · Restolution report',
@@ -595,8 +598,12 @@ export const en = {
   catalogDetailAmount: 'Amount',
   catalogDetailAmountPlaceholder: 'Qty to add',
   catalogDetailAddToInventory: 'Add to inventory',
+  catalogDetailAddDoneTitle: 'Items added, chef!',
   catalogDetailAddDone: 'Added {qty} {unit} to {place}.',
   catalogDetailAddNeedQty: 'Enter an amount greater than zero.',
+  catalogDetailAddAlreadyTitle: 'Already added',
+  catalogDetailAddAlreadyBody:
+    'That add already went through. Going back so you don’t double-tap.',
   catalogDetailFetchingImage: 'Looking up pack photo…',
   // Stack titles / common actions
   confirm: 'Confirm',

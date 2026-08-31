@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -417,6 +417,9 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
   const [placeId, setPlaceId] = useState(activePlaceId);
   const [sortMode, setSortMode] = useState<SortMode>('sheet');
   const [busy, setBusy] = useState(false);
+  /** Blocks a second Write after success (double-click / accidental re-apply). */
+  const [writeDone, setWriteDone] = useState(false);
+  const writingRef = useRef(false);
 
   const initial = useMemo<DraftRow[]>(
     () =>
@@ -543,7 +546,20 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
     setSortMode(mode);
   }
 
+  function goHomeAfterWrite() {
+    navigation.navigate('MainTabs', { screen: 'Home' });
+  }
+
   function writeInventory(createMissing: boolean) {
+    if (writeDone || writingRef.current || busy) {
+      alertInfo(
+        t('sheetImportAlreadyTitle'),
+        t('sheetImportAlreadyBody'),
+      );
+      goHomeAfterWrite();
+      return;
+    }
+
     const selected = drafts.filter((d) => d.included);
     if (!selected.length) {
       alertInfo(t('sheetImportReviewTitle'), t('sheetImportNothingSelected'));
@@ -567,6 +583,7 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
       return;
     }
 
+    writingRef.current = true;
     setBusy(true);
     try {
       setActivePlaceId(placeId);
@@ -607,14 +624,16 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
         }
       }
 
+      setWriteDone(true);
       alertAck(
         t('sheetImportDoneTitle'),
         t('sheetImportDoneBody')
           .replace('{written}', String(written))
           .replace('{created}', String(created)),
+        goHomeAfterWrite,
       );
-      navigation.navigate('MainTabs', { screen: 'Inventaario' });
     } finally {
+      writingRef.current = false;
       setBusy(false);
     }
   }
@@ -775,16 +794,22 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 8 }]}>
         <Pressable
-          disabled={busy}
+          disabled={busy || writeDone}
           onPress={() => writeInventory(false)}
           style={({ pressed }) => [
             styles.writeBtn,
             pressed && { opacity: 0.9 },
-            busy && { opacity: 0.6 },
+            (busy || writeDone) && { opacity: 0.6 },
           ]}
         >
-          <Text style={styles.writeBtnText}>{t('sheetImportWrite')}</Text>
-          <Text style={styles.writeBtnSub}>{t('sheetImportWriteSub')}</Text>
+          <Text style={styles.writeBtnText}>
+            {writeDone ? t('sheetImportDoneTitle') : t('sheetImportWrite')}
+          </Text>
+          <Text style={styles.writeBtnSub}>
+            {writeDone
+              ? t('sheetImportAlreadyBody')
+              : t('sheetImportWriteSub')}
+          </Text>
         </Pressable>
       </View>
     </View>

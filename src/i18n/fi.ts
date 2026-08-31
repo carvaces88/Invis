@@ -492,9 +492,12 @@ export const fi: Messages = {
   sheetImportCreateMissing: 'Lisää ja kirjoita',
   sheetImportWrite: 'Kirjoita inventaarioon',
   sheetImportWriteSub: 'Asettaa absoluuttiset määrät valittuun paikkaan (hinnat 0 % ALV)',
-  sheetImportDoneTitle: 'Lomake tuotu',
+  sheetImportDoneTitle: 'Tuotteet lisätty, chef!',
   sheetImportDoneBody:
-    'Kirjoitettiin {written} määrää. Lisättiin {created} uutta katalogituotetta. Järjestä A–Ö Inventaario-välilehdellä.',
+    '{written} määrää kirjoitettu · {created} uutta katalogituotetta. Palataan kotiin, jotta et napauta Write kahdesti.',
+  sheetImportAlreadyTitle: 'Jo kirjoitettu',
+  sheetImportAlreadyBody:
+    'Nämä lomakemäärät on jo kirjoitettu. Palataan kotiin, jotta et lisää niitä kahdesti.',
 
   monthWrapUpOpen: 'Päätä kuukausi',
   monthWrapUpOpenSub: 'Kuukauden lopun inventaario · yhteenveto · Restolution-raportti',
@@ -589,8 +592,12 @@ export const fi: Messages = {
   catalogDetailAmount: 'Määrä',
   catalogDetailAmountPlaceholder: 'Lisättävä määrä',
   catalogDetailAddToInventory: 'Lisää inventaarioon',
+  catalogDetailAddDoneTitle: 'Tuotteet lisätty, chef!',
   catalogDetailAddDone: 'Lisätty {qty} {unit} → {place}.',
   catalogDetailAddNeedQty: 'Anna määrä suurempi kuin nolla.',
+  catalogDetailAddAlreadyTitle: 'Jo lisätty',
+  catalogDetailAddAlreadyBody:
+    'Lisäys meni jo läpi. Palataan takaisin, jotta et napauta kahdesti.',
   catalogDetailFetchingImage: 'Haetaan pakkauskuvaa…',
 
   confirm: 'Vahvista',
