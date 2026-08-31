@@ -16,6 +16,7 @@ import type { Product } from './types';
 export const KRUOKA_PACK_IMAGES: Record<string, number> = {
   'kruoka-herkkumaa-taysmajoneesi-5kg': require('../../assets/demo/herkkumaa-taysmajoneesi-5kg-pack.png'),
   'kruoka-atria-rahkaohukainen-kaakao-vadelma-380g': require('../../assets/demo/atria-rahkaohukainen-kaakao-vadelma-380g-pack.png'),
+  'rr-maizena': require('../../assets/demo/maizena-400g.png'),
 };
 
 /** Demo walk-in / shelf photos used by fridge panorama stub. */

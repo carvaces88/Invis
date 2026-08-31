@@ -2,20 +2,26 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PlaceSelect } from '../components/PlaceSelect';
 import { ProductThumb } from '../components/ProductThumb';
+import { productImageSource } from '../data/seedKruoka';
 import { useInventory } from '../data/store';
 import type { RootStackParamList } from '../data/types';
 import { INGREDIENT_TYPE_LABELS, UNIT_LABELS } from '../data/units';
 import { useI18n, type MessageKey } from '../i18n';
 import { FOOD_ALV_RATE, foodAlvPercentLabel, withFoodAlv } from '../lib/alv';
+import { alertAck, alertInfo } from '../lib/alertAck';
+import { enrichCatalogImages } from '../lib/catalogImageEnrichment';
 import {
   compareProductPrices,
   formatEur,
@@ -176,7 +182,14 @@ function DistributorCard({
 export function ProductDetailScreen({ route, navigation }: Props) {
   const { productId } = route.params;
   const insets = useSafeAreaInsets();
-  const { products } = useInventory();
+  const {
+    products,
+    places,
+    activePlaceId,
+    setActivePlaceId,
+    addQuantity,
+    updateProductCatalogFields,
+  } = useInventory();
   const { t, locale } = useI18n();
   const product = products.find((p) => p.id === productId);
 
@@ -185,8 +198,38 @@ export function ProductDetailScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [showWithAlv, setShowWithAlv] = useState(false);
+  const [packSizeDraft, setPackSizeDraft] = useState('');
+  const [qtyDraft, setQtyDraft] = useState('1');
+  const [placeId, setPlaceId] = useState(activePlaceId);
+  const [imageBusy, setImageBusy] = useState(false);
 
   const alvPct = foodAlvPercentLabel();
+
+  useEffect(() => {
+    if (!product) return;
+    setPackSizeDraft(product.packSize ?? '');
+  }, [product?.id, product?.packSize]);
+
+  useEffect(() => {
+    setPlaceId(activePlaceId);
+  }, [activePlaceId]);
+
+  // Pull a retail packshot when this SKU still has none.
+  useEffect(() => {
+    if (!product || productImageSource(product)) return;
+    const signal = { cancelled: false };
+    setImageBusy(true);
+    void enrichCatalogImages([product], updateProductCatalogFields, {
+      delayMs: 0,
+      limit: 1,
+      signal,
+    }).finally(() => {
+      if (!signal.cancelled) setImageBusy(false);
+    });
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [product?.id, product?.imageUrl, updateProductCatalogFields]);
 
   const loadPrices = useCallback(async () => {
     if (!product) return;
@@ -224,6 +267,39 @@ export function ProductDetailScreen({ route, navigation }: Props) {
     [result],
   );
 
+  function savePackSize() {
+    if (!product) return;
+    const next = packSizeDraft.trim();
+    if (next === (product.packSize ?? '').trim()) return;
+    updateProductCatalogFields(product.id, { packSize: next || null });
+  }
+
+  function addToInventory() {
+    if (!product) return;
+    const n = Number(qtyDraft.replace(',', '.'));
+    if (!Number.isFinite(n) || n <= 0) {
+      alertInfo(t('catalogDetailTitle'), t('catalogDetailAddNeedQty'));
+      return;
+    }
+    setActivePlaceId(placeId);
+    addQuantity({
+      productId: product.id,
+      delta: n,
+      placeId,
+      notes: 'Catalog detail',
+      source: 'manual',
+    });
+    const placeName =
+      places.find((p) => p.id === placeId)?.name ?? placeId;
+    alertAck(
+      t('catalogDetailAddToInventory'),
+      t('catalogDetailAddDone')
+        .replace('{qty}', String(n).replace('.', ','))
+        .replace('{unit}', product.unit)
+        .replace('{place}', placeName),
+    );
+  }
+
   if (!product) {
     return (
       <View style={[styles.root, styles.centered]}>
@@ -242,6 +318,11 @@ export function ProductDetailScreen({ route, navigation }: Props) {
   const ourDisplay = withFoodAlv(product.unitPriceAlv0, showWithAlv);
   const withAlvShelf =
     Math.round(product.unitPriceAlv0 * (1 + FOOD_ALV_RATE) * 100) / 100;
+  const place = places.find((p) => p.id === placeId);
+  const betaTitle =
+    Platform.OS === 'web'
+      ? ({ title: t('catalogImageBetaDisclaimer') } as Record<string, string>)
+      : {};
 
   return (
     <ScrollView
@@ -254,14 +335,77 @@ export function ProductDetailScreen({ route, navigation }: Props) {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.hero}>
-        <ProductThumb product={product} size={72} />
+        <View {...betaTitle}>
+          <ProductThumb product={product} size={120} />
+          {imageBusy && !productImageSource(product) ? (
+            <Text style={styles.imageBusy}>
+              {t('catalogDetailFetchingImage')}
+            </Text>
+          ) : null}
+        </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.name}>{product.officialName}</Text>
           <Text style={styles.heroMeta}>
             {INGREDIENT_TYPE_LABELS[product.ingredientType]} · {product.unit}
             {product.packSize ? ` · ${product.packSize}` : ''}
           </Text>
+          <Text style={styles.betaHint} {...betaTitle}>
+            {t('catalogImageBeta')} · {t('catalogImageBetaBanner')}
+          </Text>
         </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.quickTitle}>{t('catalogDetailAddToInventory')}</Text>
+        {places.length > 0 ? (
+          <PlaceSelect
+            places={places}
+            selectedId={placeId}
+            onSelect={setPlaceId}
+            label={t('placesCountingAt')}
+            flush
+            compact
+          />
+        ) : null}
+        <View style={styles.quickRow}>
+          <View style={styles.quickField}>
+            <Text style={styles.metaLabel}>{t('catalogDetailAmount')}</Text>
+            <TextInput
+              value={qtyDraft}
+              onChangeText={setQtyDraft}
+              keyboardType="decimal-pad"
+              placeholder={t('catalogDetailAmountPlaceholder')}
+              placeholderTextColor={colors.inkFaint}
+              style={styles.quickInput}
+            />
+          </View>
+          <View style={styles.quickField}>
+            <Text style={styles.metaLabel}>
+              {t('catalogDetailPackSizeEdit')}
+            </Text>
+            <TextInput
+              value={packSizeDraft}
+              onChangeText={setPackSizeDraft}
+              onBlur={savePackSize}
+              placeholder={t('catalogDetailPackSizePlaceholder')}
+              placeholderTextColor={colors.inkFaint}
+              style={styles.quickInput}
+            />
+          </View>
+        </View>
+        <Pressable
+          onPress={addToInventory}
+          style={({ pressed }) => [
+            styles.addBtn,
+            pressed && { opacity: 0.9 },
+          ]}
+          accessibilityRole="button"
+        >
+          <Text style={styles.addBtnText}>
+            {t('catalogDetailAddToInventory')}
+            {place ? ` · ${place.name}` : ''}
+          </Text>
+        </Pressable>
       </View>
 
       <View style={styles.card}>
@@ -460,6 +604,48 @@ const styles = StyleSheet.create({
   },
   name: { fontSize: 18, fontWeight: '700', color: colors.ink },
   heroMeta: { marginTop: 4, fontSize: 13, color: colors.inkMuted },
+  betaHint: {
+    marginTop: 8,
+    fontSize: 11,
+    lineHeight: 15,
+    color: colors.inkFaint,
+  },
+  imageBusy: {
+    marginTop: 6,
+    fontSize: 11,
+    color: colors.inkFaint,
+  },
+  quickTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.ink,
+    marginBottom: spacing.sm,
+  },
+  quickRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  quickField: { flex: 1 },
+  quickInput: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: colors.ink,
+    backgroundColor: colors.bg,
+  },
+  addBtn: {
+    marginTop: spacing.md,
+    backgroundColor: colors.success,
+    borderRadius: radius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  addBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   card: {
     backgroundColor: colors.bgElevated,
     borderRadius: radius.lg,

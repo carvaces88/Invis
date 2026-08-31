@@ -46,6 +46,7 @@ import type {
 const CUSTOM_PRODUCTS_KEY = 'invis.customProducts';
 const ALIAS_EXTRAS_KEY = 'invis.productAliasExtras';
 const PACK_EXTRAS_KEY = 'invis.productPackExtras';
+const CATALOG_FIELD_EXTRAS_KEY = 'invis.productCatalogFieldExtras';
 const LAST_UNIT_KEY = 'invis.lastRecordUnit';
 const ACTIVITY_KEY = 'invis.recentActivity';
 const SESSION_KEY = 'invis.inventorySession';
@@ -113,6 +114,15 @@ type AliasExtras = Record<string, string[]>;
 type PackExtras = Record<
   string,
   { unitsPerPack: number; packBaseUnit: UnitCode }
+>;
+type CatalogFieldExtras = Record<
+  string,
+  {
+    packSize?: string;
+    imageUrl?: string;
+    sourceUrl?: string;
+    ean?: string;
+  }
 >;
 
 export type AddQuantityResult = {
@@ -194,6 +204,16 @@ type Store = {
     productId: string,
     unitsPerPack: number,
     packBaseUnit: UnitCode,
+  ) => void;
+  /** Update pack size / image / source / EAN on a catalog product (persisted). */
+  updateProductCatalogFields: (
+    productId: string,
+    fields: {
+      packSize?: string | null;
+      imageUrl?: string | null;
+      sourceUrl?: string | null;
+      ean?: string | null;
+    },
   ) => void;
   /** Absolute set — Inventaario tab tap-to-edit */
   updateLineQuantity: (lineId: string, quantity: number | null) => void;
@@ -328,19 +348,45 @@ function applyPackExtras(p: Product, packExtras: PackExtras): Product {
   };
 }
 
+function applyCatalogFieldExtras(
+  p: Product,
+  extras: CatalogFieldExtras,
+): Product {
+  const e = extras[p.id];
+  if (!e) return p;
+  return {
+    ...p,
+    packSize:
+      e.packSize !== undefined
+        ? e.packSize.trim() || undefined
+        : p.packSize,
+    imageUrl:
+      e.imageUrl !== undefined
+        ? e.imageUrl.trim() || undefined
+        : p.imageUrl,
+    sourceUrl:
+      e.sourceUrl !== undefined
+        ? e.sourceUrl.trim() || undefined
+        : p.sourceUrl,
+    ean: e.ean !== undefined ? e.ean.trim() || undefined : p.ean,
+  };
+}
+
 function mergeCatalog(
   seed: Product[],
   customs: Product[],
   extras: AliasExtras,
   packExtras: PackExtras = {},
+  fieldExtras: CatalogFieldExtras = {},
 ): Product[] {
-  const withExtras = seed.map((p) =>
-    applyPackExtras(applyAliasExtras(p, extras), packExtras),
-  );
+  const decorate = (p: Product) =>
+    applyCatalogFieldExtras(
+      applyPackExtras(applyAliasExtras(p, extras), packExtras),
+      fieldExtras,
+    );
+  const withExtras = seed.map(decorate);
   const seedIds = new Set(seed.map((p) => p.id));
-  const customOnly = customs
-    .filter((p) => !seedIds.has(p.id))
-    .map((p) => applyPackExtras(applyAliasExtras(p, extras), packExtras));
+  const customOnly = customs.filter((p) => !seedIds.has(p.id)).map(decorate);
   return [...withExtras, ...customOnly];
 }
 
@@ -402,6 +448,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const [customProducts, setCustomProducts] = useState<Product[]>([]);
   const [aliasExtras, setAliasExtras] = useState<AliasExtras>({});
   const [packExtras, setPackExtras] = useState<PackExtras>({});
+  const [catalogFieldExtras, setCatalogFieldExtras] =
+    useState<CatalogFieldExtras>({});
   const [siteName, setSiteNameState] = useState(SEED_SITE_NAME);
   const [places, setPlaces] = useState<Place[]>(SEED_PLACES);
   const [activePlaceId, setActivePlaceIdState] =
@@ -437,6 +485,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           customsRaw,
           extrasRaw,
           packRaw,
+          fieldExtrasRaw,
           unitRaw,
           activityRaw,
           sessionRaw,
@@ -449,6 +498,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(CUSTOM_PRODUCTS_KEY),
           AsyncStorage.getItem(ALIAS_EXTRAS_KEY),
           AsyncStorage.getItem(PACK_EXTRAS_KEY),
+          AsyncStorage.getItem(CATALOG_FIELD_EXTRAS_KEY),
           AsyncStorage.getItem(LAST_UNIT_KEY),
           AsyncStorage.getItem(ACTIVITY_KEY),
           AsyncStorage.getItem(SESSION_KEY),
@@ -462,6 +512,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         let customs: Product[] = [];
         let extras: AliasExtras = {};
         let packs: PackExtras = {};
+        let fields: CatalogFieldExtras = {};
         if (customsRaw) {
           const parsed = JSON.parse(customsRaw) as Product[];
           if (Array.isArray(parsed)) customs = parsed;
@@ -474,6 +525,10 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           const parsed = JSON.parse(packRaw) as PackExtras;
           if (parsed && typeof parsed === 'object') packs = parsed;
         }
+        if (fieldExtrasRaw) {
+          const parsed = JSON.parse(fieldExtrasRaw) as CatalogFieldExtras;
+          if (parsed && typeof parsed === 'object') fields = parsed;
+        }
         if (unitRaw && isUnitCode(unitRaw)) {
           setLastRecordUnitState(unitRaw);
         }
@@ -483,10 +538,17 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
             setRecentActivity(parsed.slice(0, MAX_ACTIVITY));
           }
         }
-        const merged = mergeCatalog(SEED_PRODUCTS, customs, extras, packs);
+        const merged = mergeCatalog(
+          SEED_PRODUCTS,
+          customs,
+          extras,
+          packs,
+          fields,
+        );
         setCustomProducts(customs);
         setAliasExtras(extras);
         setPackExtras(packs);
+        setCatalogFieldExtras(fields);
         setProducts(merged);
 
         const loadedPlaces = parsePlaces(placesRaw) ?? SEED_PLACES.map(migratePlace);
@@ -595,6 +657,14 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       JSON.stringify(packExtras),
     ).catch(() => {});
   }, [packExtras, catalogReady]);
+
+  useEffect(() => {
+    if (!catalogReady) return;
+    void AsyncStorage.setItem(
+      CATALOG_FIELD_EXTRAS_KEY,
+      JSON.stringify(catalogFieldExtras),
+    ).catch(() => {});
+  }, [catalogFieldExtras, catalogReady]);
 
   useEffect(() => {
     if (!catalogReady) return;
@@ -893,6 +963,64 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         [productId]: { unitsPerPack: per, packBaseUnit },
       }));
+    },
+    [],
+  );
+
+  const updateProductCatalogFields = useCallback(
+    (
+      productId: string,
+      fields: {
+        packSize?: string | null;
+        imageUrl?: string | null;
+        sourceUrl?: string | null;
+        ean?: string | null;
+      },
+    ) => {
+      const patch: CatalogFieldExtras[string] = {};
+      if (fields.packSize !== undefined) {
+        patch.packSize = fields.packSize?.trim() || '';
+      }
+      if (fields.imageUrl !== undefined) {
+        patch.imageUrl = fields.imageUrl?.trim() || '';
+      }
+      if (fields.sourceUrl !== undefined) {
+        patch.sourceUrl = fields.sourceUrl?.trim() || '';
+      }
+      if (fields.ean !== undefined) {
+        patch.ean = fields.ean?.replace(/\D/g, '') || '';
+      }
+      if (!Object.keys(patch).length) return;
+
+      setCatalogFieldExtras((prev) => ({
+        ...prev,
+        [productId]: { ...prev[productId], ...patch },
+      }));
+
+      const apply = (p: Product): Product => {
+        if (p.id !== productId) return p;
+        return {
+          ...p,
+          packSize:
+            fields.packSize !== undefined
+              ? fields.packSize?.trim() || undefined
+              : p.packSize,
+          imageUrl:
+            fields.imageUrl !== undefined
+              ? fields.imageUrl?.trim() || undefined
+              : p.imageUrl,
+          sourceUrl:
+            fields.sourceUrl !== undefined
+              ? fields.sourceUrl?.trim() || undefined
+              : p.sourceUrl,
+          ean:
+            fields.ean !== undefined
+              ? fields.ean?.replace(/\D/g, '') || undefined
+              : p.ean,
+        };
+      };
+      setProducts((prev) => prev.map(apply));
+      setCustomProducts((prev) => prev.map(apply));
     },
     [],
   );
@@ -1280,6 +1408,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       addProduct,
       addProductAlias,
       setProductPackInfo,
+      updateProductCatalogFields,
       updateLineQuantity,
       setLineVerification,
       updateLineCountDetails,
@@ -1316,6 +1445,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       addProduct,
       addProductAlias,
       setProductPackInfo,
+      updateProductCatalogFields,
       updateLineQuantity,
       setLineVerification,
       updateLineCountDetails,

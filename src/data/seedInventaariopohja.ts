@@ -190,9 +190,10 @@ const ROWS: Row[] = [
     id: 'rr-maizena',
     officialName: 'Maizena',
     unit: 'PSS',
+    packSize: '400 g',
     unitPriceAlv0: 1.8,
     ingredientType: 'dry_goods',
-    aliases: ['maizena', 'corn starch', 'maissitärkkelys'],
+    aliases: ['maizena', 'corn starch', 'maissitärkkelys', 'majsstärkelse'],
     qty: demoQty('rr-maizena', 1, 4),
   },
   {

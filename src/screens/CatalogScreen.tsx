@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -16,6 +16,7 @@ import { useInventory } from '../data/store';
 import type { IngredientType, Product, RootStackParamList } from '../data/types';
 import { INGREDIENT_TYPE_LABELS } from '../data/units';
 import { useI18n, type MessageKey } from '../i18n';
+import { enrichCatalogImages } from '../lib/catalogImageEnrichment';
 import {
   formatEur,
   peekCatalogListPrices,
@@ -81,12 +82,41 @@ function CatalogPriceRow({ product }: { product: Product }) {
 
 export function CatalogScreen() {
   const insets = useSafeAreaInsets();
-  const { products } = useInventory();
+  const { products, updateProductCatalogFields } = useInventory();
   const { t } = useI18n();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [typeFilter, setTypeFilter] = useState<IngredientType | 'all'>('all');
   const [browseMode, setBrowseMode] = useState<'type' | 'az'>('type');
+
+  // Slowly fill missing packshots from K-Ruoka / OFF (Beta images).
+  // Batches continue while the Catalog tab stays mounted.
+  const productsRef = useRef(products);
+  productsRef.current = products;
+
+  useEffect(() => {
+    const signal = { cancelled: false };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const runBatch = async () => {
+      const updated = await enrichCatalogImages(
+        productsRef.current,
+        updateProductCatalogFields,
+        { delayMs: 400, limit: 25, signal },
+      );
+      if (signal.cancelled) return;
+      // Keep going: more SKUs may still lack images (or just joined the catalog).
+      timer = setTimeout(() => {
+        void runBatch();
+      }, updated > 0 ? 800 : 12_000);
+    };
+
+    void runBatch();
+    return () => {
+      signal.cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [updateProductCatalogFields]);
 
   const openProduct = (productId: string) => {
     navigation.navigate('ProductDetail', { productId });
@@ -118,6 +148,7 @@ export function CatalogScreen() {
         <Text style={styles.title}>{t('catalog')}</Text>
         <Text style={styles.sub}>{t('catalogSub')}</Text>
         <Text style={styles.credit}>{t('kruokaPhotoCredit')}</Text>
+        <Text style={styles.betaNote}>{t('catalogImageBetaBanner')}</Text>
       </View>
 
       <View style={{ paddingHorizontal: spacing.lg }}>
@@ -284,6 +315,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', color: colors.ink },
   sub: { color: colors.inkMuted, marginTop: 4, fontSize: 13, lineHeight: 18 },
   credit: { color: colors.inkFaint, marginTop: 6, fontSize: 11 },
+  betaNote: {
+    color: colors.inkMuted,
+    marginTop: 4,
+    fontSize: 11,
+    lineHeight: 15,
+  },
   filtersBlock: {
     flexGrow: 0,
     flexShrink: 0,

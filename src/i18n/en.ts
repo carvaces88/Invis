@@ -583,6 +583,20 @@ export const en = {
     'Catalog stores a single inventory unit price. Multi-source € comes from live/seed lookups — not a permanent price history per distributor.',
   catalogDetailAlvToggleHint:
     'Prices stored at 0% ALV. With ALV adds {rate}% food VAT for display only.',
+  catalogImageBeta: 'Beta',
+  catalogImageMissing: 'No pack photo yet',
+  catalogImageBetaDisclaimer:
+    'Beta pack photo from retail sources (K-Ruoka / similar). It may not match the exact item in your kitchen. To correct an image, contact your account manager.',
+  catalogImageBetaBanner:
+    'Pack photos are Beta — hover a thumbnail for the full disclaimer. Contact your account manager to edit.',
+  catalogDetailPackSizeEdit: 'Pack size',
+  catalogDetailPackSizePlaceholder: 'e.g. 400 g',
+  catalogDetailAmount: 'Amount',
+  catalogDetailAmountPlaceholder: 'Qty to add',
+  catalogDetailAddToInventory: 'Add to inventory',
+  catalogDetailAddDone: 'Added {qty} {unit} to {place}.',
+  catalogDetailAddNeedQty: 'Enter an amount greater than zero.',
+  catalogDetailFetchingImage: 'Looking up pack photo…',
   // Stack titles / common actions
   confirm: 'Confirm',
   confirmLines: 'Confirm lines',

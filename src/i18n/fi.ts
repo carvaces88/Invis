@@ -577,6 +577,20 @@ export const fi: Messages = {
     'Katalogissa on yksi inventaarioyksikköhinta. Usean lähteen € tulee live-/seed-hauista — ei pysyvää hintahistoriaa jakelijaa kohti.',
   catalogDetailAlvToggleHint:
     'Hinnat tallessa 0 % ALV:lla. ALV:n kanssa +{rate} % elintarvike-ALV vain näyttöön.',
+  catalogImageBeta: 'Beta',
+  catalogImageMissing: 'Ei pakkauskuvaa vielä',
+  catalogImageBetaDisclaimer:
+    'Beta-pakkauskuva vähittäislähteistä (K-Ruoka / vastaavat). Se ei välttämättä vastaa keittiösi tarkkaa tuotetta. Kuvan korjaamiseksi ota yhteyttä tilivastaavaan.',
+  catalogImageBetaBanner:
+    'Pakkauskuvat ovat Beta — vie hiiri pikkukuvan päälle nähdäksesi huomautuksen. Muokkaus: tilivastaava.',
+  catalogDetailPackSizeEdit: 'Pakkauskoko',
+  catalogDetailPackSizePlaceholder: 'esim. 400 g',
+  catalogDetailAmount: 'Määrä',
+  catalogDetailAmountPlaceholder: 'Lisättävä määrä',
+  catalogDetailAddToInventory: 'Lisää inventaarioon',
+  catalogDetailAddDone: 'Lisätty {qty} {unit} → {place}.',
+  catalogDetailAddNeedQty: 'Anna määrä suurempi kuin nolla.',
+  catalogDetailFetchingImage: 'Haetaan pakkauskuvaa…',
 
   confirm: 'Vahvista',
   confirmLines: 'Vahvista rivit',
