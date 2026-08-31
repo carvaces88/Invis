@@ -147,7 +147,6 @@ export function SignInScreen() {
             // RN-web: help automation / keyboard activate the gate
             {...(Platform.OS === 'web'
               ? ({
-                  // @ts-expect-error RN-web DOM props
                   role: 'button',
                   tabIndex: 0,
                   onKeyDown: (e: { key?: string; preventDefault?: () => void }) => {
