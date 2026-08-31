@@ -17,6 +17,10 @@ import { friendlyOptionForCode, COMMON_UNIT_OPTIONS } from '../data/units';
 import { useInventory } from '../data/store';
 import { useI18n } from '../i18n';
 import { alertInfo } from '../lib/alertAck';
+import {
+  persistPickerAsset,
+  visionPickerOptions,
+} from '../lib/persistImageUri';
 import { useUnitSystem } from '../lib/unitSystem';
 import {
   analyzeInventoryImage,
@@ -52,19 +56,23 @@ export function ProductScanScreen() {
     const perm = fromCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      alertInfo(
+        t('recordAnalyzeFailedTitle'),
+        t('photoNeedPermission'),
+      );
+      return;
+    }
 
     const result = fromCamera
-      ? await ImagePicker.launchCameraAsync({
-          quality: 0.7,
-          allowsEditing: false,
-        })
-      : await ImagePicker.launchImageLibraryAsync({
-          quality: 0.7,
-          allowsEditing: false,
-        });
+      ? await ImagePicker.launchCameraAsync(visionPickerOptions())
+      : await ImagePicker.launchImageLibraryAsync(visionPickerOptions());
     if (!result.canceled && result.assets[0]) {
-      setUri(result.assets[0].uri);
+      try {
+        setUri(await persistPickerAsset(result.assets[0]));
+      } catch {
+        setUri(result.assets[0].uri);
+      }
     }
   }
 

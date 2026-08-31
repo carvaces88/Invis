@@ -270,6 +270,10 @@ export const en = {
   recordAnalyzeFridgeDemo: 'Run shelf demo (mayo → confirm)',
   recordAnalyzeFridgeFreshDemo: 'Run fresh demo (cilantro → confirm)',
   recordAnalyzeFreshDemo: 'Run fresh demo (cilantro → confirm)',
+  recordAnalyzeFailedTitle: 'Photo analysis failed',
+  recordAnalyzeFailedBody:
+    'Could not read this photo. Check your connection, try a clearer shot, or run a demo without a photo.',
+  photoNeedPermission: 'Allow camera or photo library access to continue.',
   recordItemName: 'Item name',
   recordItemPlaceholder: 'Try “2 buckets of mayo” or “cilantro”…',
   voiceDictateLabel: 'Dictate fridge walk-through',

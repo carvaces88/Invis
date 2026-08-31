@@ -15,6 +15,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RootStackParamList } from '../data/types';
 import { useI18n } from '../i18n';
 import { alertInfo } from '../lib/alertAck';
+import {
+  persistPickerAsset,
+  visionPickerOptions,
+} from '../lib/persistImageUri';
 import { analyzePriorStockListImages } from '../lib/vision';
 import { colors, radius, spacing } from '../theme/colors';
 
@@ -45,21 +49,28 @@ export function SheetImportScanScreen() {
       return;
     }
     if (fromCamera) {
-      const result = await ImagePicker.launchCameraAsync({ quality: 0.85 });
+      const result = await ImagePicker.launchCameraAsync(
+        visionPickerOptions({ quality: 0.85 }),
+      );
       if (!result.canceled && result.assets[0]) {
-        setUris((prev) => [...prev, result.assets[0].uri].slice(0, MAX_PHOTOS));
+        const uri = await persistPickerAsset(result.assets[0]);
+        setUris((prev) => [...prev, uri].slice(0, MAX_PHOTOS));
       }
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      quality: 0.85,
-      allowsMultipleSelection: true,
-      selectionLimit: remaining,
-    });
+    const result = await ImagePicker.launchImageLibraryAsync(
+      visionPickerOptions({
+        quality: 0.85,
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
+      }),
+    );
     if (!result.canceled && result.assets.length) {
-      setUris((prev) =>
-        [...prev, ...result.assets.map((a) => a.uri)].slice(0, MAX_PHOTOS),
-      );
+      const next: string[] = [];
+      for (const asset of result.assets) {
+        next.push(await persistPickerAsset(asset));
+      }
+      setUris((prev) => [...prev, ...next].slice(0, MAX_PHOTOS));
     }
   }
 

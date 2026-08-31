@@ -99,9 +99,10 @@ export async function analyzeFridgePanoramaImage(
   if (isRealImageUri(imageUri)) {
     try {
       return await analyzeFridgeShelfWithGemini(imageUri, trimmed);
-    } catch {
-      // No key / proxy down — fall back to stub demos for fridge walkthroughs
-      return stubFridge(imageUri, trimmed);
+    } catch (err) {
+      // Real photos must not silently become mayo/cilantro stub demos.
+      const msg = err instanceof Error ? err.message : 'Fridge vision failed';
+      throw new Error(msg);
     }
   }
   // demo-fresh, cilantro, mayo demos, etc.

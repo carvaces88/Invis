@@ -267,6 +267,10 @@ export const fi: Messages = {
   recordAnalyzeFridgeDemo: 'Aja hyllydemo (majoneesi → vahvistus)',
   recordAnalyzeFridgeFreshDemo: 'Aja tuoredemo (korianteri → vahvistus)',
   recordAnalyzeFreshDemo: 'Aja tuoredemo (korianteri → vahvistus)',
+  recordAnalyzeFailedTitle: 'Kuvan analyysi epäonnistui',
+  recordAnalyzeFailedBody:
+    'Kuvaa ei voitu lukea. Tarkista yhteys, kokeile selkeämpää kuvaa tai aja demo ilman kuvaa.',
+  photoNeedPermission: 'Salli kamera tai kuvakirjasto jatkaaksesi.',
   recordItemName: 'Tuotenimi',
   recordItemPlaceholder: 'Kokeile “2 ämpäriä majoa” tai “cilantro”…',
   voiceDictateLabel: 'Sanele kylmiökävely',

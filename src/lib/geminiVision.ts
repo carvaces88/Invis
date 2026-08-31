@@ -232,9 +232,21 @@ export async function imageUriToPayload(uri: string): Promise<ImagePayload> {
     uri.startsWith('https://') ||
     uri.startsWith('blob:')
   ) {
-    const res = await fetch(uri);
+    let res: Response;
+    try {
+      res = await fetch(uri);
+    } catch (err) {
+      throw new Error(
+        err instanceof Error
+          ? `Could not read photo (${err.message}). Try picking the image again.`
+          : 'Could not read photo. Try picking the image again.',
+      );
+    }
     if (!res.ok) throw new Error(`Failed to fetch image (${res.status})`);
     const buf = await res.arrayBuffer();
+    if (!buf.byteLength) {
+      throw new Error('Photo file was empty. Try picking the image again.');
+    }
     const base64 = bytesToBase64(new Uint8Array(buf));
     const mime =
       res.headers.get('content-type')?.split(';')[0]?.trim() ||
@@ -715,20 +727,38 @@ async function callVisionFridgeProxy(
   proxyUrl: string,
   hint?: string,
 ): Promise<DocumentExtract> {
-  const res = await fetch(proxyUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({
-      mode: 'fridge',
-      hint: hint?.trim() || undefined,
-      images: payloads.map((p) => ({
-        mimeType: p.mimeType,
-        base64: p.base64,
-      })),
-      model: getGeminiModel(),
-    }),
-  });
-  const body = (await res.json()) as DocumentExtract & { error?: string };
+  let res: Response;
+  try {
+    res = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({
+        mode: 'fridge',
+        hint: hint?.trim() || undefined,
+        images: payloads.map((p) => ({
+          mimeType: p.mimeType,
+          base64: p.base64,
+        })),
+        model: getGeminiModel(),
+      }),
+    });
+  } catch (err) {
+    throw new Error(
+      err instanceof Error
+        ? `Vision proxy unreachable: ${err.message}`
+        : 'Vision proxy unreachable',
+    );
+  }
+  let body: DocumentExtract & { error?: string };
+  try {
+    body = (await res.json()) as DocumentExtract & { error?: string };
+  } catch {
+    throw new Error(
+      res.status === 413
+        ? 'Photo too large for vision proxy — try a wider shot from farther away, or a closer crop of one shelf'
+        : `Vision proxy returned non-JSON (${res.status})`,
+    );
+  }
   if (!res.ok) {
     throw new Error(body.error || `Vision proxy failed (${res.status})`);
   }

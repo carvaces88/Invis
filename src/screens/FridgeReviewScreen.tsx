@@ -100,7 +100,7 @@ function isSuggestedLine(extract: VisionExtract, match: ProductMatch | null) {
 }
 
 export function FridgeReviewScreen({ route, navigation }: Props) {
-  const { document, imageUri } = route.params;
+  const { document, imageUri, applied } = route.params;
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { yesChef } = useChefNudge();
@@ -115,37 +115,55 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
     setProductPackInfo,
   } = useInventory();
 
-  const initial = useMemo<ReviewLine[]>(
-    () =>
-      document.lines.map((extract, i) => {
-        // Always try inventory match first (incl. unrecognized / voice names).
-        let match = bestExtractMatch(products, extract);
-        if (match && visionContradictsProduct(extract, match.product)) {
-          match = null;
-        }
-        const suggested = isSuggestedLine(extract, match);
-        const resolvedExtract =
-          match && !suggested
-            ? { ...extract, unrecognized: false }
-            : extract;
-        return {
-          key: `f-${i}-${extract.suggestedName}`,
-          extract: resolvedExtract,
-          // Keep match for suggested only when staff can still pick it; empty
-          // unrecognized crops without a hit stay match-less.
-          match:
-            suggested && !(match && isTextNamedLine(extract))
-              ? null
-              : match,
-          qty:
-            extract.quantity != null ? String(extract.quantity) : '1',
-          status: 'pending' as LineStatus,
-          isSuggested: suggested,
-        };
-      }),
+  const initial = useMemo<ReviewLine[]>(() => {
+    const base = document.lines.map((extract, i) => {
+      // Always try inventory match first (incl. unrecognized / voice names).
+      let match = bestExtractMatch(products, extract);
+      if (match && visionContradictsProduct(extract, match.product)) {
+        match = null;
+      }
+      const suggested = isSuggestedLine(extract, match);
+      const resolvedExtract =
+        match && !suggested
+          ? { ...extract, unrecognized: false }
+          : extract;
+      return {
+        key: `f-${i}-${extract.suggestedName}`,
+        extract: resolvedExtract,
+        // Keep match for suggested only when staff can still pick it; empty
+        // unrecognized crops without a hit stay match-less.
+        match:
+          suggested && !(match && isTextNamedLine(extract))
+            ? null
+            : match,
+        qty: extract.quantity != null ? String(extract.quantity) : '1',
+        status: 'pending' as LineStatus,
+        isSuggested: suggested,
+      };
+    });
+    if (!applied?.lineKey || !applied.productId) return base;
+    const product = products.find((p) => p.id === applied.productId);
+    if (!product) return base;
+    return base.map((l) => {
+      if (l.key !== applied.lineKey) return l;
+      const qty =
+        applied.quantity != null ? String(applied.quantity) : l.qty;
+      return {
+        ...l,
+        qty,
+        match: {
+          product,
+          score: 1,
+          matchedOn: 'official' as const,
+          matchedTerm: product.officialName,
+        },
+        status: 'confirmed' as LineStatus,
+        isSuggested: false,
+        extract: { ...l.extract, unrecognized: false },
+      };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [document],
-  );
+  }, [document, applied?.lineKey, applied?.productId]);
 
   const [lines, setLines] = useState(initial);
   const [detailsKey, setDetailsKey] = useState<string | null>(null);
@@ -294,6 +312,11 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
     ]
       .filter(Boolean)
       .join(' · ');
+    const qtyNum = Number(line.qty.replace(',', '.'));
+    const quantity =
+      !Number.isNaN(qtyNum) && qtyNum >= 0
+        ? qtyNum
+        : (line.extract.quantity ?? 1);
     navigation.navigate('AddProduct', {
       prefillName: name || description.slice(0, 60),
       unit: line.extract.unit ?? undefined,
@@ -309,11 +332,13 @@ export function FridgeReviewScreen({ route, navigation }: Props) {
       photoUris: imageUri ? [imageUri] : undefined,
       returnToFridge: true,
       fridgeDocument: document,
+      fridgeLineKey: line.key,
       imageUri,
       extract: {
         ...line.extract,
         suggestedName: name || line.extract.suggestedName,
         aiDescription: description,
+        quantity,
       },
     });
   }

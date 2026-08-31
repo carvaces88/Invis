@@ -39,6 +39,10 @@ import {
 } from '../lib/fuzzyMatch';
 import { resolveCountPhrase } from '../lib/priorStockCrossRef';
 import {
+  persistPickerAsset,
+  visionPickerOptions,
+} from '../lib/persistImageUri';
+import {
   baseUnitLabelEn,
   baseUnitLabelFi,
   friendlyOptionForBaseUnit,
@@ -132,19 +136,23 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
     const perm = fromCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      alertInfo(
+        t('recordAnalyzeFailedTitle'),
+        t('photoNeedPermission'),
+      );
+      return;
+    }
 
     const result = fromCamera
-      ? await ImagePicker.launchCameraAsync({
-          quality: 0.7,
-          allowsEditing: false,
-        })
-      : await ImagePicker.launchImageLibraryAsync({
-          quality: 0.7,
-          allowsEditing: false,
-        });
+      ? await ImagePicker.launchCameraAsync(visionPickerOptions())
+      : await ImagePicker.launchImageLibraryAsync(visionPickerOptions());
     if (!result.canceled && result.assets[0]) {
-      setUri(result.assets[0].uri);
+      try {
+        setUri(await persistPickerAsset(result.assets[0]));
+      } catch {
+        setUri(result.assets[0].uri);
+      }
     }
   }
 
@@ -200,8 +208,8 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
     } catch (e) {
       thinkingChef(false);
       alertInfo(
-        t('addProductAnalyzeFailedTitle'),
-        e instanceof Error ? e.message : t('addProductAnalyzeFailedBody'),
+        t('recordAnalyzeFailedTitle'),
+        e instanceof Error ? e.message : t('recordAnalyzeFailedBody'),
       );
     } finally {
       thinkingChef(false);

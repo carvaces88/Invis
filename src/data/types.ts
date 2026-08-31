@@ -362,6 +362,8 @@ export type RootStackParamList = {
     document?: DocumentExtract;
     returnToFridge?: boolean;
     fridgeDocument?: DocumentExtract;
+    /** FridgeReview line key to mark confirmed after catalog add */
+    fridgeLineKey?: string;
     /** Set by BarcodeScanScreen when returning with EAN prefill */
     scannedEan?: string;
     barcodeEnrichNotes?: string;
@@ -407,5 +409,11 @@ export type RootStackParamList = {
   FridgeReview: {
     document: DocumentExtract;
     imageUri?: string;
+    /** After Add Product from a fridge line — mark that line confirmed */
+    applied?: {
+      lineKey: string;
+      productId: string;
+      quantity?: number;
+    };
   };
 };

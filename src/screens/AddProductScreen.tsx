@@ -36,6 +36,10 @@ import {
 } from '../lib/productEnrichment';
 import { isBareEanLabel } from '../lib/packaging';
 import { IDENTITY_MATCH_MIN } from '../lib/fuzzyMatch';
+import {
+  persistPickerAsset,
+  visionPickerOptions,
+} from '../lib/persistImageUri';
 import { isLiveVisionEnabled } from '../lib/vision';
 import { colors, radius, spacing } from '../theme/colors';
 
@@ -50,11 +54,27 @@ function initialPhotos(params: Props['route']['params']): string[] {
   return [];
 }
 
+function stockQtyFromExtract(
+  extract: { quantity?: number | null } | undefined,
+): number | undefined {
+  if (!extract) return undefined;
+  const q = extract.quantity;
+  if (typeof q === 'number' && Number.isFinite(q) && q >= 0) return q;
+  return undefined;
+}
+
 export function AddProductScreen({ route, navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
-  const { products, addProduct, addProductAlias, lastRecordUnit, setLastRecordUnit } =
-    useInventory();
+  const {
+    products,
+    addProduct,
+    addProductAlias,
+    addQuantity,
+    activePlaceId,
+    lastRecordUnit,
+    setLastRecordUnit,
+  } = useInventory();
   const {
     prefillName,
     unit: prefUnit,
@@ -74,9 +94,15 @@ export function AddProductScreen({ route, navigation }: Props) {
     document,
     returnToFridge,
     fridgeDocument,
+    fridgeLineKey,
     scannedEan,
     barcodeEnrichNotes,
   } = route.params ?? {};
+
+  const inventoryFlow = Boolean(
+    returnToConfirm || returnToFridge || returnToBatch,
+  );
+  const stockQty = stockQtyFromExtract(extract);
 
   const [photoUris, setPhotoUris] = useState<string[]>(() =>
     initialPhotos(route.params),
@@ -202,16 +228,28 @@ export function AddProductScreen({ route, navigation }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- react to barcode return only
   }, [scannedEan]);
 
-  function navigateAfterSave() {
+  function navigateAfterSave(saved?: {
+    productId: string;
+    quantity?: number;
+  }) {
     if (returnToFridge && fridgeDocument) {
       navigation.replace('FridgeReview', {
         document: fridgeDocument,
         imageUri,
+        applied:
+          fridgeLineKey && saved?.productId
+            ? {
+                lineKey: fridgeLineKey,
+                productId: saved.productId,
+                quantity: saved.quantity,
+              }
+            : undefined,
       });
     } else if (returnToBatch && document) {
       navigation.replace('BatchConfirm', { document, imageUri });
-    } else if (returnToConfirm && extract) {
-      navigation.replace('Confirm', { extract, imageUri });
+    } else if (returnToConfirm) {
+      // Quantity already written — open Inventory tab so stock is visible
+      navigation.navigate('MainTabs', { screen: 'Inventaario' });
     } else {
       navigation.goBack();
     }
@@ -221,7 +259,10 @@ export function AddProductScreen({ route, navigation }: Props) {
     const perm = fromCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      alertInfo(t('addProductAnalyzeFailedTitle'), t('photoNeedPermission'));
+      return;
+    }
 
     const remaining = MAX_PHOTOS - photoUris.length;
     if (remaining <= 0) {
@@ -230,27 +271,30 @@ export function AddProductScreen({ route, navigation }: Props) {
     }
 
     if (fromCamera) {
-      const result = await ImagePicker.launchCameraAsync({
-        quality: 0.75,
-        allowsEditing: false,
-      });
+      const result = await ImagePicker.launchCameraAsync(
+        visionPickerOptions(),
+      );
       if (!result.canceled && result.assets[0]) {
-        setPhotoUris((prev) => [...prev, result.assets[0].uri].slice(0, MAX_PHOTOS));
+        const uri = await persistPickerAsset(result.assets[0]);
+        setPhotoUris((prev) => [...prev, uri].slice(0, MAX_PHOTOS));
         setEnrichNotes(null);
       }
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      quality: 0.75,
-      allowsEditing: false,
-      allowsMultipleSelection: true,
-      selectionLimit: remaining,
-    });
+    const result = await ImagePicker.launchImageLibraryAsync(
+      visionPickerOptions({
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
+        quality: 0.75,
+      }),
+    );
     if (!result.canceled && result.assets.length) {
-      setPhotoUris((prev) =>
-        [...prev, ...result.assets.map((a) => a.uri)].slice(0, MAX_PHOTOS),
-      );
+      const next: string[] = [];
+      for (const asset of result.assets) {
+        next.push(await persistPickerAsset(asset));
+      }
+      setPhotoUris((prev) => [...prev, ...next].slice(0, MAX_PHOTOS));
       setEnrichNotes(null);
     }
   }
@@ -312,6 +356,8 @@ export function AddProductScreen({ route, navigation }: Props) {
     ) {
       aliases.push(brandTrim);
     }
+    // Inventory photo/fridge flows must write quantity or Inventaario hides the row.
+    const initialQuantity = inventoryFlow ? (stockQty ?? 1) : stockQty;
     const product = addProduct({
       officialName: name,
       unit,
@@ -322,9 +368,15 @@ export function AddProductScreen({ route, navigation }: Props) {
       ean: ean.trim() || undefined,
       sourceUrl: sourceUrl.trim() || undefined,
       imageUrl: imageUrl.trim() || photoUris[0] || undefined,
+      initialQuantity,
     });
     setLastRecordUnit(unit);
-    alertAck(t('recordSavedTitle'), product.officialName, navigateAfterSave);
+    alertAck(t('recordSavedTitle'), product.officialName, () =>
+      navigateAfterSave({
+        productId: product.id,
+        quantity: initialQuantity ?? undefined,
+      }),
+    );
   }
 
   function save() {
@@ -354,12 +406,25 @@ export function AddProductScreen({ route, navigation }: Props) {
     const typed = didYouMean.name;
     const added = addProductAlias(match.product.id, typed);
     setDidYouMean(null);
+    const qty = inventoryFlow ? (stockQty ?? 1) : undefined;
+    if (qty != null) {
+      addQuantity({
+        productId: match.product.id,
+        delta: qty,
+        placeId: activePlaceId,
+      });
+    }
     const msg = added
       ? t('didYouMeanAliasAdded')
           .replace('{alias}', typed)
           .replace('{product}', match.product.officialName)
       : match.product.officialName;
-    alertAck(t('recordSavedTitle'), msg, navigateAfterSave);
+    alertAck(t('recordSavedTitle'), msg, () =>
+      navigateAfterSave({
+        productId: match.product.id,
+        quantity: qty,
+      }),
+    );
   }
 
   return (
