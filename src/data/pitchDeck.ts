@@ -5,7 +5,7 @@
 
 export const pitchMeta = {
   brand: 'INVIS',
-  tagline: 'Kitchen Inventory & Recipe Costing Engine',
+  tagline: 'Kitchen inventory made simple',
   presentationLabel: 'Investor Pitch Deck',
   audience:
     'Full-service restaurant kitchens, head chefs, kitchen managers, and multi-concept restaurant groups.',
@@ -13,10 +13,10 @@ export const pitchMeta = {
 
 export const pitchVision = {
   headline: 'Our solution',
-  body: "Become Europe's premier AI-powered kitchen operations and recipe-costing engine. INVIS eliminates food waste, automates ingredient reordering, protects menu gross margins against food inflation, and saves Head Chefs 10+ hours of admin work weekly.",
+  body: "Become Europe's premier AI-powered kitchen inventory app. INVIS replaces clipboard inventaario with photo → match → confirm counting, cuts food waste admin, and exports Restolution-ready sheets — saving Head Chefs 10+ hours of stock work weekly.",
   vsLegacyTitle: 'vs legacy software',
   vsLegacy:
-    'Legacy kitchen systems (MarketMan, Restaurant365) are desktop-heavy, clunky, and require months of onboarding. INVIS is built for prep-room speed: mobile counting, yield and prep math, dynamic recipe costing, and connections to regional food distributors and Nordic e-invoicing.',
+    'Legacy kitchen systems (MarketMan, Restaurant365) are desktop-heavy, clunky, and require months of onboarding. INVIS is built for prep-room speed: mobile counting, delivery & waste lists, POS-ready exports, and Nordic distributor price checks.',
   legacyBullets: [
     'Desktop-heavy UIs',
     'Months of onboarding',
