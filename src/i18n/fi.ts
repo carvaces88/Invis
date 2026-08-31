@@ -344,6 +344,19 @@ export const fi: Messages = {
   foodWasteHistory: 'Hävikkihistoria',
   videoDemo: 'Videodemo',
   videoDemoSub: 'Maksullinen live-kävelytys (stub)',
+  videoDemoSubPro: 'Pro auki · live-kävelytys',
+  videoDemoLockedKicker: 'Maksullinen demo · ei ilmaisessa / kokeilussa',
+  videoDemoUnlockedKicker: 'Pro auki',
+  videoDemoScreenTitle: 'Live-kamerakävelytys',
+  videoDemoLockedBody:
+    'Myöhemmin: ruudut + ääni kylmiön kierroksella. Kustannus skaalautuu minuuteilla, joten tämä pysyy maksullisen lipun takana. Kuva-analyysi on oletuspolku.',
+  videoDemoUnlockedBody:
+    'Pro on auki tällä istunnolla. Kokeile live-kävelytystä — kuva-analyysi pysyy arjen keittiöpolkuna.',
+  videoDemoStatusTitle: 'Tila',
+  videoDemoStatusOn: 'Videoanalyysi auki tällä kirjautumisella',
+  videoDemoStatusOff:
+    'Lukittu ilmaisessa / kokeilussa — vaatii päivityksen tai investor-pääsyn',
+  videoDemoBack: 'Takaisin kuva-analyysiin',
   priceCompareTitle: 'Hintaverttailu',
   priceCompareSub: 'Oma 0 % ALV vs kilpailijoiden hylly- ja tukkuhinnat',
   priceCompareIntro:
@@ -796,5 +809,14 @@ export const fi: Messages = {
   adminVenue: 'Toimipiste',
   adminRoleKitchen: 'Keittiö',
   adminRoleTester: 'Testaaja',
+  adminRoleInvestor: 'Sijoittaja',
   adminRefresh: 'Päivitä',
+  pitchDeckTitle: 'Sijoittajapitch',
+  pitchDeckMoreSub: 'Markkina, positio, ROI — luottamuksellinen.',
+  tractionDeckTitle: 'Live-traction',
+  tractionDeckMoreSub: 'Nykyinen käyttäjämäärä tervetuloaportista.',
+  tractionDeckSub:
+    'Uniikit henkilöt, jotka ovat avanneet Invisin. Nimet ja toimipisteet pysyvät piilossa tällä näkymällä.',
+  tractionUsersLabel: 'Nykyiset käyttäjät',
+  tractionEntriesMeta: '{n} porttikirjausta tässä otoksessa',
 };

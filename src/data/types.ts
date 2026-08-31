@@ -393,8 +393,10 @@ export type RootStackParamList = {
   InventoryPhotos: undefined;
   /** Optional feedback / comments (strongly nudged after sign-in) */
   Feedback: { nudged?: boolean } | undefined;
-  /** Cesar / Elena / Ivan: people, sign-ins, feedback */
+  /** Cesar: full people / feedback; investor: user-count traction only */
   AdminDeck: undefined;
+  /** Investor pitch deck (also previewable by Cesar) */
+  PitchDeck: undefined;
   /** Catalog product detail (identity + inventory price + distributor lookups) */
   ProductDetail: { productId: string };
   /** Compare inventory 0% ALV vs competitor / distributor shelf prices */

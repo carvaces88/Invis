@@ -45,6 +45,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
       Places: 'places',
       Feedback: 'feedback',
       AdminDeck: 'admin',
+      PitchDeck: 'pitch',
     },
   },
 };

@@ -83,7 +83,10 @@ export function SignInScreen() {
             placeholderTextColor={colors.inkFaint}
             style={styles.input}
             editable={!busy}
-            returnKeyType="next"
+            returnKeyType={bypass ? 'go' : 'next'}
+            onSubmitEditing={() => {
+              if (bypass && canSubmit && !busy) void onSubmit();
+            }}
           />
 
           {!bypass ? (
@@ -118,7 +121,9 @@ export function SignInScreen() {
                 style={styles.input}
                 editable={!busy}
                 returnKeyType="go"
-                onSubmitEditing={onSubmit}
+                onSubmitEditing={() => {
+                  if (canSubmit && !busy) void onSubmit();
+                }}
               />
             </>
           ) : (
@@ -133,10 +138,26 @@ export function SignInScreen() {
               pressed && styles.pressed,
               (busy || !canSubmit) && styles.btnDisabled,
             ]}
-            onPress={onSubmit}
+            onPress={() => {
+              if (!busy && canSubmit) void onSubmit();
+            }}
             disabled={busy || !canSubmit}
             accessibilityRole="button"
             accessibilityLabel={t('gateSubmit')}
+            // RN-web: help automation / keyboard activate the gate
+            {...(Platform.OS === 'web'
+              ? ({
+                  // @ts-expect-error RN-web DOM props
+                  role: 'button',
+                  tabIndex: 0,
+                  onKeyDown: (e: { key?: string; preventDefault?: () => void }) => {
+                    if (e?.key === 'Enter' || e?.key === ' ') {
+                      e.preventDefault?.();
+                      if (!busy && canSubmit) void onSubmit();
+                    }
+                  },
+                } as object)
+              : null)}
           >
             {busy ? (
               <ActivityIndicator color="#fff" />

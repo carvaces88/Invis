@@ -12,6 +12,7 @@ import {
   isAdminName,
   isBetaTesterName,
   isGateBypassName,
+  isInvestorName,
   isKitchenName,
   isMasterName,
   isValidEmail,
@@ -25,7 +26,7 @@ export type GateSession = {
   name: string;
   venue: string | null;
   email: string | null;
-  kind: 'kitchen' | 'tester';
+  kind: 'kitchen' | 'tester' | 'investor';
   enteredAt: string;
 };
 
@@ -47,6 +48,10 @@ type AuthContextValue = {
   } | null;
   isAdmin: boolean;
   isMaster: boolean;
+  /** Investor walkthrough login */
+  isInvestor: boolean;
+  /** Pro features (video walkthrough, etc.) — unlocked for investors */
+  isPro: boolean;
   configured: boolean;
   justSignedIn: boolean;
   clearJustSignedIn: () => void;
@@ -59,7 +64,10 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function toProfile(session: GateSession) {
-  const known = isKitchenName(session.name) || isBetaTesterName(session.name);
+  const known =
+    isKitchenName(session.name) ||
+    isBetaTesterName(session.name) ||
+    isInvestorName(session.name);
   return {
     username: session.name.toLowerCase(),
     displayName: known ? displayKitchenName(session.name) : session.name,
@@ -116,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const kitchen = isKitchenName(name);
     const beta = isBetaTesterName(name);
+    const investor = isInvestorName(name);
     const bypass = isGateBypassName(name);
     const venue = normalizeGateName(input.venue ?? '') || null;
     const emailRaw = (input.email ?? '').trim();
@@ -137,10 +146,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const next: GateSession = {
-      name: kitchen || beta ? displayKitchenName(name) : name,
+      name:
+        kitchen || beta || investor ? displayKitchenName(name) : name,
       venue: bypass ? null : venue,
       email: bypass ? null : email,
-      kind: kitchen ? 'kitchen' : 'tester',
+      kind: kitchen ? 'kitchen' : investor ? 'investor' : 'tester',
       enteredAt: new Date().toISOString(),
     };
 
@@ -165,6 +175,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const profile = session ? toProfile(session) : null;
 
+  const isInvestor = session ? isInvestorName(session.name) : false;
+
   const value = useMemo<AuthContextValue>(
     () => ({
       ready,
@@ -172,13 +184,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       isAdmin: profile?.role === 'admin',
       isMaster: session ? isMasterName(session.name) : false,
+      isInvestor,
+      isPro: isInvestor,
       configured: true,
       justSignedIn,
       clearJustSignedIn,
       enter,
       signOut,
     }),
-    [ready, session, profile, justSignedIn, clearJustSignedIn, enter, signOut],
+    [
+      ready,
+      session,
+      profile,
+      isInvestor,
+      justSignedIn,
+      clearJustSignedIn,
+      enter,
+      signOut,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

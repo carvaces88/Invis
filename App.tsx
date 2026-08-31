@@ -35,6 +35,7 @@ import { KuormaScanScreen } from './src/screens/KuormaScanScreen';
 import { MoreScreen } from './src/screens/MoreScreen';
 import { MonthWrapUpScreen } from './src/screens/MonthWrapUpScreen';
 import { PlacesScreen } from './src/screens/PlacesScreen';
+import { PitchDeckScreen } from './src/screens/PitchDeckScreen';
 import { PriceComparisonScreen } from './src/screens/PriceComparisonScreen';
 import { ProductDetailScreen } from './src/screens/ProductDetailScreen';
 import { ProductScanScreen } from './src/screens/ProductScanScreen';
@@ -444,6 +445,15 @@ function RootNavigator() {
           component={AdminDeckScreen}
           options={{
             title: t('masterDeckTitle'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="PitchDeck"
+          component={PitchDeckScreen}
+          options={{
+            title: t('pitchDeckTitle'),
             headerTintColor: colors.primary,
             headerStyle: { backgroundColor: colors.bg },
           }}

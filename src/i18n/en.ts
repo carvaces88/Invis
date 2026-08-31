@@ -348,6 +348,19 @@ export const en = {
   foodWasteHistory: 'Food waste history',
   videoDemo: 'Video demo',
   videoDemoSub: 'Paid live walkthrough stub',
+  videoDemoSubPro: 'Pro unlocked · live walkthrough',
+  videoDemoLockedKicker: 'Paid demo · not in free/trial',
+  videoDemoUnlockedKicker: 'Pro unlocked',
+  videoDemoScreenTitle: 'Live camera walkthrough',
+  videoDemoLockedBody:
+    'Later: stream frames + voice while walking the walk-in. Costs scale with session minutes, so this stays behind a paid flag. Image scan remains the default path.',
+  videoDemoUnlockedBody:
+    'Pro access is on for this session. Try the live walkthrough path — image scan remains available as the everyday kitchen flow.',
+  videoDemoStatusTitle: 'Status',
+  videoDemoStatusOn: 'Video analysis unlocked for this login',
+  videoDemoStatusOff:
+    'Locked on free/trial — upgrade or investor access required',
+  videoDemoBack: 'Back to photo scan',
   priceCompareTitle: 'Price comparison',
   priceCompareSub: 'Our 0% ALV vs competitor shelf & tukku prices',
   priceCompareIntro:
@@ -799,7 +812,16 @@ export const en = {
   adminVenue: 'Venue',
   adminRoleKitchen: 'Kitchen',
   adminRoleTester: 'Tester',
+  adminRoleInvestor: 'Investor',
   adminRefresh: 'Refresh',
+  pitchDeckTitle: 'Investor pitch deck',
+  pitchDeckMoreSub: 'Market, positioning, ROI — confidential walkthrough.',
+  tractionDeckTitle: 'Live traction',
+  tractionDeckMoreSub: 'Current user count from the welcome gate.',
+  tractionDeckSub:
+    'Unique people who have entered Invis. Names and venues stay private on this view.',
+  tractionUsersLabel: 'Current users',
+  tractionEntriesMeta: '{n} gate entries in this sample',
 } as const;
 
 export type MessageKey = keyof typeof en;

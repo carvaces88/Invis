@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -87,16 +87,32 @@ function buildLocations(entries: EntryRow[]): LocationRow[] {
     .sort((a, b) => b.visits - a.visits || a.venue.localeCompare(b.venue));
 }
 
-export function AdminDeckScreen(_props: Props) {
+function uniqueUserCount(entries: EntryRow[]): number {
+  const keys = new Set(
+    entries.map((e) => e.name.trim().toLowerCase()).filter(Boolean),
+  );
+  return keys.size;
+}
+
+export function AdminDeckScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { t, locale } = useI18n();
-  const { isMaster } = useAuth();
+  const { isMaster, isInvestor } = useAuth();
+  const tractionOnly = isInvestor && !isMaster;
+  const canView = isMaster || isInvestor;
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<EntryRow[]>([]);
   const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const locations = useMemo(() => buildLocations(entries), [entries]);
+  const users = useMemo(() => uniqueUserCount(entries), [entries]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: tractionOnly ? t('tractionDeckTitle') : t('masterDeckTitle'),
+    });
+  }, [navigation, t, tractionOnly]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -105,11 +121,29 @@ export function AdminDeckScreen(_props: Props) {
       setLoading(false);
       return;
     }
-    if (!isMaster) {
+    if (!canView) {
       setError(t('masterDeckDenied'));
       setLoading(false);
       return;
     }
+
+    if (tractionOnly) {
+      const e = await supabase
+        .from('app_entries')
+        .select('id, name, venue, email, kind, created_at')
+        .order('created_at', { ascending: false })
+        .limit(500);
+      if (e.error) {
+        setError(e.error.message || 'Load failed');
+        setEntries([]);
+      } else {
+        setEntries(e.data ?? []);
+      }
+      setFeedback([]);
+      setLoading(false);
+      return;
+    }
+
     const [e, f] = await Promise.all([
       supabase
         .from('app_entries')
@@ -129,7 +163,7 @@ export function AdminDeckScreen(_props: Props) {
       setFeedback(f.data ?? []);
     }
     setLoading(false);
-  }, [isMaster, t]);
+  }, [canView, tractionOnly, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -137,6 +171,46 @@ export function AdminDeckScreen(_props: Props) {
       void load();
     }, [load]),
   );
+
+  if (tractionOnly) {
+    return (
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.md,
+          paddingBottom: insets.bottom + spacing.xl,
+        }}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={() => void load()} />
+        }
+      >
+        <Text style={styles.lead}>{t('tractionDeckSub')}</Text>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <View style={styles.tractionCard}>
+          {loading && entries.length === 0 ? (
+            <ActivityIndicator color={colors.accent} style={{ marginVertical: 24 }} />
+          ) : (
+            <>
+              <Text style={styles.tractionNum}>{users}</Text>
+              <Text style={styles.tractionLabel}>{t('tractionUsersLabel')}</Text>
+              <Text style={styles.tractionMeta}>
+                {t('tractionEntriesMeta').replace(
+                  '{n}',
+                  String(entries.length),
+                )}
+              </Text>
+            </>
+          )}
+        </View>
+
+        <Pressable onPress={() => void load()} style={styles.refreshBtn}>
+          <Text style={styles.refreshTextAccent}>{t('adminRefresh')}</Text>
+        </Pressable>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView
@@ -190,7 +264,9 @@ export function AdminDeckScreen(_props: Props) {
               <Text style={styles.badge}>
                 {row.kind === 'kitchen'
                   ? t('adminRoleKitchen')
-                  : t('adminRoleTester')}
+                  : row.kind === 'investor'
+                    ? t('adminRoleInvestor')
+                    : t('adminRoleTester')}
               </Text>
             </View>
             {row.venue ? (
@@ -252,6 +328,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F0D9A8',
   },
+  tractionCard: {
+    backgroundColor: colors.accent,
+    borderRadius: radius.xl,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  tractionNum: {
+    fontSize: 64,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: -2,
+  },
+  tractionLabel: {
+    marginTop: spacing.sm,
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.95)',
+  },
+  tractionMeta: {
+    marginTop: spacing.sm,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+  },
   rowTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -285,4 +386,5 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, marginBottom: spacing.md },
   refreshBtn: { alignSelf: 'center', marginTop: spacing.lg, padding: 12 },
   refreshText: { color: colors.warning, fontWeight: '700' },
+  refreshTextAccent: { color: colors.accent, fontWeight: '700' },
 });
