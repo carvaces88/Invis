@@ -32,7 +32,15 @@ import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SheetImportReview'>;
 
-type SortMode = 'sheet' | 'az' | 'za' | 'qty';
+type SortMode =
+  | 'sheet'
+  | 'az'
+  | 'za'
+  | 'qty'
+  | 'priceAsc'
+  | 'priceDesc'
+  | 'totalAsc'
+  | 'totalDesc';
 
 type DraftRow = {
   key: string;
@@ -348,6 +356,28 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
 
   const sortedDrafts = useMemo(() => {
     const rows = [...drafts];
+    const lineTotal = (d: DraftRow) => {
+      const q = parseFiNumber(d.qty);
+      const p = parseFiNumber(d.price);
+      if (q == null || p == null) return null;
+      return Math.round(q * p * 100) / 100;
+    };
+    const byNum = (
+      get: (d: DraftRow) => number | null,
+      dir: 1 | -1,
+    ) =>
+      rows.sort((a, b) => {
+        const av = get(a);
+        const bv = get(b);
+        const aMissing = av == null ? 1 : 0;
+        const bMissing = bv == null ? 1 : 0;
+        if (aMissing !== bMissing) return aMissing - bMissing;
+        if (av != null && bv != null && av !== bv) {
+          return (av - bv) * dir;
+        }
+        return a.name.localeCompare(b.name, 'fi', { sensitivity: 'base' });
+      });
+
     if (sortMode === 'sheet') {
       return rows.sort((a, b) => a.index - b.index);
     }
@@ -361,10 +391,26 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
         b.name.localeCompare(a.name, 'fi', { sensitivity: 'base' }),
       );
     }
+    if (sortMode === 'priceAsc') {
+      return byNum((d) => parseFiNumber(d.price), 1);
+    }
+    if (sortMode === 'priceDesc') {
+      return byNum((d) => parseFiNumber(d.price), -1);
+    }
+    if (sortMode === 'totalAsc') {
+      return byNum(lineTotal, 1);
+    }
+    if (sortMode === 'totalDesc') {
+      return byNum(lineTotal, -1);
+    }
+    // qty: filled first, then by name
     return rows.sort((a, b) => {
       const aQ = a.qty.trim() ? 0 : 1;
       const bQ = b.qty.trim() ? 0 : 1;
       if (aQ !== bQ) return aQ - bQ;
+      const aq = parseFiNumber(a.qty) ?? 0;
+      const bq = parseFiNumber(b.qty) ?? 0;
+      if (aq !== bq) return bq - aq;
       return a.name.localeCompare(b.name, 'fi', { sensitivity: 'base' });
     });
   }, [drafts, sortMode]);
@@ -512,6 +558,10 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
               ['az', t('sheetImportSortAz')],
               ['za', t('sheetImportSortZa')],
               ['qty', t('sheetImportSortQty')],
+              ['priceAsc', t('sheetImportSortPriceAsc')],
+              ['priceDesc', t('sheetImportSortPriceDesc')],
+              ['totalAsc', t('sheetImportSortTotalAsc')],
+              ['totalDesc', t('sheetImportSortTotalDesc')],
             ] as const
           ).map(([mode, label]) => (
             <Pressable
