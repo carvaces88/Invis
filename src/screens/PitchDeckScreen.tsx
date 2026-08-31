@@ -284,9 +284,10 @@ function RoseChart({ pct, size = 88 }: { pct: number; size?: number }) {
 
 /** Stylized Finland silhouette + region % labels (choropleth-style) */
 function FinlandMap() {
+  const mapW = Math.min(Dimensions.get('window').width - spacing.lg * 2, 420);
   return (
     <View style={styles.mapFrame}>
-      <Svg width="100%" height={280} viewBox="0 0 200 320">
+      <Svg width={mapW} height={280} viewBox="0 0 200 320">
         {/* Simplified Finland outline */}
         <Path
           d="M95 12 L118 28 L125 55 L132 78 L128 105 L135 130 L130 155 L138 175 L125 195 L118 220 L108 245 L95 268 L78 285 L62 295 L48 288 L42 265 L38 240 L45 215 L40 190 L48 165 L42 140 L50 115 L45 90 L55 65 L70 40 L82 22 Z"

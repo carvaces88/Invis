@@ -1,12 +1,22 @@
 import React, { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthContext';
 import { InventoryValueModal } from '../components/InventoryValueModal';
 import { useInventory } from '../data/store';
-import type { RootStackParamList } from '../data/types';
+import type { MainTabParamList, RootStackParamList } from '../data/types';
 import { useI18n, type Locale } from '../i18n';
 import { alertAck, alertConfirm } from '../lib/alertAck';
 import { useUnitSystem, type UnitSystem } from '../lib/unitSystem';
@@ -14,15 +24,34 @@ import { colors, radius, shadows, spacing, surfaces } from '../theme/colors';
 
 const brandWordmark = require('../../assets/invis-wordmark.png');
 
+type MoreNav = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'More'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+
 export function MoreScreen() {
   const insets = useSafeAreaInsets();
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<MoreNav>();
   const { t, locale, setLocale } = useI18n();
   const { unitSystem, setUnitSystem } = useUnitSystem();
   const { clearAllInventory } = useInventory();
   const { profile, isMaster, isInvestor, isPro, signOut } = useAuth();
   const [valueOpen, setValueOpen] = useState(false);
+
+  const openRoot = (
+    route: keyof RootStackParamList,
+    params?: RootStackParamList[keyof RootStackParamList],
+  ) => {
+    // Prefer root stack navigation (More sits inside tabs).
+    const parent = navigation.getParent();
+    if (parent) {
+      // @ts-expect-error root stack route
+      parent.navigate(route, params);
+      return;
+    }
+    // @ts-expect-error root stack route
+    navigation.navigate(route, params);
+  };
 
   const items = [
     {
@@ -107,7 +136,7 @@ export function MoreScreen() {
 
       <Pressable
         style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-        onPress={() => navigation.navigate('Feedback', {})}
+        onPress={() => openRoot('Feedback', {})}
         accessibilityRole="button"
       >
         <Text style={styles.cardTitle}>{t('feedbackTitle')}</Text>
@@ -120,9 +149,19 @@ export function MoreScreen() {
             styles.pitchCard,
             pressed && styles.pressed,
           ]}
-          onPress={() => navigation.navigate('PitchDeck')}
+          onPress={() => openRoot('PitchDeck')}
           accessibilityRole="button"
           accessibilityLabel={t('pitchDeckTitle')}
+          {...(Platform.OS === 'web'
+            ? ({
+                role: 'link',
+                href: '/pitch',
+                onClick: (e: { preventDefault?: () => void }) => {
+                  e?.preventDefault?.();
+                  openRoot('PitchDeck');
+                },
+              } as object)
+            : null)}
         >
           <Text style={styles.pitchTitle}>{t('pitchDeckTitle')}</Text>
           <Text style={styles.pitchSub}>{t('pitchDeckMoreSub')}</Text>
@@ -132,7 +171,7 @@ export function MoreScreen() {
       {isMaster ? (
         <Pressable
           style={({ pressed }) => [styles.masterCard, pressed && styles.pressed]}
-          onPress={() => navigation.navigate('AdminDeck')}
+          onPress={() => openRoot('AdminDeck')}
           accessibilityRole="button"
           accessibilityLabel={t('masterDeckTitle')}
         >
@@ -147,7 +186,7 @@ export function MoreScreen() {
             styles.tractionCard,
             pressed && styles.pressed,
           ]}
-          onPress={() => navigation.navigate('AdminDeck')}
+          onPress={() => openRoot('AdminDeck')}
           accessibilityRole="button"
           accessibilityLabel={t('tractionDeckTitle')}
         >
