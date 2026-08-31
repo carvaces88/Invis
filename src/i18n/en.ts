@@ -474,6 +474,8 @@ export const en = {
   sheetImportMatchMeta: 'Matched {matched} · unmatched {unmatched}',
   sheetImportColName: 'Name',
   sheetImportColUnit: 'Unit',
+  sheetImportUnitPickTitle: 'Unit (YKSIKKÖ)',
+  sheetImportUnitPickSub: 'Pick box, bag, piece, kg… — not free text',
   sheetImportColQty: 'Qty',
   sheetImportColPrice: 'Price 0%',
   sheetImportColMatch: 'Catalog match',

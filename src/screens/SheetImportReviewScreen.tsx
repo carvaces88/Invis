@@ -13,6 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaceSelect } from '../components/PlaceSelect';
 import { useInventory } from '../data/store';
+import { UNIT_CODES, UNIT_GUIDE } from '../data/units';
 import type {
   Product,
   ProductMatch,
@@ -51,7 +52,7 @@ type DraftRow = {
   /** Best auto suggestion — may be weak; shown in picker until confirmed/rejected */
   suggestion: ProductMatch | null;
   name: string;
-  unit: string;
+  unit: UnitCode;
   qty: string;
   price: string;
   included: boolean;
@@ -117,6 +118,98 @@ function sheetAutoMatch(
   const match =
     strongEnough && sharesToken ? suggestion : null;
   return { suggestion: sharesToken ? suggestion : null, match };
+}
+
+function unitOptionLabel(
+  code: UnitCode,
+  locale: 'en' | 'fi',
+): string {
+  const row = UNIT_GUIDE.find((r) => r.code === code);
+  if (!row) return code;
+  const name = locale === 'fi' ? row.fiName : row.enName.split(' / ')[0];
+  return `${code} · ${name}`;
+}
+
+function SheetUnitSelect({
+  value,
+  onChange,
+}: {
+  value: UnitCode;
+  onChange: (unit: UnitCode) => void;
+}) {
+  const { t, locale } = useI18n();
+  const insets = useSafeAreaInsets();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <View style={styles.unitWrap}>
+      <Pressable
+        onPress={() => setOpen(true)}
+        style={styles.unitTrigger}
+        accessibilityRole="button"
+        accessibilityLabel={t('sheetImportColUnit')}
+      >
+        <Text style={styles.unitTriggerText} numberOfLines={1}>
+          {unitOptionLabel(value, locale)}
+        </Text>
+        <Text style={styles.matchChevron}>▾</Text>
+      </Pressable>
+
+      <Modal
+        visible={open}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setOpen(false)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
+          <Pressable
+            style={[
+              styles.sheet,
+              { paddingBottom: Math.max(insets.bottom, spacing.lg) },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.handle} />
+            <Text style={styles.sheetTitle}>{t('sheetImportUnitPickTitle')}</Text>
+            <Text style={styles.sheetSub}>{t('sheetImportUnitPickSub')}</Text>
+            <ScrollView
+              style={styles.optionsScroll}
+              keyboardShouldPersistTaps="handled"
+            >
+              {UNIT_CODES.map((code) => (
+                <Pressable
+                  key={code}
+                  onPress={() => {
+                    onChange(code);
+                    setOpen(false);
+                  }}
+                  style={[
+                    styles.option,
+                    value === code && styles.optionOn,
+                  ]}
+                >
+                  <Text style={styles.optionName}>
+                    {unitOptionLabel(code, locale)}
+                  </Text>
+                  <Text style={styles.optionMeta}>
+                    {locale === 'fi'
+                      ? UNIT_GUIDE.find((r) => r.code === code)?.enName
+                      : UNIT_GUIDE.find((r) => r.code === code)?.fiName}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable
+              onPress={() => setOpen(false)}
+              style={styles.cancelBtn}
+            >
+              <Text style={styles.cancelText}>{t('cancel')}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
+  );
 }
 
 function CatalogMatchPicker({
@@ -336,7 +429,7 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
           match,
           suggestion,
           name: formatProductDisplayName(extract.suggestedName),
-          unit: (extract.unit ?? 'KPL').toUpperCase(),
+          unit: normalizeUnit(extract.unit ?? 'KPL'),
           qty:
             extract.quantity != null
               ? String(extract.quantity).replace('.', ',')
@@ -483,7 +576,7 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
       for (const d of selected) {
         const qty = parseFiNumber(d.qty);
         const price = parseFiNumber(d.price);
-        const unit = normalizeUnit(d.unit);
+        const unit = d.unit;
         let productId = d.match?.product.id;
 
         if (!productId && createMissing) {
@@ -592,7 +685,7 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
       <ScrollView
         horizontal={!wide}
         style={styles.tableScroll}
-        contentContainerStyle={{ minWidth: wide ? undefined : 780 }}
+        contentContainerStyle={{ minWidth: wide ? undefined : 860 }}
       >
         <ScrollView
           style={{ flex: 1 }}
@@ -651,16 +744,9 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
                 onBlur={() => normalizeNameField(d.key, d.name)}
                 style={[styles.input, styles.colName]}
               />
-              <TextInput
+              <SheetUnitSelect
                 value={d.unit}
-                onChangeText={(unit) =>
-                  patch(d.key, { unit: unit.toUpperCase() })
-                }
-                onBlur={() =>
-                  patch(d.key, { unit: normalizeUnit(d.unit) })
-                }
-                autoCapitalize="characters"
-                style={[styles.input, styles.colUnit]}
+                onChange={(unit) => patch(d.key, { unit })}
               />
               <TextInput
                 value={d.qty}
@@ -765,7 +851,26 @@ const styles = StyleSheet.create({
   trWarn: { backgroundColor: colors.warningSoft },
   colCheck: { width: 36, alignItems: 'center' },
   colName: { flex: 1.6, minWidth: 160 },
-  colUnit: { width: 64 },
+  colUnit: { width: 118 },
+  unitWrap: { width: 118, marginHorizontal: 2 },
+  unitTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    backgroundColor: colors.bg,
+    minHeight: 36,
+  },
+  unitTriggerText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.ink,
+  },
   colQty: { width: 72 },
   colPrice: { width: 72 },
   colMatch: { flex: 1.4, minWidth: 160, paddingLeft: 6 },

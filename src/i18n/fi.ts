@@ -469,6 +469,8 @@ export const fi: Messages = {
   sheetImportMatchMeta: 'Osumia {matched} · ilman osumaa {unmatched}',
   sheetImportColName: 'Nimi',
   sheetImportColUnit: 'Yks.',
+  sheetImportUnitPickTitle: 'Yksikkö (YKSIKKÖ)',
+  sheetImportUnitPickSub: 'Valitse laatikko, pussi, kappale, kg… — ei vapaata tekstiä',
   sheetImportColQty: 'Määrä',
   sheetImportColPrice: 'Hinta 0 %',
   sheetImportColMatch: 'Katalogiosuma',
