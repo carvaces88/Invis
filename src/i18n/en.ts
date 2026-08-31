@@ -474,6 +474,15 @@ export const en = {
   sheetImportColPrice: 'Price 0%',
   sheetImportColMatch: 'Catalog match',
   sheetImportNoMatch: 'No match — will add',
+  sheetImportNoMatchHint: 'Create a new catalog product from this row',
+  sheetImportMatchPickTitle: 'Catalog match',
+  sheetImportMatchSearch: 'Search catalog…',
+  sheetImportConfirmSuggest: 'Confirm suggestion · {pct}%',
+  sheetImportWeakSuggest: 'Suggested: {name} — tap to confirm or reject',
+  sheetImportMatchHint:
+    'Tap Catalog match to confirm, pick another product, or choose “No match — will add”.',
+  sheetImportSelectAll: 'Select all',
+  sheetImportUnselectAll: 'Unselect all',
   sheetImportNothingSelected: 'Select at least one row.',
   sheetImportUnmatchedTitle: 'Unmatched products',
   sheetImportUnmatchedBody:

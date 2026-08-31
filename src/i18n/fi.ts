@@ -469,6 +469,15 @@ export const fi: Messages = {
   sheetImportColPrice: 'Hinta 0 %',
   sheetImportColMatch: 'Katalogiosuma',
   sheetImportNoMatch: 'Ei osumaa — lisätään',
+  sheetImportNoMatchHint: 'Luo uusi katalogituote tästä rivistä',
+  sheetImportMatchPickTitle: 'Katalogiosuma',
+  sheetImportMatchSearch: 'Hae katalogista…',
+  sheetImportConfirmSuggest: 'Vahvista ehdotus · {pct} %',
+  sheetImportWeakSuggest: 'Ehdotus: {name} — napauta vahvistaaksesi tai hylätäksesi',
+  sheetImportMatchHint:
+    'Napauta Katalogiosuma vahvistaaksesi, valitaksesi toisen tuotteen tai “Ei osumaa — lisätään”.',
+  sheetImportSelectAll: 'Valitse kaikki',
+  sheetImportUnselectAll: 'Poista valinnat',
   sheetImportNothingSelected: 'Valitse vähintään yksi rivi.',
   sheetImportUnmatchedTitle: 'Tuntemattomat tuotteet',
   sheetImportUnmatchedBody:
