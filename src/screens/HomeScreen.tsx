@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,13 +12,12 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AnimatedFridgeLogo } from '../components/AnimatedFridgeLogo';
 import { InventoryValueModal } from '../components/InventoryValueModal';
 import { useChefNudge } from '../components/ChefNudge';
 import type { MainTabParamList, RootStackParamList, ScanMode } from '../data/types';
 import { useI18n } from '../i18n';
 import { colors, radius, shadows, spacing, surfaces } from '../theme/colors';
-
-const logoMark = require('../../assets/invis-logo.png');
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Home'>,
@@ -104,11 +102,9 @@ export function HomeScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.brandRow}>
-        <Image
-          source={logoMark}
-          style={styles.logoMark}
-          accessibilityLabel={t('appBrand')}
-        />
+        <View style={styles.brandMark}>
+          <AnimatedFridgeLogo accessibilityLabel={t('appBrand')} size={72} />
+        </View>
         <View style={styles.brandText}>
           <Text style={styles.greeting}>{t('homeGreeting')}</Text>
           <Text style={styles.subtitle}>
@@ -233,9 +229,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.xl,
   },
-  logoMark: {
-    width: 72,
-    height: 72,
+  brandMark: {
     marginTop: 2,
   },
   brandText: {
