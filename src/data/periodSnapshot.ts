@@ -6,6 +6,76 @@ export function monthKey(d = new Date()): string {
   return `${y}-${m}`;
 }
 
+/** Next calendar month as YYYY-MM (e.g. 2026-08 → 2026-09). */
+export function nextMonthKey(ym: string): string {
+  const [yRaw, mRaw] = ym.split('-');
+  const y = Number(yRaw);
+  const m = Number(mRaw);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) {
+    return monthKey();
+  }
+  const d = new Date(y, m, 1); // month is 0-based; `m` advances one month
+  return monthKey(d);
+}
+
+export type FinalizeInventoryMonthResult =
+  | {
+      ok: true;
+      closedMonth: string;
+      nextMonth: string;
+    }
+  | {
+      ok: false;
+      reason: 'already';
+      closedMonth: string;
+      nextMonth: string;
+    };
+
+/**
+ * Explicit end-of-month wrap-up: current line quantities become opening for the
+ * next month. Blocks an immediate second finalize of the brand-new period.
+ */
+export function finalizePeriodSnapshot(
+  existing: InventoryPeriodSnapshot | null,
+  lines: InventoryLine[],
+  now = new Date(),
+): { snapshot: InventoryPeriodSnapshot; result: FinalizeInventoryMonthResult } {
+  const openMonth = existing?.currentMonth ?? monthKey(now);
+  const nextMonth = nextMonthKey(openMonth);
+
+  const justWrapped =
+    existing != null &&
+    existing.lastFinalizedMonth != null &&
+    nextMonthKey(existing.lastFinalizedMonth) === openMonth &&
+    existing.lastFinalizedAt != null &&
+    now.getTime() - Date.parse(existing.lastFinalizedAt) < 5 * 60 * 1000;
+
+  if (justWrapped && existing?.lastFinalizedMonth) {
+    return {
+      snapshot: existing,
+      result: {
+        ok: false,
+        reason: 'already',
+        closedMonth: existing.lastFinalizedMonth,
+        nextMonth: openMonth,
+      },
+    };
+  }
+
+  const capturedAt = now.toISOString();
+  const snapshot: InventoryPeriodSnapshot = {
+    currentMonth: nextMonth,
+    capturedAt,
+    openingQuantities: quantitiesFromLines(lines),
+    lastFinalizedMonth: openMonth,
+    lastFinalizedAt: capturedAt,
+  };
+  return {
+    snapshot,
+    result: { ok: true, closedMonth: openMonth, nextMonth },
+  };
+}
+
 export function linePeriodKey(productId: string, placeId: string): string {
   return `${productId}::${placeId}`;
 }
@@ -56,6 +126,8 @@ export function ensurePeriodSnapshot(
     currentMonth: nowMonth,
     capturedAt: now.toISOString(),
     openingQuantities: quantitiesFromLines(lines),
+    lastFinalizedMonth: existing.lastFinalizedMonth,
+    lastFinalizedAt: existing.lastFinalizedAt,
   };
 }
 

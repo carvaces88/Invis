@@ -35,6 +35,7 @@ import {
   columnHeader,
   getExportProfile,
   profileTitleKey,
+  RESTOLUTION_FI_HEADERS,
   type ExportCellContext,
   type ExportColumnId,
   type ExportProfileId,
@@ -90,7 +91,6 @@ function colStyle(col: ExportColumnId) {
     case 'storage':
       return styles.colStorage;
     case 'qty':
-    case 'closingStock':
       return styles.colQty;
     case 'price':
       return styles.colPrice;
@@ -102,6 +102,7 @@ function colStyle(col: ExportColumnId) {
       return styles.colCode;
     case 'openingStock':
     case 'purchases':
+    case 'closingStock':
     case 'usage':
     case 'need':
     case 'variance':
@@ -122,8 +123,6 @@ function tableMinWidth(columns: ExportColumnId[]): number {
         return sum + 100;
       case 'qty':
         return sum + 48;
-      case 'closingStock':
-        return sum + 88;
       case 'price':
       case 'total':
         return sum + 52;
@@ -133,12 +132,13 @@ function tableMinWidth(columns: ExportColumnId[]): number {
         return sum + 120;
       case 'openingStock':
       case 'purchases':
+      case 'closingStock':
       case 'usage':
       case 'need':
       case 'variance':
-        return sum + 88;
+        return sum + 96;
       case 'turnover':
-        return sum + 120;
+        return sum + 112;
       default:
         return sum + 56;
     }
@@ -168,6 +168,8 @@ export function InventaarioScreen() {
   );
   const [placeFilter, setPlaceFilter] = useState<string | 'all'>('all');
   const [compareMonths, setCompareMonths] = useState(false);
+  /** nameAsc / nameDesc = A–Z / Z–A (keeps qty+price on the row); place = default */
+  const [nameSort, setNameSort] = useState<'place' | 'az' | 'za'>('place');
   const placesForFilter = useMemo(() => {
     if (storageFilter === 'all') return places;
     return places.filter((p) => resolveStorageType(p) === storageFilter);
@@ -319,12 +321,24 @@ export function InventaarioScreen() {
       const aSet = a.quantity != null ? 0 : 1;
       const bSet = b.quantity != null ? 0 : 1;
       if (aSet !== bSet) return aSet - bSet;
+      if (nameSort === 'az') {
+        return a.officialName.localeCompare(b.officialName, 'fi', {
+          sensitivity: 'base',
+        });
+      }
+      if (nameSort === 'za') {
+        return b.officialName.localeCompare(a.officialName, 'fi', {
+          sensitivity: 'base',
+        });
+      }
       if (placeFilter === 'all' && a.placeId !== b.placeId) {
         const ao = placeById.get(a.placeId)?.sortOrder ?? 0;
         const bo = placeById.get(b.placeId)?.sortOrder ?? 0;
         if (ao !== bo) return ao - bo;
       }
-      return a.officialName.localeCompare(b.officialName);
+      return a.officialName.localeCompare(b.officialName, 'fi', {
+        sensitivity: 'base',
+      });
     });
     const modeFiltered = showFullSheet
       ? sorted
@@ -352,12 +366,13 @@ export function InventaarioScreen() {
     placeById,
     productById,
     searchQuery,
+    nameSort,
   ]);
 
   const needsHScrollEffective =
     needsHScroll || compareMonths || columns.length > 4;
   const minTableWidthEffective =
-    minTableWidth + (compareMonths ? 120 : 0);
+    minTableWidth + (compareMonths ? 200 : 0);
 
   const searchActive = searchQuery.trim().length > 0;
 
@@ -428,9 +443,13 @@ export function InventaarioScreen() {
     return formatQty(toDisplayQty(unit, qty)).replace('.', ',');
   }
 
-  function renderQtyEditor(item: InventoryLine, editing: boolean) {
+  function renderQtyEditor(
+    item: InventoryLine,
+    editing: boolean,
+    wide = false,
+  ) {
     return (
-      <View style={styles.colQty}>
+      <View style={wide ? styles.colMove : styles.colQty}>
         {editing ? (
           <TextInput
             value={draftQty}
@@ -460,10 +479,10 @@ export function InventaarioScreen() {
     );
   }
 
-  function renderLastMonthQty(item: InventoryLine) {
+  function renderLastMonthQty(item: InventoryLine, wide = false) {
     const opening = getOpeningQuantity(item.productId, item.placeId);
     return (
-      <View style={styles.colQty}>
+      <View style={wide ? styles.colMove : styles.colQty}>
         <Text style={[styles.td, styles.num, styles.lastMonthQty]}>
           {formatLineQty(item.unit, opening ?? null)}
         </Text>
@@ -561,16 +580,20 @@ export function InventaarioScreen() {
         );
       }
       case 'qty':
-      case 'closingStock':
+      case 'closingStock': {
+        const wideQty = col === 'closingStock';
         if (compareMonths) {
           return (
             <React.Fragment key={col}>
-              {renderLastMonthQty(item)}
-              {renderQtyEditor(item, editing)}
+              {renderLastMonthQty(item, wideQty)}
+              {renderQtyEditor(item, editing, wideQty)}
             </React.Fragment>
           );
         }
-        return <View key={col}>{renderQtyEditor(item, editing)}</View>;
+        return (
+          <View key={col}>{renderQtyEditor(item, editing, wideQty)}</View>
+        );
+      }
       case 'price':
         return (
           <Text key={col} style={[styles.td, styles.colPrice, styles.num]}>
@@ -619,17 +642,19 @@ export function InventaarioScreen() {
           return <UnitColumnLegend key={col} />;
         }
         if (compareMonths && (col === 'qty' || col === 'closingStock')) {
+          const qtyCol =
+            col === 'closingStock' ? styles.colMove : styles.colQty;
           return (
             <React.Fragment key={col}>
               <Text
-                style={[styles.th, styles.colQty]}
+                style={[styles.th, qtyCol]}
                 numberOfLines={2}
                 accessibilityLabel={t('inventoryLastMonth')}
               >
                 {t('inventoryLastMonth')}
               </Text>
               <Text
-                style={[styles.th, styles.colQty]}
+                style={[styles.th, qtyCol]}
                 numberOfLines={2}
                 accessibilityLabel={t('inventoryThisMonth')}
               >
@@ -638,15 +663,21 @@ export function InventaarioScreen() {
             </React.Fragment>
           );
         }
+        // Locale labels on-screen (not bilingual FI/EN) so mobile headers
+        // stay legible; exports keep RESTOLUTION_FI_HEADERS.
+        const label = columnHeader(col, strings);
+        const a11y =
+          viewProfile.finnishExportHeaders && RESTOLUTION_FI_HEADERS[col]
+            ? RESTOLUTION_FI_HEADERS[col]!
+            : label;
         return (
           <Text
             key={col}
             style={[styles.th, colStyle(col)]}
-            numberOfLines={viewProfile.finnishExportHeaders ? 3 : 1}
+            numberOfLines={2}
+            accessibilityLabel={a11y}
           >
-            {columnHeader(col, strings, {
-              finnishRestolution: Boolean(viewProfile.finnishExportHeaders),
-            })}
+            {label}
           </Text>
         );
       })}
@@ -693,6 +724,28 @@ export function InventaarioScreen() {
 
         {toolsOpen ? (
           <View style={styles.toolsRow}>
+            <Pressable
+              onPress={() => navigation.navigate('SheetImport')}
+              style={({ pressed }) => [
+                styles.toolLink,
+                pressed && { opacity: 0.75 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('sheetImportOpen')}
+            >
+              <Text style={styles.toolLinkText}>{t('sheetImportOpen')}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.navigate('MonthWrapUp')}
+              style={({ pressed }) => [
+                styles.toolLink,
+                pressed && { opacity: 0.75 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('monthWrapUpOpen')}
+            >
+              <Text style={styles.toolLinkText}>{t('monthWrapUpOpen')}</Text>
+            </Pressable>
             <Pressable
               onPress={() =>
                 navigation.navigate('VerifyAmounts', { mode: 'pending' })
@@ -825,6 +878,32 @@ export function InventaarioScreen() {
               {t('inventoryCompareMonths')}
             </Text>
           </Pressable>
+          <Pressable
+            onPress={() =>
+              setNameSort((v) =>
+                v === 'place' ? 'az' : v === 'az' ? 'za' : 'place',
+              )
+            }
+            style={[
+              styles.filterChip,
+              nameSort !== 'place' && styles.filterChipOn,
+            ]}
+            accessibilityRole="button"
+            accessibilityHint={t('inventorySortHint')}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                nameSort !== 'place' && styles.filterChipTextOn,
+              ]}
+            >
+              {nameSort === 'az'
+                ? t('inventorySortAz')
+                : nameSort === 'za'
+                  ? t('inventorySortZa')
+                  : t('inventorySortDefault')}
+            </Text>
+          </Pressable>
           {showPriceCols ? (
             <>
               <Pressable
@@ -920,6 +999,30 @@ export function InventaarioScreen() {
         </View>
 
         <View style={styles.exportRow}>
+          <Pressable
+            onPress={() => navigation.navigate('SheetImport')}
+            style={({ pressed }) => [
+              styles.finalizeBtn,
+              { backgroundColor: colors.accent },
+              pressed && { opacity: 0.85 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t('sheetImportOpen')}
+          >
+            <Text style={styles.finalizeBtnText}>{t('sheetImportOpen')}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => navigation.navigate('MonthWrapUp')}
+            style={({ pressed }) => [
+              styles.finalizeBtn,
+              pressed && { opacity: 0.85 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t('monthWrapUpOpen')}
+            accessibilityHint={t('monthWrapUpOpenSub')}
+          >
+            <Text style={styles.finalizeBtnText}>{t('monthWrapUpOpen')}</Text>
+          </Pressable>
           <Pressable
             onPress={() => navigation.navigate('ExportPreview')}
             style={({ pressed }) => [
@@ -1071,22 +1174,36 @@ export function InventaarioScreen() {
                             </Text>
                           );
                         case 'qty':
-                        case 'closingStock':
+                        case 'closingStock': {
+                          const qtyStyle =
+                            col === 'closingStock'
+                              ? styles.footerQtyWide
+                              : styles.footerQty;
                           if (compareMonths) {
                             return (
                               <React.Fragment key={col}>
-                                <View style={styles.colQty} />
-                                <Text key={`${col}-this`} style={styles.footerQty}>
+                                <View
+                                  style={
+                                    col === 'closingStock'
+                                      ? styles.colMove
+                                      : styles.colQty
+                                  }
+                                />
+                                <Text
+                                  key={`${col}-this`}
+                                  style={qtyStyle}
+                                >
                                   {String(totals.quantity).replace('.', ',')}
                                 </Text>
                               </React.Fragment>
                             );
                           }
                           return (
-                            <Text key={col} style={styles.footerQty}>
+                            <Text key={col} style={qtyStyle}>
                               {String(totals.quantity).replace('.', ',')}
                             </Text>
                           );
+                        }
                         case 'total':
                           return (
                             <Text key={col} style={styles.footerValue}>
@@ -1291,6 +1408,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12,
   },
+  finalizeBtn: {
+    backgroundColor: colors.success,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+  },
+  finalizeBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 12,
+  },
   columnsBtn: {
     flexGrow: 1,
     flexBasis: '36%',
@@ -1339,7 +1467,7 @@ const styles = StyleSheet.create({
   },
   tableHead: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'flex-start',
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
@@ -1347,13 +1475,15 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.line,
     backgroundColor: colors.primarySoft,
     zIndex: 20,
-    overflow: 'visible',
+    overflow: 'hidden',
   },
   th: {
     fontSize: 10,
     fontWeight: '700',
     color: colors.primary,
     letterSpacing: 0.3,
+    lineHeight: 13,
+    overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',
@@ -1428,8 +1558,22 @@ const styles = StyleSheet.create({
   colTotal: { width: 52, textAlign: 'right', paddingTop: 1 },
   colDate: { width: 88, textAlign: 'left', paddingTop: 1, paddingRight: 4 },
   colCode: { width: 110, textAlign: 'left', paddingTop: 1, paddingRight: 4 },
-  colMove: { width: 88, textAlign: 'right', paddingTop: 1 },
-  colTurnover: { width: 120, textAlign: 'right', paddingTop: 1 },
+  colMove: {
+    width: 96,
+    flexGrow: 0,
+    flexShrink: 0,
+    textAlign: 'right',
+    paddingTop: 1,
+    paddingLeft: 4,
+  },
+  colTurnover: {
+    width: 112,
+    flexGrow: 0,
+    flexShrink: 0,
+    textAlign: 'right',
+    paddingTop: 1,
+    paddingLeft: 4,
+  },
   num: { fontVariant: ['tabular-nums'], textAlign: 'right' },
   qtyInput: {
     borderWidth: 1,
@@ -1464,6 +1608,12 @@ const styles = StyleSheet.create({
   },
   footerQty: {
     width: 48,
+    textAlign: 'right',
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  footerQtyWide: {
+    width: 96,
     textAlign: 'right',
     fontWeight: '700',
     color: colors.ink,

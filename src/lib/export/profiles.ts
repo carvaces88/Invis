@@ -44,8 +44,10 @@ export type ExportProfile = {
   /** Session qty + value footer (only when price columns present) */
   includeTotals: boolean;
   /**
-   * When true, file exports and on-screen view use bilingual Restolution
+   * When true, file exports (and export preview) use bilingual Restolution
    * headers (FI / EN) for import compatibility — see RESTOLUTION_FI_HEADERS.
+   * The live inventory sheet uses locale column labels instead so mobile
+   * headers stay readable; full bilingual names remain on accessibilityLabel.
    */
   finnishExportHeaders?: boolean;
 };
@@ -103,7 +105,7 @@ export const DEFAULT_EXPORT_PROFILE: ExportProfileId = 'restolution';
 
 /**
  * Restolution sheet headers — bilingual FI / EN as Restolution templates use.
- * Used in Excel/PDF/Word and on-screen Restolution view.
+ * Used in Excel/PDF/Word and export preview (not the live inventory sheet).
  */
 export const RESTOLUTION_FI_HEADERS: Partial<Record<ExportColumnId, string>> = {
   productCode: 'Tuotekoodi / Product Code',
@@ -116,6 +118,18 @@ export const RESTOLUTION_FI_HEADERS: Partial<Record<ExportColumnId, string>> = {
   variance: 'Ero / Variance',
   turnover: 'Varastonkiertonopeus / Inventory Turnover',
 };
+
+/** Split "FI / EN" Restolution headers for stacked on-screen preview cells. */
+export function restolutionHeaderParts(
+  column: ExportColumnId,
+): { fi: string; en: string } | null {
+  const raw = RESTOLUTION_FI_HEADERS[column];
+  if (!raw) return null;
+  const sep = ' / ';
+  const i = raw.indexOf(sep);
+  if (i < 0) return null;
+  return { fi: raw.slice(0, i), en: raw.slice(i + sep.length) };
+}
 
 export function getExportProfile(id: ExportProfileId): ExportProfile {
   return EXPORT_PROFILES.find((p) => p.id === id) ?? EXPORT_PROFILES[0];

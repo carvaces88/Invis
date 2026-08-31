@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -38,6 +39,7 @@ import { alertAck, alertInfo } from '../lib/alertAck';
 import { confirmIfRecentAdd } from '../lib/confirmIfRecentAdd';
 import {
   bestExtractMatch,
+  isGarbageProductName,
   isIdentityCatalogMatch,
   isStrongCatalogMatch,
   matchExtractToCatalog,
@@ -50,9 +52,11 @@ import {
   type PackCheckInfo,
   type PackCheckResolve,
 } from '../lib/packUnits';
+import { isBareEanLabel } from '../lib/packaging';
 import {
   enrichFromExtractAsync,
   enrichmentToExtract,
+  humanProductNameFromExtract,
 } from '../lib/productEnrichment';
 import { formatClockTime } from '../lib/relativeTime';
 import { useUnitSystem } from '../lib/unitSystem';
@@ -87,6 +91,19 @@ function mergeUniqueAliases(
     out.push(raw.trim());
   }
   return out;
+}
+
+/** Prefer a human title; never default the editable name to a raw barcode. */
+function searchQueryFromExtract(extract: VisionExtract): string {
+  return humanProductNameFromExtract(extract);
+}
+
+function shouldKeepVisionSuggestedName(name: string | undefined): boolean {
+  const n = name?.trim() ?? '';
+  if (!n) return false;
+  if (isBareEanLabel(n)) return false;
+  if (isGarbageProductName(n)) return false;
+  return true;
 }
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Confirm'>;
@@ -126,6 +143,11 @@ export function ConfirmScreen({ route, navigation }: Props) {
   const [enriching, setEnriching] = useState(true);
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
   const [zoomTarget, setZoomTarget] = useState<ImageZoomTarget>(null);
+  const [productName, setProductName] = useState(() =>
+    searchQueryFromExtract(routeExtract),
+  );
+  const productNameTouchedRef = useRef(false);
+  const selectedProductIdRef = useRef<string | undefined>(undefined);
 
   // Always show the original vision label in “Model said …” (enrichment must
   // not rewrite cucumbers into a mayo catalog title).
@@ -147,11 +169,23 @@ export function ConfirmScreen({ route, navigation }: Props) {
         const enrichment = await enrichFromExtractAsync(routeExtract, products);
         if (cancelled) return;
         const next = enrichmentToExtract(enrichment);
-        // Always keep vision label fields; only fill gaps from catalog enrich.
-        // Prevents “Korsnäs crate” brand sitting on a mayo officialName/EAN.
-        setExtract({
+        // Keep vision label fields when they describe the item; only fill gaps
+        // from catalog enrich. Prefer enrichment name when vision name is bare EAN.
+        const keepVisionName = shouldKeepVisionSuggestedName(
+          routeExtract.suggestedName,
+        );
+        const enrichedNameOk =
+          Boolean(next.suggestedName?.trim()) &&
+          !isBareEanLabel(next.suggestedName) &&
+          !isGarbageProductName(next.suggestedName);
+        const merged: VisionExtract = {
           ...next,
-          suggestedName: routeExtract.suggestedName,
+          suggestedName:
+            keepVisionName
+              ? routeExtract.suggestedName
+              : enrichedNameOk
+                ? next.suggestedName
+                : routeExtract.suggestedName,
           brand: routeExtract.brand ?? next.brand,
           containerHint: routeExtract.containerHint ?? next.containerHint,
           packSize: routeExtract.packSize ?? next.packSize,
@@ -165,10 +199,22 @@ export function ConfirmScreen({ route, navigation }: Props) {
           crop: routeExtract.crop ?? next.crop,
           confidence: routeExtract.confidence,
           unrecognized: routeExtract.unrecognized,
+          sourceUrl: next.sourceUrl ?? routeExtract.sourceUrl,
+          imageUrl: next.imageUrl ?? routeExtract.imageUrl,
+          unitPriceAlv0:
+            routeExtract.unitPriceAlv0 ?? next.unitPriceAlv0 ?? null,
           rawNotes: [routeExtract.rawNotes, enrichment.notes]
             .filter(Boolean)
             .join(' · '),
-        });
+        };
+        setExtract(merged);
+        if (!productNameTouchedRef.current) {
+          setProductName(searchQueryFromExtract(merged));
+        }
+        // Default unit from enriched pack when no catalog match yet
+        if (!selectedProductIdRef.current && merged.unit) {
+          setUnitOption(unitOptionForProduct(null, merged.unit));
+        }
       } finally {
         if (!cancelled) setEnriching(false);
       }
@@ -216,6 +262,7 @@ export function ConfirmScreen({ route, navigation }: Props) {
 
   // Default unit when the matched product changes (not on every extract tick).
   const selectedProductId = selected?.product.id;
+  selectedProductIdRef.current = selectedProductId;
   useEffect(() => {
     if (!selected) return;
     setUnitOption(unitOptionForProduct(selected.product, extract.unit));
@@ -228,6 +275,12 @@ export function ConfirmScreen({ route, navigation }: Props) {
   const [expiry, setExpiry] = useState(routeExtract.expiryDate ?? '');
   const [packCheck, setPackCheck] = useState<PackCheckInfo | null>(null);
   const moreIsActive = MORE_UNIT_OPTIONS.some((o) => o.id === unitOption.id);
+
+  const modelSaidName =
+    productName.trim() ||
+    (isBareEanLabel(visionLabel.suggestedName)
+      ? t('confirmScannedBarcode')
+      : visionLabel.suggestedName);
 
   function pickUnit(option: FriendlyUnitOption) {
     setUnitOption(option);
@@ -270,6 +323,7 @@ export function ConfirmScreen({ route, navigation }: Props) {
     !isDevOrStubNote(extract.rawNotes ?? '') &&
     (visionSetupNote || (!extract.unrecognized && !unmatched));
 
+  const nameAliases = (extract.aliases ?? []).filter((a) => !isBareEanLabel(a));
   const extractMeta = [
     extract.brand ? `${t('addProductBrand')}: ${extract.brand}` : null,
     extract.containerHint
@@ -278,9 +332,12 @@ export function ConfirmScreen({ route, navigation }: Props) {
     extract.packSize
       ? `${t('addProductPackSize')}: ${extract.packSize}`
       : null,
-    extract.ean ? `${t('addProductEan')}: ${extract.ean}` : null,
-    extract.aliases?.length
-      ? `${t('alsoAs')} ${extract.aliases.slice(0, 6).join(', ')}`
+    // When unmatched, EAN is shown next to the editable product name instead
+    !unmatched && extract.ean
+      ? `${t('addProductEan')}: ${extract.ean}`
+      : null,
+    nameAliases.length
+      ? `${t('alsoAs')} ${nameAliases.slice(0, 6).join(', ')}`
       : null,
   ]
     .filter(Boolean)
@@ -396,31 +453,56 @@ export function ConfirmScreen({ route, navigation }: Props) {
   }
 
   function openAddProduct() {
-    navigation.navigate('AddProduct', {
-      prefillName: visionLabel.suggestedName,
-      unit: visionLabel.unit ?? extract.unit ?? undefined,
-      packSize: visionLabel.packSize ?? extract.packSize ?? undefined,
-      unitPriceAlv0:
-        visionLabel.unitPriceAlv0 ?? extract.unitPriceAlv0 ?? undefined,
+    const name =
+      productName.trim() ||
+      humanProductNameFromExtract(extract) ||
+      (shouldKeepVisionSuggestedName(visionLabel.suggestedName)
+        ? visionLabel.suggestedName
+        : undefined);
+    const prefillExtract: VisionExtract = {
+      ...visionLabel,
+      suggestedName: name || visionLabel.suggestedName,
+      brand: visionLabel.brand ?? extract.brand,
+      packSize: visionLabel.packSize ?? extract.packSize,
+      unit: visionLabel.unit ?? extract.unit,
+      ean: visionLabel.ean ?? extract.ean,
       aliases: mergeUniqueAliases(visionLabel.aliases, extract.aliases),
-      ean: visionLabel.ean ?? undefined,
-      sourceUrl: extract.sourceUrl ?? undefined,
-      imageUrl: extract.imageUrl ?? undefined,
-      ingredientType:
-        visionLabel.ingredientType ?? extract.ingredientType ?? undefined,
-      brand: visionLabel.brand ?? extract.brand ?? undefined,
-      containerHint:
-        visionLabel.containerHint ?? extract.containerHint ?? undefined,
+      quantity:
+        visionLabel.quantity ??
+        extract.quantity ??
+        (Number(qty.replace(',', '.')) || 1),
+      unitPriceAlv0: visionLabel.unitPriceAlv0 ?? extract.unitPriceAlv0,
+      sourceUrl: extract.sourceUrl ?? visionLabel.sourceUrl,
+      imageUrl: extract.imageUrl ?? visionLabel.imageUrl,
+      containerHint: visionLabel.containerHint ?? extract.containerHint,
+      ingredientType: visionLabel.ingredientType ?? extract.ingredientType,
+    };
+    navigation.navigate('AddProduct', {
+      prefillName: name,
+      unit: prefillExtract.unit ?? undefined,
+      packSize: prefillExtract.packSize ?? undefined,
+      unitPriceAlv0: prefillExtract.unitPriceAlv0 ?? undefined,
+      aliases: prefillExtract.aliases,
+      ean: prefillExtract.ean ?? undefined,
+      sourceUrl: prefillExtract.sourceUrl ?? undefined,
+      imageUrl: prefillExtract.imageUrl ?? undefined,
+      ingredientType: prefillExtract.ingredientType ?? undefined,
+      brand: prefillExtract.brand ?? undefined,
+      containerHint: prefillExtract.containerHint ?? undefined,
       photoUris: imageUri ? [imageUri] : undefined,
       returnToConfirm: true,
-      extract: visionLabel,
+      extract: prefillExtract,
       imageUri,
     });
   }
 
   const catalogZoomSource = selected
     ? productImageSource(selected.product)
-    : null;
+    : extract.imageUrl
+      ? { uri: extract.imageUrl }
+      : null;
+
+  const eanDisplay = extract.ean ?? visionLabel.ean ?? null;
 
   return (
     <ScrollView
@@ -436,7 +518,7 @@ export function ConfirmScreen({ route, navigation }: Props) {
       <Text style={styles.title}>{t('fridgeIsThisProduct')}</Text>
       <Text style={styles.sub}>
         {t('confirmModelSaid')
-          .replace('{name}', visionLabel.suggestedName)
+          .replace('{name}', modelSaidName)
           .replace('{pct}', String(Math.round(visionLabel.confidence * 100)))}
       </Text>
 
@@ -503,6 +585,23 @@ export function ConfirmScreen({ route, navigation }: Props) {
             >
               <ProductThumb product={selected.product} size={108} />
             </Pressable>
+          ) : extract.imageUrl ? (
+            <Pressable
+              onPress={() =>
+                setZoomTarget({
+                  source: { uri: extract.imageUrl! },
+                  label: productName || t('fridgeOfficialPhoto'),
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={`${t('fridgeOfficialPhoto')} · ${t('imageZoomTitle')}`}
+            >
+              <Image
+                source={{ uri: extract.imageUrl }}
+                style={styles.listingThumb}
+                resizeMode="contain"
+              />
+            </Pressable>
           ) : (
             <View style={styles.packPlaceholder} />
           )}
@@ -547,6 +646,27 @@ export function ConfirmScreen({ route, navigation }: Props) {
         >
           <Text style={styles.notHaveTitle}>{t('confirmNotHaveTitle')}</Text>
           <Text style={styles.notHaveBody}>{t('confirmNotHaveBody')}</Text>
+          <Text style={styles.prefillHint}>{t('confirmPrefillHint')}</Text>
+
+          <Text style={styles.fieldLabel}>{t('confirmProductName')}</Text>
+          <TextInput
+            value={productName}
+            onChangeText={(text) => {
+              productNameTouchedRef.current = true;
+              setProductName(text);
+            }}
+            style={styles.input}
+            placeholder={t('confirmProductNamePlaceholder')}
+            placeholderTextColor={colors.inkFaint}
+            autoCapitalize="sentences"
+            accessibilityLabel={t('confirmProductName')}
+          />
+          {eanDisplay ? (
+            <Text style={styles.eanSecondary} accessibilityRole="text">
+              {t('addProductEan')}: {eanDisplay}
+            </Text>
+          ) : null}
+
           <Pressable
             style={styles.addPrimary}
             onPress={openAddProduct}
@@ -643,7 +763,8 @@ export function ConfirmScreen({ route, navigation }: Props) {
       </Text>
       <ProductSearchInput
         products={products}
-        initialQuery={visionLabel.suggestedName}
+        initialQuery={productName}
+        placeholder={t('confirmSearchPlaceholder')}
         onSelect={(m) => selectMatch(m)}
       />
 
@@ -703,11 +824,13 @@ export function ConfirmScreen({ route, navigation }: Props) {
       ) : null}
 
       <Text style={styles.label}>{t('qty')}</Text>
+      <Text style={styles.qtyHint}>{t('confirmQtyHint')}</Text>
       <TextInput
         value={qty}
         onChangeText={setQty}
         keyboardType="decimal-pad"
         style={styles.input}
+        accessibilityLabel={t('qty')}
       />
 
       <Text style={styles.label}>{t('confirmExpiryOptional')}</Text>
@@ -821,6 +944,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.primarySoft,
+  },
+  listingThumb: {
+    width: 108,
+    height: 108,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: '#fff',
+  },
+  prefillHint: {
+    marginTop: spacing.sm,
+    color: colors.ink,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  fieldLabel: {
+    marginTop: spacing.md,
+    marginBottom: 6,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  eanSecondary: {
+    marginTop: spacing.sm,
+    fontSize: 13,
+    color: colors.inkMuted,
+  },
+  qtyHint: {
+    marginTop: 4,
+    marginBottom: 4,
+    fontSize: 12,
+    color: colors.inkMuted,
   },
   alreadyBox: {
     marginTop: spacing.md,

@@ -834,3 +834,224 @@ async function callGeminiFridgeDirect(
     })),
   };
 }
+
+const SHEET_SYSTEM_PROMPT = `You are Inventaario OCR for Finnish kitchen inventory CLIPBOARD sheets (INVENTAARIOPOHJA RR and similar).
+Return JSON only. Ground EVERY row on the printed/handwritten text in the photo.
+
+Sheet columns (left → right):
+1) NIMIKE — product name (printed; sometimes handwritten extras at the bottom)
+2) YKSIKKÖ — unit code (pkt, PSS, L, PRK, LTK, KPL, kg, rsa, RAS, plo, …)
+3) MÄÄRÄ — quantity. Often HANDWRITTEN in blue ink. Use European decimals (0,5 → 0.5). If blank → quantity null.
+4) HINTA — unit price printed on the form. European decimals (2,29 → 2.29). These kitchen sheet prices are already 0% ALV — do NOT divide by 1.14.
+5) Yht — ignore (totals usually empty).
+
+Rules:
+- Read as many product rows as you can see (typically 40–80). Do not invent products that are not on the sheet.
+- Include rows with empty MÄÄRÄ (quantity null) so the catalog list is complete.
+- Also parse handwritten extras below the table (e.g. "Kond. Maito 8 prk", "Farini 8 pss") as extra lines with quantity and unit from the note.
+- Normalize unit to POS codes: L, KPL, PRK, RSA, PSS, PL, PLO, LTK, KG, RAS, PKT.
+  pkt/PKT → PKT; pss → PSS; kg → KG; rsa → RSA; ras/RAS → RAS; plo → PLO; prk → PRK; ltk → LTK; kpl → KPL; L stays L.
+- suggestedName = NIMIKE text as printed (keep Finnish casing).
+- unitPriceAlv0 = HINTA number (or null if blank).
+- quantity = MÄÄRÄ number (or null if blank).
+- rawNotes: section headers (EVENTS KYLMIÖ, TOP TUOTTEET, YHTEENSÄ), ALV columns if filled, "handwritten extra" when from footer notes.
+- title: sheet title + PVM date when visible (e.g. "Inventaariopohja RR · 1.3.2024").
+- confidence: overall OCR confidence 0–1.`;
+
+/**
+ * Printed inventaariopohja / clipboard sheet photo → DocumentExtract (kind sheet).
+ */
+export async function analyzeInventaarioSheetWithGemini(
+  imageUri: string,
+  hint?: string,
+): Promise<DocumentExtract> {
+  if (!isRealImageUri(imageUri)) {
+    throw new Error('No sheet photo to analyze');
+  }
+
+  const payload = await imageUriToPayload(imageUri);
+  const apiKey = getGeminiApiKey();
+  if (apiKey) {
+    return callGeminiSheetDirect([payload], apiKey, hint);
+  }
+
+  const proxyUrl = getVisionProxyUrl();
+  if (proxyUrl) {
+    return callVisionSheetProxy([payload], proxyUrl, hint);
+  }
+
+  throw new Error(
+    'Live vision is not configured. Set EXPO_PUBLIC_GEMINI_API_KEY or GEMINI_API_KEY on /api/vision.',
+  );
+}
+
+function toSheetDocument(
+  raw: Record<string, unknown>,
+  noteSuffix: string,
+): DocumentExtract {
+  const linesRaw = Array.isArray(raw.lines) ? raw.lines : [];
+  const lines = linesRaw
+    .filter((l): l is Record<string, unknown> => !!l && typeof l === 'object')
+    .map((l) => {
+      const line = toFridgeLine(l);
+      // Sheet blank qty must stay null (fridge defaults to 1)
+      if (typeof l.quantity !== 'number' || !Number.isFinite(l.quantity)) {
+        return { ...line, quantity: null };
+      }
+      return line;
+    });
+  const confidence =
+    typeof raw.confidence === 'number'
+      ? Math.min(1, Math.max(0, raw.confidence))
+      : lines.length
+        ? lines.reduce((s, l) => s + l.confidence, 0) / lines.length
+        : 0.5;
+  const title =
+    typeof raw.title === 'string' && raw.title.trim()
+      ? raw.title.trim()
+      : 'Inventaariopohja';
+  const rawNotes = [
+    typeof raw.rawNotes === 'string' && raw.rawNotes.trim()
+      ? raw.rawNotes.trim()
+      : null,
+    noteSuffix,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return {
+    kind: 'sheet',
+    title,
+    lines,
+    confidence,
+    rawNotes,
+  };
+}
+
+async function callVisionSheetProxy(
+  payloads: ImagePayload[],
+  proxyUrl: string,
+  hint?: string,
+): Promise<DocumentExtract> {
+  const res = await fetch(proxyUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({
+      mode: 'sheet',
+      hint: hint?.trim() || undefined,
+      images: payloads.map((p) => ({
+        mimeType: p.mimeType,
+        base64: p.base64,
+      })),
+      model: getGeminiModel(),
+    }),
+  });
+  const body = (await res.json()) as DocumentExtract & { error?: string };
+  if (!res.ok) {
+    throw new Error(body.error || `Vision proxy failed (${res.status})`);
+  }
+  if (!Array.isArray(body.lines)) {
+    throw new Error('Vision proxy returned an empty sheet extract');
+  }
+  const note = hint?.trim();
+  return {
+    kind: 'sheet',
+    title: body.title ?? 'Inventaariopohja',
+    lines: body.lines.map((l) => ({
+      ...l,
+      unit: (l.unit as VisionExtract['unit']) ?? null,
+      quantity:
+        typeof l.quantity === 'number' && Number.isFinite(l.quantity)
+          ? l.quantity
+          : null,
+      confidence: l.confidence ?? 0.5,
+      rawNotes: note
+        ? [l.rawNotes, note].filter(Boolean).join(' · ')
+        : l.rawNotes,
+    })),
+    confidence: body.confidence ?? 0.5,
+    rawNotes: note
+      ? [body.rawNotes ?? 'Live Gemini sheet (proxy)', `Staff notes: ${note}`]
+          .filter(Boolean)
+          .join(' · ')
+      : (body.rawNotes ?? 'Live Gemini sheet (proxy)'),
+  };
+}
+
+async function callGeminiSheetDirect(
+  payloads: ImagePayload[],
+  apiKey: string,
+  hint?: string,
+): Promise<DocumentExtract> {
+  const note = hint?.trim();
+  const parts: GeminiPart[] = [
+    ...payloads.map((p) => ({
+      inlineData: { mimeType: p.mimeType, data: p.base64 },
+    })),
+    {
+      text: [
+        SHEET_SYSTEM_PROMPT,
+        note ? `Optional staff notes (may be wrong): ${note}` : null,
+        'OCR this inventaariopohja clipboard photo. Extract every NIMIKE row with YKSIKKÖ, MÄÄRÄ (handwritten), HINTA.',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    },
+  ];
+
+  const model = getGeminiModel();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts }],
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: 'application/json',
+        responseSchema: FRIDGE_SCHEMA,
+      },
+    }),
+  });
+
+  const body = (await res.json()) as GeminiResponse;
+  if (!res.ok) {
+    throw new Error(
+      body.error?.message || `Gemini sheet vision failed (${res.status})`,
+    );
+  }
+
+  const text = body.candidates?.[0]?.content?.parts
+    ?.map((p) => p.text ?? '')
+    .join('')
+    .trim();
+  if (!text) {
+    throw new Error('Gemini returned empty sheet vision result');
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(extractJsonText(text)) as Record<string, unknown>;
+  } catch {
+    throw new Error('Gemini returned non-JSON sheet vision result');
+  }
+
+  const doc = toSheetDocument(
+    parsed,
+    `Live Gemini sheet (${model}) · ${payloads.length} photo(s)`,
+  );
+  if (!note) return doc;
+  return {
+    ...doc,
+    rawNotes: [doc.rawNotes, `Staff notes: ${note}`]
+      .filter(Boolean)
+      .join(' · '),
+    lines: doc.lines.map((l) => ({
+      ...l,
+      rawNotes: [l.rawNotes, note].filter(Boolean).join(' · '),
+    })),
+  };
+}

@@ -146,6 +146,22 @@ export const fi: Messages = {
   homeInventoryValueSub: 'Laskettujen rivien summa · alv 0 %',
   homeMoreSettings: 'Lisää / Asetukset',
 
+  // Empty-inventory welcome / onboarding
+  welcomeKicker: 'inventaarion sous chef',
+  welcomeTitle: 'Mistä haluaisit aloittaa?',
+  welcomePrompt:
+    'Ei vielä laskettuja määriä — autan rakentamaan taulukon keittiön tilanteesta.',
+  welcomeFilesAsk:
+    'Onko sinulla nykyisiä tiedostoja tai kuvia, jotka haluaisit ottaa huomioon?',
+  welcomeScanFridge: 'Skannaa jääkaappi / ota kuvia',
+  welcomeScanFridgeSub: 'Kuvaa jääkaappi tai hylly · vahvista · tarkista',
+  welcomeImport: 'Tuo lomakkeen kuva',
+  welcomeImportSub:
+    'Inventaariopohja, kuormakirja tai tuloste → OCR (Excel-tuontia ei vielä)',
+  welcomeCatalog: 'Aloita katalogista',
+  welcomeCatalogSub: 'Selaa tuotteita tai lisää käsin',
+  welcomeSkip: 'Ohita toistaiseksi',
+
   inventoryValueTitle: 'Varaston arvo juuri nyt',
   inventoryValueExclVat: 'alv 0 % / ilman ALV:a',
   inventoryValueWithAlv: 'ALV {rate} % kanssa',
@@ -419,6 +435,50 @@ export const fi: Messages = {
   inventoryLastMonth: 'Edellinen kk',
   inventoryThisMonth: 'Tämä kk',
   inventoryCompareHint: 'Alkuvarasto (edellinen kk) vs nykyinen määrä',
+  inventorySortAz: 'A–Ö nimet',
+  inventorySortZa: 'Ö–A nimet',
+  inventorySortDefault: 'Paikan mukaan',
+  inventorySortHint: 'Järjestää rivit; määrä ja hinta pysyvät tuotteessa',
+
+  sheetImportOpen: 'Tuo lomakkeen kuva',
+  sheetImportOpenSub: 'Painettu inventaariopohja → OCR → tarkistus → inventaario',
+  sheetImportKicker: 'Lomakkeen tuonti',
+  sheetImportTitle: 'Tuo inventaarilomake',
+  sheetImportSub:
+    'Lataa kuva painetusta inventaariopohjasta. Luemme NIMIKE, YKSIKKÖ, MÄÄRÄ ja HINTA — myös käsin kirjoitetut määrät.',
+  sheetImportPlaceholder: 'Kuva inventaariopohja RR -lomakkeesta',
+  sheetImportUpload: 'Lataa kuva',
+  sheetImportCamera: 'Kamera',
+  sheetImportAnalyze: 'Lue lomake ja tarkista',
+  sheetImportHint:
+    'Työpöytä: käytä Lataa kuva selkeälle leikepöytäkuvalle. Tarkista rivit ennen kirjoitusta.',
+  sheetImportNeedPhoto: 'Valitse ensin lomakkeen kuva.',
+  sheetImportNeedPermission: 'Salli kuvien käyttö lomakkeen lataamiseen.',
+  sheetImportEmpty: 'Tuoterivejä ei löytynyt — kokeile terävämpää kuvaa.',
+  sheetImportFailed: 'Lomaketta ei voitu lukea. Tarkista vision-asetukset.',
+  sheetImportReviewTitle: 'Tarkista lomakkeen rivit',
+  sheetImportWithQty: 'määrällä',
+  sheetImportSortSheet: 'Lomakkeen järjestys',
+  sheetImportSortAz: 'A–Ö',
+  sheetImportSortZa: 'Ö–A',
+  sheetImportSortQty: 'Määrä ensin',
+  sheetImportMatchMeta: 'Osumia {matched} · ilman osumaa {unmatched}',
+  sheetImportColName: 'Nimi',
+  sheetImportColUnit: 'Yks.',
+  sheetImportColQty: 'Määrä',
+  sheetImportColPrice: 'Hinta 0 %',
+  sheetImportColMatch: 'Katalogiosuma',
+  sheetImportNoMatch: 'Ei osumaa — lisätään',
+  sheetImportNothingSelected: 'Valitse vähintään yksi rivi.',
+  sheetImportUnmatchedTitle: 'Tuntemattomat tuotteet',
+  sheetImportUnmatchedBody:
+    '{count} rivi(ä) ei ole katalogissa. Lisätäänkö uusina ja kirjoitetaan määrät?',
+  sheetImportCreateMissing: 'Lisää ja kirjoita',
+  sheetImportWrite: 'Kirjoita inventaarioon',
+  sheetImportWriteSub: 'Asettaa absoluuttiset määrät valittuun paikkaan (hinnat 0 % ALV)',
+  sheetImportDoneTitle: 'Lomake tuotu',
+  sheetImportDoneBody:
+    'Kirjoitettiin {written} määrää. Lisättiin {created} uutta katalogituotetta. Järjestä A–Ö Inventaario-välilehdellä.',
 
   monthWrapUpOpen: 'Päätä kuukausi',
   monthWrapUpOpenSub: 'Kuukauden lopun inventaario · yhteenveto · Restolution-raportti',

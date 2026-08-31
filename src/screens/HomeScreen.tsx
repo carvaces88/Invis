@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -7,6 +7,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
@@ -14,10 +15,21 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnimatedFridgeLogo } from '../components/AnimatedFridgeLogo';
 import { InventoryValueModal } from '../components/InventoryValueModal';
+import {
+  WelcomeOnboarding,
+  type WelcomeStartAction,
+} from '../components/WelcomeOnboarding';
 import { useChefNudge } from '../components/ChefNudge';
+import {
+  hasRecordedInventory,
+  useInventory,
+} from '../data/store';
 import type { MainTabParamList, RootStackParamList, ScanMode } from '../data/types';
 import { useI18n } from '../i18n';
 import { colors, radius, shadows, spacing, surfaces } from '../theme/colors';
+
+/** Dismissed for the current empty stretch; cleared once stock is recorded again. */
+const WELCOME_DISMISS_KEY = 'invis.welcomeOnboarding.dismissedEmpty';
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Home'>,
@@ -35,11 +47,45 @@ export function HomeScreen() {
   const navigation = useNavigation<Nav>();
   const { t } = useI18n();
   const { yesChef } = useChefNudge();
+  const { session } = useInventory();
   const { width } = useWindowDimensions();
   const gap = spacing.md;
   const pad = spacing.lg;
   const cardWidth = Math.floor((width - pad * 2 - gap) / 2);
   const [valueOpen, setValueOpen] = useState(false);
+  /** null = AsyncStorage not loaded yet */
+  const [welcomeDismissed, setWelcomeDismissed] = useState<boolean | null>(
+    null,
+  );
+
+  const inventoryEmpty = !hasRecordedInventory(session);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(WELCOME_DISMISS_KEY);
+        if (!cancelled) setWelcomeDismissed(raw === '1');
+      } catch {
+        if (!cancelled) setWelcomeDismissed(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Once the user has counted stock, clear dismiss so the next empty stretch can welcome again.
+  useEffect(() => {
+    if (inventoryEmpty) return;
+    setWelcomeDismissed(false);
+    void AsyncStorage.removeItem(WELCOME_DISMISS_KEY).catch(() => {});
+  }, [inventoryEmpty]);
+
+  function dismissWelcome() {
+    setWelcomeDismissed(true);
+    void AsyncStorage.setItem(WELCOME_DISMISS_KEY, '1').catch(() => {});
+  }
 
   function withYesChef(action: () => void) {
     yesChef();
@@ -54,6 +100,31 @@ export function HomeScreen() {
   function openInventoryValue() {
     yesChef();
     setTimeout(() => setValueOpen(true), 280);
+  }
+
+  function handleWelcomeStart(action: WelcomeStartAction) {
+    dismissWelcome();
+    withYesChef(() => {
+      if (action === 'scanFridge') {
+        navigation.navigate('RecordInventory', { heroFridge: true });
+      } else if (action === 'importSheet') {
+        navigation.navigate('SheetImport');
+      } else {
+        navigation.navigate('Catalog');
+      }
+    });
+  }
+
+  function handleWelcomeSkip() {
+    dismissWelcome();
+  }
+
+  const showWelcome =
+    inventoryEmpty && welcomeDismissed === false;
+
+  // Hold a blank frame while dismiss flag loads — avoids flashing full Home then welcome.
+  if (inventoryEmpty && welcomeDismissed === null) {
+    return <View style={styles.root} />;
   }
 
   const secondary: SecondaryAction[] = [
@@ -88,6 +159,15 @@ export function HomeScreen() {
       onPress: openInventoryValue,
     },
   ];
+
+  if (showWelcome) {
+    return (
+      <WelcomeOnboarding
+        onStart={handleWelcomeStart}
+        onSkip={handleWelcomeSkip}
+      />
+    );
+  }
 
   return (
     <ScrollView

@@ -46,6 +46,16 @@ export function MoreScreen() {
       route: 'PriceComparison' as const,
     },
     {
+      title: t('sheetImportOpen'),
+      subtitle: t('sheetImportOpenSub'),
+      route: 'SheetImport' as const,
+    },
+    {
+      title: t('monthWrapUpOpen'),
+      subtitle: t('monthWrapUpOpenSub'),
+      route: 'MonthWrapUp' as const,
+    },
+    {
       title: t('reportsChat'),
       subtitle: t('reportsChatSub'),
       route: 'ReportsChat' as const,

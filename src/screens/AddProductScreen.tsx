@@ -32,7 +32,9 @@ import {
 import {
   enrichFromExtractAsync,
   enrichProductFromPhotos,
+  humanProductNameFromExtract,
 } from '../lib/productEnrichment';
+import { isBareEanLabel } from '../lib/packaging';
 import { IDENTITY_MATCH_MIN } from '../lib/fuzzyMatch';
 import { isLiveVisionEnabled } from '../lib/vision';
 import { colors, radius, spacing } from '../theme/colors';
@@ -81,11 +83,18 @@ export function AddProductScreen({ route, navigation }: Props) {
   );
   const [analyzing, setAnalyzing] = useState(false);
   const [enrichNotes, setEnrichNotes] = useState<string | null>(null);
-  const [officialName, setOfficialName] = useState(prefillName ?? '');
+  const [officialName, setOfficialName] = useState(() => {
+    if (prefillName && !isBareEanLabel(prefillName)) return prefillName;
+    if (extract) {
+      const human = humanProductNameFromExtract(extract);
+      if (human) return human;
+    }
+    return prefillName && !isBareEanLabel(prefillName) ? prefillName : '';
+  });
   const [aliasesText, setAliasesText] = useState(
     prefAliases?.length
       ? prefAliases.join(', ')
-      : prefillName
+      : prefillName && !isBareEanLabel(prefillName)
         ? prefillName
         : '',
   );
@@ -110,9 +119,19 @@ export function AddProductScreen({ route, navigation }: Props) {
   } | null>(null);
 
   function applyEnrichment(e: ProductEnrichment) {
-    setOfficialName(e.officialName);
+    const name =
+      e.officialName && !isBareEanLabel(e.officialName)
+        ? e.officialName
+        : humanProductNameFromExtract({
+            suggestedName: e.officialName,
+            brand: e.brand,
+            aliases: e.aliases,
+            packSize: e.packSize,
+            ean: e.ean,
+          }) || e.officialName;
+    setOfficialName(name);
     setAliasesText(
-      e.aliases.length ? e.aliases.join(', ') : e.officialName,
+      e.aliases.length ? e.aliases.join(', ') : name,
     );
     setUnit(e.unit);
     setLastRecordUnit(e.unit);
@@ -150,7 +169,9 @@ export function AddProductScreen({ route, navigation }: Props) {
     if (!scannedEan) return;
     const eanDigits = scannedEan.replace(/\D/g, '');
     applyEnrichment({
-      officialName: prefillName || scannedEan,
+      officialName:
+        (prefillName && !isBareEanLabel(prefillName) ? prefillName : '') ||
+        scannedEan,
       unit: prefUnit ?? lastRecordUnit ?? 'KPL',
       packSize: prefPack,
       unitPriceAlv0: prefPrice,

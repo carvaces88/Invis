@@ -148,6 +148,22 @@ export const en = {
   homeInventoryValueSub: 'Sum of counted lines · excl. VAT',
   homeMoreSettings: 'More / Settings',
 
+  // Empty-inventory welcome / onboarding
+  welcomeKicker: 'inventory sous chef',
+  welcomeTitle: 'Where would you like to start?',
+  welcomePrompt:
+    'Nothing counted yet — I’ll help you build the sheet from what’s in the kitchen.',
+  welcomeFilesAsk:
+    'Do you have current files or photos you want me to know or take into account?',
+  welcomeScanFridge: 'Scan fridge / take photos',
+  welcomeScanFridgeSub: 'Photo the fridge or shelf · confirm · verify',
+  welcomeImport: 'Import a sheet photo',
+  welcomeImportSub:
+    'Inventaariopohja, delivery note, or printed list → OCR (not Excel upload yet)',
+  welcomeCatalog: 'Start from catalog',
+  welcomeCatalogSub: 'Browse products or add them manually',
+  welcomeSkip: 'Skip for now',
+
   inventoryValueTitle: 'My inventory value right now',
   inventoryValueExclVat: 'excl. VAT / 0% ALV',
   inventoryValueWithAlv: 'with {rate}% ALV',
@@ -424,6 +440,50 @@ export const en = {
   inventoryLastMonth: 'Last month',
   inventoryThisMonth: 'This month',
   inventoryCompareHint: 'Opening (last month) vs current count',
+  inventorySortAz: 'A–Z names',
+  inventorySortZa: 'Z–A names',
+  inventorySortDefault: 'By place',
+  inventorySortHint: 'Reorder rows; qty and price stay with each product',
+
+  sheetImportOpen: 'Import sheet photo',
+  sheetImportOpenSub: 'Printed inventaariopohja → OCR → validate → inventory',
+  sheetImportKicker: 'Sheet import',
+  sheetImportTitle: 'Import inventory sheet',
+  sheetImportSub:
+    'Upload a photo of your printed inventaariopohja (clipboard). We read NIMIKE, YKSIKKÖ, MÄÄRÄ, and HINTA — including handwritten quantities.',
+  sheetImportPlaceholder: 'Photo of inventaariopohja RR or similar sheet',
+  sheetImportUpload: 'Upload photo',
+  sheetImportCamera: 'Camera',
+  sheetImportAnalyze: 'Read sheet & validate',
+  sheetImportHint:
+    'Desktop tip: use Upload photo for a clear clipboard image. Check every row before writing stock.',
+  sheetImportNeedPhoto: 'Choose a sheet photo first.',
+  sheetImportNeedPermission: 'Allow photo access to upload the sheet.',
+  sheetImportEmpty: 'No product rows found — try a sharper photo.',
+  sheetImportFailed: 'Could not read the sheet. Check vision setup and retry.',
+  sheetImportReviewTitle: 'Validate sheet rows',
+  sheetImportWithQty: 'with qty',
+  sheetImportSortSheet: 'Sheet order',
+  sheetImportSortAz: 'A–Z',
+  sheetImportSortZa: 'Z–A',
+  sheetImportSortQty: 'Qty first',
+  sheetImportMatchMeta: 'Matched {matched} · unmatched {unmatched}',
+  sheetImportColName: 'Name',
+  sheetImportColUnit: 'Unit',
+  sheetImportColQty: 'Qty',
+  sheetImportColPrice: 'Price 0%',
+  sheetImportColMatch: 'Catalog match',
+  sheetImportNoMatch: 'No match — will add',
+  sheetImportNothingSelected: 'Select at least one row.',
+  sheetImportUnmatchedTitle: 'Unmatched products',
+  sheetImportUnmatchedBody:
+    '{count} row(s) are not in the catalog. Add them as new products, then write counts?',
+  sheetImportCreateMissing: 'Add & write',
+  sheetImportWrite: 'Write to inventory',
+  sheetImportWriteSub: 'Sets absolute counts for the selected place (0% ALV prices)',
+  sheetImportDoneTitle: 'Sheet imported',
+  sheetImportDoneBody:
+    'Wrote {written} count(s). Added {created} new catalog product(s). Sort A–Z on Inventory anytime.',
 
   monthWrapUpOpen: 'Finalize month',
   monthWrapUpOpenSub: 'End-of-month count · summary · Restolution report',

@@ -53,6 +53,12 @@ export function ScanScreen() {
       tone: 'primary' as const,
     },
     {
+      title: t('sheetImportOpen'),
+      subtitle: t('sheetImportOpenSub'),
+      onPress: () => navigation.navigate('SheetImport'),
+      tone: 'primary' as const,
+    },
+    {
       title: t('delivery'),
       subtitle: t('deliverySub'),
       onPress: () => navigation.navigate('KuormaScan'),

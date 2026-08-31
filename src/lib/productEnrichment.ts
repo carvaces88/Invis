@@ -27,6 +27,7 @@ import {
   containerLabelForUnit,
   extractEanFromText,
   inferPackaging,
+  isBareEanLabel,
   normalizeEanDigits,
 } from './packaging';
 import { generateProductAliases, mergeAliasLists } from './productAliases';
@@ -34,6 +35,16 @@ import { analyzeInventoryImage, analyzeProductCloseups } from './vision';
 import { isLiveVisionEnabled } from './visionConfig';
 
 function inferBrand(officialName: string, aliases: string[]): string | undefined {
+  if (isBareEanLabel(officialName)) {
+    for (const a of aliases) {
+      if (isBareEanLabel(a) || isGarbageProductName(a)) continue;
+      const word = a.trim().split(/\s+/)[0];
+      if (word && word.length > 2) {
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      }
+    }
+    return undefined;
+  }
   const first = officialName.trim().split(/\s+/)[0];
   if (first && /^[A-ZÅÄÖ]/.test(first) && first.length > 1) return first;
   for (const a of aliases) {
@@ -43,6 +54,70 @@ function inferBrand(officialName: string, aliases: string[]): string | undefined
     }
   }
   return undefined;
+}
+
+/**
+ * Best human-readable product title from vision/enrichment fields.
+ * Never returns a bare barcode when brand, aliases, or a real name exist.
+ */
+export function humanProductNameFromExtract(
+  extract: Pick<
+    VisionExtract,
+    'suggestedName' | 'brand' | 'aliases' | 'packSize' | 'ean'
+  >,
+): string {
+  const suggested = extract.suggestedName?.trim() ?? '';
+  const suggestedIsEan =
+    isBareEanLabel(suggested) ||
+    (Boolean(extract.ean) &&
+      normalizeEanDigits(suggested) === normalizeEanDigits(extract.ean));
+
+  if (suggested && !suggestedIsEan && !isGarbageProductName(suggested)) {
+    const brand = extract.brand?.trim();
+    if (
+      brand &&
+      !isBareEanLabel(brand) &&
+      !suggested.toLowerCase().includes(brand.toLowerCase())
+    ) {
+      return `${brand} ${suggested}`.replace(/\s+/g, ' ').trim();
+    }
+    return suggested;
+  }
+
+  const brand = extract.brand?.trim();
+  const alias = (extract.aliases ?? []).find(
+    (a) =>
+      a.trim() &&
+      !isBareEanLabel(a) &&
+      !isGarbageProductName(a) &&
+      normalizeEanDigits(a) !== normalizeEanDigits(extract.ean),
+  );
+  const pack = extract.packSize?.trim();
+
+  let title = '';
+  if (alias) {
+    title =
+      brand &&
+      !isBareEanLabel(brand) &&
+      !alias.toLowerCase().includes(brand.toLowerCase())
+        ? `${brand} ${alias}`
+        : alias;
+  } else if (brand && !isBareEanLabel(brand) && !isGarbageProductName(brand)) {
+    title = brand;
+  }
+
+  if (
+    pack &&
+    title &&
+    !title.toLowerCase().includes(pack.toLowerCase())
+  ) {
+    title = `${title} ${pack}`;
+  }
+
+  title = title.replace(/\s+/g, ' ').trim();
+  if (title) return title;
+  if (suggested && !suggestedIsEan) return suggested;
+  return '';
 }
 
 function resolvePackaging(
@@ -141,8 +216,12 @@ function enrichmentFromExtract(
       ),
     ) ??
     undefined;
+  const officialName =
+    humanProductNameFromExtract(extract) ||
+    (!isBareEanLabel(extract.suggestedName) ? extract.suggestedName : '') ||
+    extract.suggestedName;
   const aliases = buildAliases({
-    officialName: extract.suggestedName,
+    officialName,
     brand: extract.brand,
     packSize: extract.packSize,
     ean,
@@ -150,11 +229,11 @@ function enrichmentFromExtract(
     extra: extract.aliases,
   });
   return {
-    officialName: extract.suggestedName,
+    officialName,
     unit: pack.unit,
     packSize: extract.packSize ?? undefined,
     unitPriceAlv0: extract.unitPriceAlv0 ?? undefined,
-    brand: extract.brand ?? inferBrand(extract.suggestedName, aliases),
+    brand: extract.brand ?? inferBrand(officialName, aliases),
     containerHint: pack.containerHint,
     ean: ean ?? undefined,
     sourceUrl: extract.sourceUrl ?? undefined,
@@ -170,7 +249,8 @@ function enrichmentFromExtract(
     matchedPublicListing: Boolean(
       extract.sourceUrl &&
         !extract.unrecognized &&
-        !isGarbageProductName(extract.suggestedName),
+        !isGarbageProductName(officialName) &&
+        !isBareEanLabel(officialName),
     ),
   };
 }

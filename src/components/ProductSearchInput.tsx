@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import type { Product, ProductMatch } from '../data/types';
 import { searchProducts } from '../lib/fuzzyMatch';
+import { isBareEanLabel } from '../lib/packaging';
 import { colors, radius, shadows, spacing, surfaces } from '../theme/colors';
 
 type Props = {
@@ -27,6 +28,31 @@ export function ProductSearchInput({
   initialQuery = '',
 }: Props) {
   const [query, setQuery] = useState(initialQuery);
+  const prevInitialRef = useRef(initialQuery);
+  const userEditedRef = useRef(false);
+
+  // When Confirm enrichment replaces a bare EAN with a human name, sync the field
+  // unless the user already typed something else.
+  useEffect(() => {
+    if (initialQuery === prevInitialRef.current) return;
+    const prev = prevInitialRef.current;
+    prevInitialRef.current = initialQuery;
+    setQuery((current) => {
+      if (userEditedRef.current && current.trim() && current !== prev) {
+        return current;
+      }
+      if (
+        !current.trim() ||
+        current === prev ||
+        isBareEanLabel(current)
+      ) {
+        userEditedRef.current = false;
+        return initialQuery;
+      }
+      return current;
+    });
+  }, [initialQuery]);
+
   const results = useMemo(
     () => searchProducts(products, query, 10),
     [products, query],
@@ -36,7 +62,10 @@ export function ProductSearchInput({
     <View style={styles.wrap}>
       <TextInput
         value={query}
-        onChangeText={setQuery}
+        onChangeText={(text) => {
+          userEditedRef.current = true;
+          setQuery(text);
+        }}
         placeholder={placeholder}
         placeholderTextColor={colors.inkFaint}
         autoFocus={autoFocus}
@@ -58,6 +87,7 @@ export function ProductSearchInput({
                   style={styles.row}
                   onPress={() => {
                     onSelect(item);
+                    userEditedRef.current = true;
                     setQuery(item.product.officialName);
                   }}
                 >

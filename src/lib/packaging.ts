@@ -97,6 +97,21 @@ export function normalizeEanDigits(raw?: string | null): string | null {
   return null;
 }
 
+/**
+ * True when a “name” is only a retail barcode (EAN/UPC digits), not a
+ * human product title. Used so Confirm/search never treat the code as identity.
+ */
+export function isBareEanLabel(raw?: string | null): boolean {
+  if (!raw) return false;
+  const trimmed = raw.trim();
+  if (!trimmed) return false;
+  // Allow spaces/dashes between digits; reject any letters.
+  if (/[A-Za-zÅÄÖåäö]/.test(trimmed)) return false;
+  const digits = normalizeEanDigits(trimmed);
+  if (!digits) return false;
+  return digits === trimmed.replace(/\D/g, '');
+}
+
 /** Pull first EAN-13-ish run from OCR / filename / hint text. */
 export function extractEanFromText(text: string): string | null {
   const spaced = text.replace(/(\d)\s+(?=\d)/g, '$1');

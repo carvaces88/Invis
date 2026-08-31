@@ -7,6 +7,7 @@ import type { DocumentExtract, VisionExtract } from '../data/types';
 import {
   analyzeFridgeShelfWithGemini,
   analyzeImagesWithGemini,
+  analyzeInventaarioSheetWithGemini,
   isRealImageUri,
 } from './geminiVision';
 import {
@@ -118,4 +119,24 @@ export async function analyzeHavikkiImage(
   demoVariant: 'A' | 'B' = 'A',
 ): Promise<DocumentExtract> {
   return stubHavikki(imageUri, demoVariant);
+}
+
+/**
+ * Printed inventaariopohja / clipboard sheet photo → rows for SheetImportReview.
+ * Real photos require Gemini (proxy or client key). No offline Figaro stub.
+ */
+export async function analyzeInventaarioSheetImage(
+  imageUri: string,
+  hint?: string,
+): Promise<DocumentExtract> {
+  const trimmed = hint?.trim() || undefined;
+  if (!isRealImageUri(imageUri)) {
+    throw new Error('Upload a photo of the printed inventory sheet first.');
+  }
+  try {
+    return await analyzeInventaarioSheetWithGemini(imageUri, trimmed);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Sheet OCR failed';
+    throw new Error(msg);
+  }
 }

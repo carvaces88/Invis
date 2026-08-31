@@ -33,6 +33,7 @@ import { ExportPreviewScreen } from './src/screens/ExportPreviewScreen';
 import { InventaarioScreen } from './src/screens/InventaarioScreen';
 import { KuormaScanScreen } from './src/screens/KuormaScanScreen';
 import { MoreScreen } from './src/screens/MoreScreen';
+import { MonthWrapUpScreen } from './src/screens/MonthWrapUpScreen';
 import { PlacesScreen } from './src/screens/PlacesScreen';
 import { PriceComparisonScreen } from './src/screens/PriceComparisonScreen';
 import { ProductDetailScreen } from './src/screens/ProductDetailScreen';
@@ -41,6 +42,8 @@ import { RecordInventoryScreen } from './src/screens/RecordInventoryScreen';
 import { RecentActivityScreen } from './src/screens/RecentActivityScreen';
 import { ReportsChatScreen } from './src/screens/ReportsChatScreen';
 import { ScanScreen } from './src/screens/ScanScreen';
+import { SheetImportReviewScreen } from './src/screens/SheetImportReviewScreen';
+import { SheetImportScanScreen } from './src/screens/SheetImportScanScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { UnitsGuideScreen } from './src/screens/UnitsGuideScreen';
 import { VerifyAmountsScreen } from './src/screens/VerifyAmountsScreen';
@@ -340,6 +343,33 @@ function RootNavigator() {
           component={ExportPreviewScreen}
           options={{
             title: t('exportPreviewTitle'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="MonthWrapUp"
+          component={MonthWrapUpScreen}
+          options={{
+            title: t('monthWrapUpTitle'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="SheetImport"
+          component={SheetImportScanScreen}
+          options={{
+            title: t('sheetImportTitle'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="SheetImportReview"
+          component={SheetImportReviewScreen}
+          options={{
+            title: t('sheetImportReviewTitle'),
             headerTintColor: colors.primary,
             headerStyle: { backgroundColor: colors.bg },
           }}

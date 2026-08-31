@@ -24,6 +24,7 @@ import {
   getExportProfile,
   isNumericColumn,
   profileTitleKey,
+  restolutionHeaderParts,
   type ExportCellContext,
   type ExportColumnId,
   type ExportProfileId,
@@ -36,7 +37,7 @@ type ExportKind = 'xlsx' | 'pdf' | 'docx';
 function colWidth(col: ExportColumnId): number {
   switch (col) {
     case 'productCode':
-      return 100;
+      return 110;
     case 'name':
       return 200;
     case 'openingStock':
@@ -45,9 +46,9 @@ function colWidth(col: ExportColumnId): number {
     case 'usage':
     case 'need':
     case 'variance':
-      return 72;
+      return 108;
     case 'turnover':
-      return 88;
+      return 120;
     case 'unit':
       return 56;
     case 'qty':
@@ -255,21 +256,58 @@ export function ExportPreviewScreen() {
         >
           <View style={{ minWidth, flex: 1 }}>
             <View style={styles.headRow}>
-              {columns.map((col) => (
-                <Text
-                  key={col}
-                  style={[
-                    styles.headCell,
-                    { width: colWidth(col) },
-                    isNumericColumn(col) && styles.cellNum,
-                  ]}
-                  numberOfLines={3}
-                >
-                  {columnHeader(col, strings, {
-                    finnishRestolution: useRestolutionHeaders,
-                  })}
-                </Text>
-              ))}
+              {columns.map((col) => {
+                const parts = useRestolutionHeaders
+                  ? restolutionHeaderParts(col)
+                  : null;
+                const full = columnHeader(col, strings, {
+                  finnishRestolution: useRestolutionHeaders,
+                });
+                return (
+                  <View
+                    key={col}
+                    style={[
+                      styles.headCellWrap,
+                      { width: colWidth(col) },
+                      isNumericColumn(col) && styles.headCellNum,
+                    ]}
+                    accessibilityLabel={full}
+                  >
+                    {parts ? (
+                      <>
+                        <Text
+                          style={[
+                            styles.headCell,
+                            isNumericColumn(col) && styles.headCellAlignEnd,
+                          ]}
+                          numberOfLines={2}
+                        >
+                          {parts.fi}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.headCellEn,
+                            isNumericColumn(col) && styles.headCellAlignEnd,
+                          ]}
+                          numberOfLines={2}
+                        >
+                          {parts.en}
+                        </Text>
+                      </>
+                    ) : (
+                      <Text
+                        style={[
+                          styles.headCell,
+                          isNumericColumn(col) && styles.headCellAlignEnd,
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {full}
+                      </Text>
+                    )}
+                  </View>
+                );
+              })}
             </View>
 
             <FlatList
@@ -445,18 +483,37 @@ const styles = StyleSheet.create({
   },
   headRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     backgroundColor: colors.primarySoft,
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
     paddingVertical: 8,
     paddingHorizontal: 8,
   },
+  headCellWrap: {
+    flexGrow: 0,
+    flexShrink: 0,
+    paddingRight: 6,
+    overflow: 'hidden',
+  },
+  headCellNum: {
+    alignItems: 'flex-end',
+  },
   headCell: {
     fontSize: 10,
     fontWeight: '700',
     color: colors.primary,
-    paddingRight: 6,
     lineHeight: 13,
+  },
+  headCellEn: {
+    marginTop: 1,
+    fontSize: 9,
+    fontWeight: '600',
+    color: colors.inkMuted,
+    lineHeight: 12,
+  },
+  headCellAlignEnd: {
+    textAlign: 'right',
   },
   dataRow: {
     flexDirection: 'row',

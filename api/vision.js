@@ -1,9 +1,10 @@
 /**
  * Vercel serverless vision proxy — keeps GEMINI_API_KEY off the client bundle.
  * POST /api/vision
- * Body: { images: [{ mimeType, base64 }], hint?, model?, mode?: 'product' | 'fridge' }
+ * Body: { images: [{ mimeType, base64 }], hint?, model?, mode?: 'product' | 'fridge' | 'sheet' }
  * mode product (default) → VisionExtract JSON
  * mode fridge → DocumentExtract-shaped JSON { kind:'fridge', lines, confidence, title? }
+ * mode sheet → DocumentExtract { kind:'sheet', … } for inventaariopohja clipboard OCR
  */
 const DEFAULT_MODEL = 'gemini-3.6-flash';
 
@@ -44,6 +45,28 @@ crop: normalized 0–1 {x,y,width,height} when you can locate the product.
 Prices at 0% ALV if shelf tag visible (€ ÷ 1.14).
 If unreadable: unrecognized true + best-guess suggestedName + aiDescription.
 rawNotes: class, storage, origin when printed.`;
+
+const SHEET_SYSTEM_PROMPT = `You are Inventaario OCR for Finnish kitchen inventory CLIPBOARD sheets (INVENTAARIOPOHJA RR and similar).
+Return JSON only. Ground EVERY row on the printed/handwritten text in the photo.
+
+Sheet columns (left → right):
+1) NIMIKE — product name (printed; sometimes handwritten extras at the bottom)
+2) YKSIKKÖ — unit code (pkt, PSS, L, PRK, LTK, KPL, kg, rsa, RAS, plo, …)
+3) MÄÄRÄ — quantity. Often HANDWRITTEN in blue ink. Use European decimals (0,5 → 0.5). If blank → quantity null.
+4) HINTA — unit price printed on the form. European decimals (2,29 → 2.29). These kitchen sheet prices are already 0% ALV — do NOT divide by 1.14.
+5) Yht — ignore (totals usually empty).
+
+Rules:
+- Read as many product rows as you can see (typically 40–80). Do not invent products that are not on the sheet.
+- Include rows with empty MÄÄRÄ (quantity null) so the catalog list is complete.
+- Also parse handwritten extras below the table (e.g. "Kond. Maito 8 prk") as extra lines.
+- Normalize unit to: L, KPL, PRK, RSA, PSS, PL, PLO, LTK, KG, RAS, PKT.
+- suggestedName = NIMIKE text as printed.
+- unitPriceAlv0 = HINTA number (or null if blank).
+- quantity = MÄÄRÄ number (or null if blank).
+- rawNotes: section headers, "handwritten extra" for footer notes.
+- title: sheet title + PVM date when visible.
+- confidence: overall OCR confidence 0–1.`;
 
 const VISION_SCHEMA = {
   type: 'OBJECT',
@@ -182,6 +205,40 @@ function mapFridgeDocument(raw, model, photoCount) {
   };
 }
 
+function mapSheetDocument(raw, model, photoCount) {
+  const linesRaw = Array.isArray(raw.lines) ? raw.lines : [];
+  const lines = linesRaw.map((row) => {
+    const extract = mapExtract(row);
+    // Blank MÄÄRÄ must stay null (mapExtract defaults quantity to 1)
+    if (
+      row == null ||
+      typeof row.quantity !== 'number' ||
+      !Number.isFinite(row.quantity)
+    ) {
+      extract.quantity = null;
+    }
+    return extract;
+  });
+  const confidence =
+    typeof raw.confidence === 'number' && Number.isFinite(raw.confidence)
+      ? Math.max(0, Math.min(1, raw.confidence))
+      : lines.length
+        ? lines.reduce((s, l) => s + l.confidence, 0) / lines.length
+        : 0.5;
+  return {
+    kind: 'sheet',
+    title: raw.title ? String(raw.title).trim() : 'Inventaariopohja',
+    lines,
+    confidence,
+    rawNotes: [
+      raw.rawNotes ? String(raw.rawNotes) : null,
+      `Live Gemini sheet proxy (${model}) · ${photoCount} photo(s)`,
+    ]
+      .filter(Boolean)
+      .join(' · '),
+  };
+}
+
 function parseGeminiJson(text) {
   const cleaned = text.replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
   return JSON.parse(cleaned);
@@ -214,10 +271,15 @@ module.exports = async function handler(req, res) {
     const images = Array.isArray(body.images) ? body.images : [];
     const hint = typeof body.hint === 'string' ? body.hint.trim() : '';
     const model = (body.model || process.env.GEMINI_MODEL || DEFAULT_MODEL).trim();
-    const mode = body.mode === 'fridge' ? 'fridge' : 'product';
+    const mode =
+      body.mode === 'fridge'
+        ? 'fridge'
+        : body.mode === 'sheet'
+          ? 'sheet'
+          : 'product';
 
     const payloads = images
-      .slice(0, mode === 'fridge' ? 2 : 4)
+      .slice(0, mode === 'product' ? 4 : 2)
       .map((img) => ({
         mimeType: String(img.mimeType || 'image/jpeg'),
         data: String(img.base64 || '').replace(/\s/g, ''),
@@ -230,26 +292,35 @@ module.exports = async function handler(req, res) {
     }
 
     const isFridge = mode === 'fridge';
+    const isSheet = mode === 'sheet';
     const parts = [
       ...payloads.map((p) => ({
         inlineData: { mimeType: p.mimeType, data: p.data },
       })),
       {
-        text: isFridge
+        text: isSheet
           ? [
-              FRIDGE_SYSTEM_PROMPT,
+              SHEET_SYSTEM_PROMPT,
               hint ? `Optional staff notes (may be wrong): ${hint}` : null,
-              'Analyze this fridge/shelf panorama. List every distinct product with estimated count.',
+              'OCR this inventaariopohja clipboard photo. Extract every NIMIKE row with YKSIKKÖ, MÄÄRÄ (handwritten), HINTA.',
             ]
               .filter(Boolean)
               .join('\n')
-          : [
-              SYSTEM_PROMPT,
-              hint ? `Optional staff hint (may be wrong): ${hint}` : null,
-              `Analyze ${payloads.length} close-up photo(s) of one product.`,
-            ]
-              .filter(Boolean)
-              .join('\n'),
+          : isFridge
+            ? [
+                FRIDGE_SYSTEM_PROMPT,
+                hint ? `Optional staff notes (may be wrong): ${hint}` : null,
+                'Analyze this fridge/shelf panorama. List every distinct product with estimated count.',
+              ]
+                .filter(Boolean)
+                .join('\n')
+            : [
+                SYSTEM_PROMPT,
+                hint ? `Optional staff hint (may be wrong): ${hint}` : null,
+                `Analyze ${payloads.length} close-up photo(s) of one product.`,
+              ]
+                .filter(Boolean)
+                .join('\n'),
       },
     ];
 
@@ -260,9 +331,9 @@ module.exports = async function handler(req, res) {
       body: JSON.stringify({
         contents: [{ role: 'user', parts }],
         generationConfig: {
-          temperature: 0.2,
+          temperature: isSheet ? 0.1 : 0.2,
           responseMimeType: 'application/json',
-          responseSchema: isFridge ? FRIDGE_SCHEMA : VISION_SCHEMA,
+          responseSchema: isFridge || isSheet ? FRIDGE_SCHEMA : VISION_SCHEMA,
         },
       }),
     });
@@ -297,6 +368,11 @@ module.exports = async function handler(req, res) {
       parsed = parseGeminiJson(text);
     } catch {
       res.status(502).json({ error: 'Gemini returned non-JSON' });
+      return;
+    }
+
+    if (isSheet) {
+      res.status(200).json(mapSheetDocument(parsed, model, payloads.length));
       return;
     }
 

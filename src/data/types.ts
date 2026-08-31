@@ -104,6 +104,10 @@ export interface InventoryPeriodSnapshot {
   capturedAt: string;
   /** `${productId}::${placeId}` → quantity at month start */
   openingQuantities: Record<string, number | null>;
+  /** Last month the kitchen explicitly finalized (YYYY-MM) */
+  lastFinalizedMonth?: string;
+  /** ISO timestamp of that finalize */
+  lastFinalizedAt?: string;
 }
 
 /** Final amount check — swipe verify before trusting totals */
@@ -253,8 +257,11 @@ export interface ProductEnrichment {
 }
 
 export interface DocumentExtract {
-  /** kuorma = delivery in · havikki = waste out · fridge = multi-item inventory count */
-  kind: 'kuorma' | 'havikki' | 'fridge';
+  /**
+   * kuorma = delivery in · havikki = waste out · fridge = multi-item shelf count
+   * · sheet = printed inventaariopohja / clipboard inventory form
+   */
+  kind: 'kuorma' | 'havikki' | 'fridge' | 'sheet';
   title?: string;
   station?: string;
   lines: VisionExtract[];
@@ -339,6 +346,14 @@ export type RootStackParamList = {
   Places: undefined;
   RecentActivity: undefined;
   ExportPreview: undefined;
+  /** End-of-month finalize · summary · Restolution report */
+  MonthWrapUp: undefined;
+  /** Photo of printed inventaariopohja → OCR → validate → absolute counts */
+  SheetImport: undefined;
+  SheetImportReview: {
+    document: DocumentExtract;
+    imageUri?: string;
+  };
   /** Optional feedback / comments (strongly nudged after sign-in) */
   Feedback: { nudged?: boolean } | undefined;
   /** Cesar / Elena / Ivan: people, sign-ins, feedback */

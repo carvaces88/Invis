@@ -21,8 +21,10 @@ import {
 } from '../data/seedPlaces';
 import {
   ensurePeriodSnapshot,
+  finalizePeriodSnapshot,
   isPeriodSnapshot,
   openingQtyForLine,
+  type FinalizeInventoryMonthResult,
 } from '../data/periodSnapshot';
 import { DEFAULT_PORTION_ERROR_PERCENT, SEED_RECIPES } from '../data/seedRecipes';
 import { isStorageType, storageTypeFromKind } from '../data/storageTypes';
@@ -149,6 +151,11 @@ type Store = {
     productId: string,
     placeId: string,
   ) => number | null | undefined;
+  /**
+   * End-of-month wrap-up: current counts become opening for the next month.
+   * Returns whether the period advanced or was already just finalized.
+   */
+  finalizeInventoryMonth: () => FinalizeInventoryMonthResult;
   /** Last unit chosen when recording / creating a product */
   lastRecordUnit: UnitCode;
   setLastRecordUnit: (unit: UnitCode) => void;
@@ -210,6 +217,8 @@ type Store = {
     placeId?: string;
     expiryDate?: string | null;
     notes?: string;
+    /** When set (e.g. sheet HINTA), apply to the inventory line at 0% ALV */
+    unitPriceAlv0?: number;
   }) => void;
   /** Additive receive — Record inventory / confirm / fridge */
   addQuantity: (args: {
@@ -665,6 +674,16 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     [periodSnapshot],
   );
 
+  const finalizeInventoryMonth =
+    useCallback((): FinalizeInventoryMonthResult => {
+      const { snapshot, result } = finalizePeriodSnapshot(
+        periodSnapshot,
+        session.lines,
+      );
+      setPeriodSnapshot(snapshot);
+      return result;
+    }, [periodSnapshot, session.lines]);
+
   const addPlace = useCallback(
     (name: string, kind?: Place['kind'], storageType?: StorageType) => {
       const trimmed = name.trim();
@@ -941,6 +960,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       placeId?: string;
       expiryDate?: string | null;
       notes?: string;
+      unitPriceAlv0?: number;
     }) => {
       const placeId = args.placeId ?? activePlaceId;
       const now = new Date().toISOString();
@@ -956,6 +976,11 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         }
         const product = products.find((p) => p.id === args.productId)!;
         const before = line.quantity ?? 0;
+        const price =
+          typeof args.unitPriceAlv0 === 'number' &&
+          Number.isFinite(args.unitPriceAlv0)
+            ? Math.round(args.unitPriceAlv0 * 100) / 100
+            : line.unitPriceAlv0 || product.unitPriceAlv0;
         const updated: InventoryLine = {
           ...line,
           quantity: args.quantity,
@@ -963,8 +988,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           countedAt: now,
           lastUpdatedAt: now,
           notes: args.notes ?? line.notes,
-          // Keep existing unit price — never wipe when counting
-          unitPriceAlv0: line.unitPriceAlv0 || product.unitPriceAlv0,
+          unitPriceAlv0: price,
           verificationStatus: 'pending',
         };
         const movement: StockMovement = {
@@ -1242,6 +1266,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       activePlaceId,
       periodSnapshot,
       getOpeningQuantity,
+      finalizeInventoryMonth,
       lastRecordUnit,
       setLastRecordUnit,
       setSiteName,
@@ -1278,6 +1303,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       activePlaceId,
       periodSnapshot,
       getOpeningQuantity,
+      finalizeInventoryMonth,
       lastRecordUnit,
       setLastRecordUnit,
       setSiteName,
@@ -1314,6 +1340,11 @@ export function useInventory() {
   const ctx = useContext(InventoryContext);
   if (!ctx) throw new Error('useInventory must be used within InventoryProvider');
   return ctx;
+}
+
+/** True when at least one inventory line has a recorded quantity (incl. 0). */
+export function hasRecordedInventory(session: InventorySession): boolean {
+  return session.lines.some((l) => l.quantity != null);
 }
 
 export function lineTotal(line: InventoryLine): number {
