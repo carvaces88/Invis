@@ -20,6 +20,7 @@ import {
   type WelcomeStartAction,
 } from '../components/WelcomeOnboarding';
 import { useChefNudge } from '../components/ChefNudge';
+import { useAuth } from '../auth/AuthContext';
 import {
   hasRecordedInventory,
   useInventory,
@@ -47,6 +48,7 @@ export function HomeScreen() {
   const navigation = useNavigation<Nav>();
   const { t } = useI18n();
   const { yesChef } = useChefNudge();
+  const { profile } = useAuth();
   const { session } = useInventory();
   const { width } = useWindowDimensions();
   const gap = spacing.md;
@@ -186,7 +188,12 @@ export function HomeScreen() {
           <AnimatedFridgeLogo accessibilityLabel={t('appBrand')} size={72} />
         </View>
         <View style={styles.brandText}>
-          <Text style={styles.greeting}>{t('homeGreeting')}</Text>
+          <Text style={styles.greeting}>
+            {t('homeGreeting').replace(
+              '{name}',
+              profile?.displayName?.trim() || t('homeGreetingNameFallback'),
+            )}
+          </Text>
           <Text style={styles.subtitle}>
             {t('appBrand')} · {t('kitchenInventory').toLowerCase()}
           </Text>

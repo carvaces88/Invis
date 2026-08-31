@@ -128,7 +128,8 @@ export const fi: Messages = {
   unitsGuideColMeaning: 'Merkitys',
   unitsGuideColFi: 'Suomeksi',
 
-  homeGreeting: 'Hei Chef! Mitä haluaisit tehdä?',
+  homeGreeting: 'Hei {name}! Mitä haluaisit tehdä?',
+  homeGreetingNameFallback: 'Chef',
   chefYes: 'Yes chef!',
   chefThinking: 'Mietin, chef…',
   homeScanFridge: 'Skannaa jääkaappi',
@@ -550,7 +551,7 @@ export const fi: Messages = {
   catalogColSkaupat: 'S-kaupat',
   catalogColLidl: 'Lidl',
   catalogPriceColsHint:
-    'Seed-/välimuistihinnat (0 % ALV). Avaa rivi live-hakua varten.',
+    'Jakelijoiden € (0 % ALV). Vieritä sivuttain nähdäksesi kaikki sarakkeet; avaa rivi live-hakua varten.',
   catalogPriceEmpty: '—',
   catalogPriceInventoryHint: 'inv.',
   catalogDetailTitle: 'Tuote',

@@ -130,7 +130,8 @@ export const en = {
   unitsGuideColFi: 'Finnish',
 
   // Home / Welcome
-  homeGreeting: 'Hello Chef! What do you want to do?',
+  homeGreeting: 'Hello {name}! What do you want to do?',
+  homeGreetingNameFallback: 'Chef',
   chefYes: 'Yes chef!',
   chefThinking: "I'm thinking, chef…",
   homeScanFridge: 'Scan fridge',
@@ -556,7 +557,7 @@ export const en = {
   catalogColSkaupat: 'S-kaupat',
   catalogColLidl: 'Lidl',
   catalogPriceColsHint:
-    'Seed/cached distributor € (0% ALV). Tap a row for live lookup.',
+    'Distributor € (0% ALV). Scroll sideways for all columns; tap a row for live lookup.',
   catalogPriceEmpty: '—',
   catalogPriceInventoryHint: 'inv.',
   catalogDetailTitle: 'Product',

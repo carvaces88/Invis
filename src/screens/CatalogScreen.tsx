@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,6 +27,20 @@ import {
 import { colors, radius, shadows, spacing, surfaces } from '../theme/colors';
 
 const TYPES = Object.keys(INGREDIENT_TYPE_LABELS) as IngredientType[];
+
+/** Fixed catalog table metrics — name stays tight; prices scroll horizontally. */
+const CATALOG_THUMB = 48;
+const CATALOG_NAME_W = 168;
+const CATALOG_PRICE_COL_W = 96;
+const CATALOG_PRICE_IDS = ['kruoka', 'skaupat', 'lidl'] as const;
+const CATALOG_IDENTITY_W = CATALOG_THUMB + spacing.sm + CATALOG_NAME_W;
+const CATALOG_PRICES_W = CATALOG_PRICE_COL_W * CATALOG_PRICE_IDS.length;
+const CATALOG_MIN_TABLE =
+  spacing.lg * 2 +
+  spacing.md * 2 +
+  CATALOG_IDENTITY_W +
+  spacing.sm +
+  CATALOG_PRICES_W;
 
 function columnHeaderKey(id: CatalogPriceColumnId): MessageKey {
   switch (id) {
@@ -80,6 +95,24 @@ function CatalogPriceRow({ product }: { product: Product }) {
   );
 }
 
+function CatalogColHeaders() {
+  const { t } = useI18n();
+  return (
+    <View style={styles.colHeaderRow}>
+      <View style={styles.identityCol} />
+      <View style={styles.priceCols}>
+        {CATALOG_PRICE_IDS.map((id) => (
+          <View key={id} style={styles.priceCol}>
+            <Text style={styles.colHeaderText} numberOfLines={1}>
+              {t(columnHeaderKey(id))}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export function CatalogScreen() {
   const insets = useSafeAreaInsets();
   const { products, updateProductCatalogFields } = useInventory();
@@ -88,6 +121,8 @@ export function CatalogScreen() {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [typeFilter, setTypeFilter] = useState<IngredientType | 'all'>('all');
   const [browseMode, setBrowseMode] = useState<'type' | 'az'>('type');
+  /** Nested H-ScrollView + FlatList needs a hard pixel height on web. */
+  const [listHeight, setListHeight] = useState(0);
 
   // Slowly fill missing packshots from K-Ruoka / OFF (Beta images).
   // Batches continue while the Catalog tab stays mounted.
@@ -251,59 +286,87 @@ export function CatalogScreen() {
           ))}
         </ScrollView>
 
-        <View style={styles.colHeaderBlock}>
-          <Text style={styles.colHint}>{t('catalogPriceColsHint')}</Text>
-          <View style={styles.colHeaderRow}>
-            <View style={styles.colHeaderFlex} />
-            <View style={styles.priceCols}>
-              {(['kruoka', 'skaupat', 'lidl'] as const).map((id) => (
-                <View key={id} style={styles.priceCol}>
-                  <Text style={styles.colHeaderText} numberOfLines={1}>
-                    {t(columnHeaderKey(id))}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
+        <Text style={styles.colHint}>{t('catalogPriceColsHint')}</Text>
       </View>
 
-      <View style={styles.listWrap}>
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => item.id}
-          style={styles.list}
-          contentContainerStyle={{
-            paddingHorizontal: spacing.lg,
-            paddingBottom: insets.bottom + 100,
-          }}
-          keyboardShouldPersistTaps="handled"
-          renderItem={({ item }) => (
-            <Pressable
-              style={({ pressed }) => [
-                styles.card,
-                pressed && styles.cardPressed,
-              ]}
-              onPress={() => openProduct(item.id)}
-              accessibilityRole="button"
-              accessibilityLabel={item.officialName}
-            >
-              <View style={styles.cardRow}>
-                <ProductThumb product={item} size={48} />
-                <View style={styles.cardBody}>
-                  <Text style={styles.cardName} numberOfLines={2}>
-                    {item.officialName}
-                  </Text>
-                  <Text style={styles.cardMeta} numberOfLines={1}>
-                    {item.unit}
-                    {item.packSize ? ` · ${item.packSize}` : ''}
-                  </Text>
-                </View>
-                <CatalogPriceRow product={item} />
-              </View>
-            </Pressable>
-          )}
-        />
+      {/*
+        Measure listWrap height so nested horizontal ScrollView + FlatList
+        get a hard pixel bound (web VirtualizedList absolute-fill needs this).
+      */}
+      <View
+        style={styles.listWrap}
+        onLayout={(e) => {
+          const h = Math.floor(e.nativeEvent.layout.height);
+          if (h > 0 && Math.abs(h - listHeight) > 1) setListHeight(h);
+        }}
+      >
+        <ScrollView
+          horizontal
+          nestedScrollEnabled
+          showsHorizontalScrollIndicator
+          style={[
+            styles.tableScroll,
+            listHeight > 0 ? { height: listHeight } : null,
+          ]}
+          contentContainerStyle={[
+            styles.tableScrollContent,
+            { minWidth: CATALOG_MIN_TABLE },
+            listHeight > 0 ? { height: listHeight } : null,
+            Platform.OS === 'web' && listHeight <= 0
+              ? ({ height: '100%' } as object)
+              : null,
+          ]}
+        >
+          <View
+            style={[
+              styles.tableInner,
+              { minWidth: CATALOG_MIN_TABLE },
+              listHeight > 0 ? { height: listHeight } : null,
+            ]}
+          >
+            <View style={styles.colHeaderBlock}>
+              <CatalogColHeaders />
+            </View>
+            <FlatList
+              data={filtered}
+              keyExtractor={(item) => item.id}
+              style={styles.list}
+              nestedScrollEnabled
+              contentContainerStyle={{
+                paddingHorizontal: spacing.lg,
+                paddingBottom: insets.bottom + 100,
+              }}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.card,
+                    pressed && styles.cardPressed,
+                  ]}
+                  onPress={() => openProduct(item.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.officialName}
+                >
+                  <View style={styles.cardRow}>
+                    <View style={styles.identityCol}>
+                      <ProductThumb product={item} size={CATALOG_THUMB} />
+                      <View style={styles.cardBody}>
+                        <Text style={styles.cardName} numberOfLines={2}>
+                          {item.officialName}
+                        </Text>
+                        <Text style={styles.cardMeta} numberOfLines={1}>
+                          {item.unit}
+                          {item.packSize ? ` · ${item.packSize}` : ''}
+                        </Text>
+                      </View>
+                    </View>
+                    <CatalogPriceRow product={item} />
+                  </View>
+                </Pressable>
+              )}
+            />
+          </View>
+        </ScrollView>
       </View>
     </View>
   );
@@ -373,18 +436,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xs,
     paddingBottom: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
+    backgroundColor: colors.bg,
   },
   colHint: {
     fontSize: 11,
     color: colors.inkFaint,
-    marginBottom: 6,
+    marginBottom: 4,
+    paddingHorizontal: spacing.lg,
   },
   colHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: spacing.sm,
   },
-  colHeaderFlex: { flex: 1 },
   colHeaderText: {
     fontSize: 10,
     fontWeight: '700',
@@ -398,19 +464,36 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
     zIndex: 0,
+    position: 'relative',
   },
-  list: { flex: 1 },
+  tableScroll: { flex: 1 },
+  tableScrollContent: {
+    flexGrow: 1,
+  },
+  tableInner: {
+    flex: 1,
+    minHeight: 0,
+  },
+  list: { flex: 1, minHeight: 0 },
   card: {
     ...surfaces.cardTight,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     marginBottom: spacing.sm,
+    width: CATALOG_IDENTITY_W + spacing.sm + CATALOG_PRICES_W + spacing.md * 2,
   },
   cardPressed: { opacity: 0.88 },
   cardRow: {
     flexDirection: 'row',
     gap: spacing.sm,
     alignItems: 'center',
+  },
+  identityCol: {
+    width: CATALOG_IDENTITY_W,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+    flexShrink: 0,
   },
   cardBody: {
     flex: 1,
@@ -420,11 +503,11 @@ const styles = StyleSheet.create({
   cardMeta: { fontSize: 11, color: colors.inkMuted, marginTop: 2 },
   priceCols: {
     flexDirection: 'row',
-    width: 168,
+    width: CATALOG_PRICES_W,
     flexShrink: 0,
   },
   priceCol: {
-    flex: 1,
+    width: CATALOG_PRICE_COL_W,
     alignItems: 'flex-end',
     paddingLeft: 4,
   },
