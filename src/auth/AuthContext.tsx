@@ -10,6 +10,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   displayKitchenName,
   isAdminName,
+  isBetaTesterName,
+  isGateBypassName,
   isKitchenName,
   isMasterName,
   isValidEmail,
@@ -57,10 +59,10 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function toProfile(session: GateSession) {
-  const kitchen = session.kind === 'kitchen';
+  const known = isKitchenName(session.name) || isBetaTesterName(session.name);
   return {
     username: session.name.toLowerCase(),
-    displayName: kitchen ? displayKitchenName(session.name) : session.name,
+    displayName: known ? displayKitchenName(session.name) : session.name,
     email: session.email,
     venue: session.venue,
     role: (isAdminName(session.name) ? 'admin' : 'guest') as 'admin' | 'guest',
@@ -113,11 +115,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const kitchen = isKitchenName(name);
+    const beta = isBetaTesterName(name);
+    const bypass = isGateBypassName(name);
     const venue = normalizeGateName(input.venue ?? '') || null;
     const emailRaw = (input.email ?? '').trim();
     const email = emailRaw || null;
 
-    if (!kitchen) {
+    if (!bypass) {
       if (!email) {
         return {
           ok: false as const,
@@ -133,9 +137,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const next: GateSession = {
-      name: kitchen ? displayKitchenName(name) : name,
-      venue: kitchen ? null : venue,
-      email: kitchen ? null : email,
+      name: kitchen || beta ? displayKitchenName(name) : name,
+      venue: bypass ? null : venue,
+      email: bypass ? null : email,
       kind: kitchen ? 'kitchen' : 'tester',
       enteredAt: new Date().toISOString(),
     };

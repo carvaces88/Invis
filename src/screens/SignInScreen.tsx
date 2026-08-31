@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n';
-import { isKitchenName } from '../lib/authAccounts';
+import { isGateBypassName } from '../lib/authAccounts';
 import { colors, radius, spacing, surfaces } from '../theme/colors';
 
 const brandWordmark = require('../../assets/invis-wordmark.png');
@@ -29,7 +29,7 @@ export function SignInScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const kitchen = useMemo(() => isKitchenName(name), [name]);
+  const bypass = useMemo(() => isGateBypassName(name), [name]);
 
   const onSubmit = async () => {
     setError(null);
@@ -86,21 +86,8 @@ export function SignInScreen() {
             returnKeyType="next"
           />
 
-          {!kitchen ? (
+          {!bypass ? (
             <>
-              <Text style={[styles.label, styles.labelGap]}>{t('gateVenue')}</Text>
-              <TextInput
-                value={venue}
-                onChangeText={setVenue}
-                autoCapitalize="words"
-                autoCorrect={false}
-                placeholder={t('gateVenuePlaceholder')}
-                placeholderTextColor={colors.inkFaint}
-                style={styles.input}
-                editable={!busy}
-                returnKeyType="next"
-              />
-
               <Text style={[styles.label, styles.labelGap]}>
                 {t('gateEmail')}
                 <Text style={styles.recommended}> {t('gateEmailRecommended')}</Text>
@@ -116,10 +103,23 @@ export function SignInScreen() {
                 placeholderTextColor={colors.inkFaint}
                 style={styles.input}
                 editable={!busy}
+                returnKeyType="next"
+              />
+              <Text style={styles.fieldHint}>{t('gateTesterHint')}</Text>
+
+              <Text style={[styles.label, styles.labelGap]}>{t('gateVenue')}</Text>
+              <TextInput
+                value={venue}
+                onChangeText={setVenue}
+                autoCapitalize="words"
+                autoCorrect={false}
+                placeholder={t('gateVenuePlaceholder')}
+                placeholderTextColor={colors.inkFaint}
+                style={styles.input}
+                editable={!busy}
                 returnKeyType="go"
                 onSubmitEditing={onSubmit}
               />
-              <Text style={styles.fieldHint}>{t('gateTesterHint')}</Text>
             </>
           ) : (
             <Text style={styles.kitchenHint}>{t('gateKitchenHint')}</Text>
