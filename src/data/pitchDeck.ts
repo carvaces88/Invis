@@ -32,7 +32,7 @@ export const pitchVision = {
 export const pitchMoat = [
   {
     title: 'First-hand chef expertise',
-    body: 'Designed by a former professional chef with 10+ years in real kitchens. The product handles butchery waste, peeling loss, batch prep, and volume-to-weight — workflows corporate tools miss.',
+    body: 'Designed by a former professional chef with 10+ years in real kitchens. The product fits how stock is actually counted — units, packs, deliveries, and hävikki — workflows corporate tools miss.',
   },
   {
     title: 'Kitchen-speed product',
@@ -186,7 +186,7 @@ export const pitchBusinessModel = [
   },
   {
     title: 'Product',
-    body: 'Recipe costing, yield math, and exports kitchens already need for close.',
+    body: 'Photo counting, catalog match, and Restolution exports kitchens already need for close.',
   },
   {
     title: 'Cost',
@@ -221,7 +221,7 @@ export const pitchCompetitors = [
     name: 'Sortly',
     priceLow: 24,
     priceHigh: 89,
-    note: 'Generic asset tracker — no recipe/yield logic',
+    note: 'Generic asset tracker — no hospitality inventory logic',
   },
   {
     name: 'INVIS',
@@ -236,20 +236,20 @@ export const pitchRoi = {
   wasteOfPurchasesLowPct: 4,
   wasteOfPurchasesHighPct: 10,
   wasteCutPct: 25,
-  foodCostTargetLowPct: 28,
-  foodCostTargetHighPct: 32,
+  /** Hours of inventaario / stock admin saved per week (chef-facing) */
+  hoursSavedWeekly: 10,
   points: [
     {
       title: 'Food waste reduction',
-      body: 'Food waste is 4–10% of raw food purchases. INVIS tracks batch expiry and par levels — cutting kitchen waste by up to 25%.',
+      body: 'Food waste is 4–10% of raw food purchases. INVIS tracks hävikki and stock movements — cutting kitchen waste by up to 25%.',
     },
     {
-      title: 'Automated recipe costing',
-      body: 'Dynamic dish cost alerts when ingredient prices rise, locking food cost % into target ranges (28–32%).',
+      title: 'Accurate stock value',
+      body: 'Counts and prices stay at 0% ALV with clear ALV display — managers see real inventory € without spreadsheet rework.',
     },
     {
-      title: 'Yield & prep loss math',
-      body: 'Butchery waste, prep shrinkage, and batch volume changes stay accurate for financial balance sheets.',
+      title: 'Faster month close',
+      body: 'Photo inventaario → confirm → Restolution export replaces clipboard sheets and hours of admin each period.',
     },
   ],
 };

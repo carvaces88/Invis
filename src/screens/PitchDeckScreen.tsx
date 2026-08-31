@@ -598,11 +598,8 @@ export function PitchDeckScreen(_props: Props) {
             <Text style={styles.roiCap}>Waste cut potential</Text>
           </View>
           <View style={[styles.roiTile, { backgroundColor: T.blueDeep }]}>
-            <Text style={styles.roiBig}>
-              {pitchRoi.foodCostTargetLowPct}–
-              {pitchRoi.foodCostTargetHighPct}%
-            </Text>
-            <Text style={styles.roiCap}>Target food cost</Text>
+            <Text style={styles.roiBig}>{pitchRoi.hoursSavedWeekly}+</Text>
+            <Text style={styles.roiCap}>Hours/week stock admin</Text>
           </View>
         </View>
         {pitchRoi.points.map((p) => (
