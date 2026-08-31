@@ -1,0 +1,17 @@
+{
+  "name": "Invis (Expo web)",
+  "install": "npm ci",
+  "terminals": [
+    {
+      "name": "expo-web",
+      "command": "npx expo start --web --port 8081",
+      "description": "Expo web dev server (Metro bundler) for the Invis kitchen inventory app. Once it prints 'Waiting on http://localhost:8081', open that URL and sign in with the name 'guest' (a bypass account that needs no email)."
+    }
+  ],
+  "ports": [
+    {
+      "name": "expo-web",
+      "port": 8081
+    }
+  ]
+}
