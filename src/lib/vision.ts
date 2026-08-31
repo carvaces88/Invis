@@ -37,12 +37,12 @@ function unrecognizedFromError(
   const notes = /not configured|GEMINI_API_KEY|Vision API not configured/i.test(
     msg,
   )
-    ? 'Photo received, but live label reading is not configured. Set GEMINI_API_KEY on the server (/api/vision) for production web, or EXPO_PUBLIC_GEMINI_API_KEY for local Expo.'
+    ? 'Photo received, but live label reading is not available right now. Match inventory or add as new.'
     : keyRestricted
-      ? 'Live label reading blocked by the Google API key. In Cloud Console → Credentials, set Application restrictions to None (needed for Vercel) and allow Generative Language API. Wait 1–5 min, then retry. Match inventory or add as new — we will not invent a K-Ruoka match.'
+      ? 'Live label reading is temporarily unavailable. Match an inventory product or add this as new — we will not invent a public listing match.'
       : configured
-        ? `Live label reading failed: ${msg}. Match an inventory product or add this as new — we will not invent a K-Ruoka match.`
-        : 'Photo received, but live label reading is not configured. Match an inventory product or add this as new.';
+        ? `Live label reading failed. Match an inventory product or add this as new — we will not invent a public listing match.`
+        : 'Photo received, but live label reading is not available right now. Match inventory or add as new.';
   return {
     suggestedName: hint?.trim() || 'Unknown product',
     unit: 'KPL',

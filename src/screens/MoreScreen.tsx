@@ -21,7 +21,7 @@ export function MoreScreen() {
   const { t, locale, setLocale } = useI18n();
   const { unitSystem, setUnitSystem } = useUnitSystem();
   const { clearAllInventory } = useInventory();
-  const { profile, isMaster, signOut } = useAuth();
+  const { profile, isMaster, isInvestor, isPro, signOut } = useAuth();
   const [valueOpen, setValueOpen] = useState(false);
 
   const items = [
@@ -67,7 +67,7 @@ export function MoreScreen() {
     },
     {
       title: t('videoDemo'),
-      subtitle: t('videoDemoSub'),
+      subtitle: isPro ? t('videoDemoSubPro') : t('videoDemoSub'),
       route: 'VideoDemo' as const,
     },
   ];
@@ -109,6 +109,21 @@ export function MoreScreen() {
         <Text style={styles.cardSub}>{t('feedbackMoreSub')}</Text>
       </Pressable>
 
+      {isInvestor || isMaster ? (
+        <Pressable
+          style={({ pressed }) => [
+            styles.pitchCard,
+            pressed && styles.pressed,
+          ]}
+          onPress={() => navigation.navigate('PitchDeck')}
+          accessibilityRole="button"
+          accessibilityLabel={t('pitchDeckTitle')}
+        >
+          <Text style={styles.pitchTitle}>{t('pitchDeckTitle')}</Text>
+          <Text style={styles.pitchSub}>{t('pitchDeckMoreSub')}</Text>
+        </Pressable>
+      ) : null}
+
       {isMaster ? (
         <Pressable
           style={({ pressed }) => [styles.masterCard, pressed && styles.pressed]}
@@ -118,6 +133,21 @@ export function MoreScreen() {
         >
           <Text style={styles.masterTitle}>{t('masterDeckTitle')}</Text>
           <Text style={styles.masterSub}>{t('masterDeckMoreSub')}</Text>
+        </Pressable>
+      ) : null}
+
+      {isInvestor ? (
+        <Pressable
+          style={({ pressed }) => [
+            styles.tractionCard,
+            pressed && styles.pressed,
+          ]}
+          onPress={() => navigation.navigate('AdminDeck')}
+          accessibilityRole="button"
+          accessibilityLabel={t('tractionDeckTitle')}
+        >
+          <Text style={styles.tractionTitle}>{t('tractionDeckTitle')}</Text>
+          <Text style={styles.tractionSub}>{t('tractionDeckMoreSub')}</Text>
         </Pressable>
       ) : null}
 
@@ -345,6 +375,42 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   masterSub: {
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.9)',
+    lineHeight: 20,
+  },
+  pitchCard: {
+    backgroundColor: '#2E9A8A',
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.float,
+  },
+  pitchTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.2,
+  },
+  pitchSub: {
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.92)',
+    lineHeight: 20,
+  },
+  tractionCard: {
+    backgroundColor: colors.accent,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.soft,
+  },
+  tractionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.2,
+  },
+  tractionSub: {
     marginTop: 4,
     color: 'rgba(255,255,255,0.9)',
     lineHeight: 20,

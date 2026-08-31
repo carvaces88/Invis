@@ -35,6 +35,7 @@ import { KuormaScanScreen } from './src/screens/KuormaScanScreen';
 import { MoreScreen } from './src/screens/MoreScreen';
 import { MonthWrapUpScreen } from './src/screens/MonthWrapUpScreen';
 import { PlacesScreen } from './src/screens/PlacesScreen';
+import { PitchDeckScreen } from './src/screens/PitchDeckScreen';
 import { PriceComparisonScreen } from './src/screens/PriceComparisonScreen';
 import { ProductDetailScreen } from './src/screens/ProductDetailScreen';
 import { ProductScanScreen } from './src/screens/ProductScanScreen';
@@ -49,6 +50,7 @@ import { UnitsGuideScreen } from './src/screens/UnitsGuideScreen';
 import { VerifyAmountsScreen } from './src/screens/VerifyAmountsScreen';
 import { VideoDemoScreen } from './src/screens/VideoDemoScreen';
 import { linking } from './src/navigation/linking';
+import { useStackScreenOptions } from './src/navigation/useStackScreenOptions';
 import { colors } from './src/theme/colors';
 
 /**
@@ -204,8 +206,155 @@ function MainTabs() {
   );
 }
 
-function RootNavigator() {
+function RootStack() {
   const { t } = useI18n();
+  const stackScreenOptions = useStackScreenOptions();
+  return (
+    <Stack.Navigator screenOptions={stackScreenOptions}>
+      <Stack.Screen
+        name="MainTabs"
+        component={MainTabs}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="RecordInventory"
+        component={RecordInventoryScreen}
+        options={{ title: t('recordInventoryTitle') }}
+      />
+      <Stack.Screen
+        name="ProductScan"
+        component={ProductScanScreen}
+        options={{ title: t('productPhoto') }}
+      />
+      <Stack.Screen
+        name="KuormaScan"
+        component={KuormaScanScreen}
+        options={{ title: t('delivery') }}
+      />
+      <Stack.Screen
+        name="HavikkiScan"
+        component={HavikkiScanScreen}
+        options={{ title: t('foodWaste') }}
+      />
+      <Stack.Screen
+        name="Confirm"
+        component={ConfirmScreen}
+        options={{ title: t('confirm') }}
+      />
+      <Stack.Screen
+        name="BarcodeScan"
+        component={BarcodeScanScreen}
+        options={{
+          title: t('scanBarcode'),
+          headerTransparent: Platform.OS !== 'web',
+          headerTitleStyle: {
+            color: Platform.OS === 'web' ? colors.ink : '#fff',
+          },
+        }}
+      />
+      <Stack.Screen
+        name="BatchConfirm"
+        component={BatchConfirmScreen}
+        options={{ title: t('confirmLines') }}
+      />
+      <Stack.Screen
+        name="FridgeReview"
+        component={FridgeReviewScreen}
+        options={{ title: t('fridgeReviewTitle') }}
+      />
+      <Stack.Screen
+        name="AddProduct"
+        component={AddProductScreen}
+        options={{ title: t('addProduct') }}
+      />
+      <Stack.Screen
+        name="ReportsChat"
+        component={ReportsChatScreen}
+        options={{ title: t('reports') }}
+      />
+      <Stack.Screen
+        name="HavikkiLog"
+        component={HavikkiLogScreen}
+        options={{ title: t('foodWasteLog') }}
+      />
+      <Stack.Screen
+        name="RecentActivity"
+        component={RecentActivityScreen}
+        options={{ title: t('recentActivityTitle') }}
+      />
+      <Stack.Screen
+        name="VerifyAmounts"
+        component={VerifyAmountsScreen}
+        options={{ title: t('verifyAmountsTitle') }}
+      />
+      <Stack.Screen
+        name="ExportPreview"
+        component={ExportPreviewScreen}
+        options={{ title: t('exportPreviewTitle') }}
+      />
+      <Stack.Screen
+        name="MonthWrapUp"
+        component={MonthWrapUpScreen}
+        options={{ title: t('monthWrapUpTitle') }}
+      />
+      <Stack.Screen
+        name="SheetImport"
+        component={SheetImportScanScreen}
+        options={{ title: t('sheetImportTitle') }}
+      />
+      <Stack.Screen
+        name="SheetImportReview"
+        component={SheetImportReviewScreen}
+        options={{ title: t('sheetImportReviewTitle') }}
+      />
+      <Stack.Screen
+        name="VideoDemo"
+        component={VideoDemoScreen}
+        options={{ title: t('videoDemo') }}
+      />
+      <Stack.Screen
+        name="UnitsGuide"
+        component={UnitsGuideScreen}
+        options={{ title: t('unitsGuide') }}
+      />
+      <Stack.Screen
+        name="ProductDetail"
+        component={ProductDetailScreen}
+        options={{ title: t('catalogDetailTitle') }}
+      />
+      <Stack.Screen
+        name="PriceComparison"
+        component={PriceComparisonScreen}
+        options={{ title: t('priceCompareTitle') }}
+      />
+      <Stack.Screen
+        name="Places"
+        component={PlacesScreen}
+        options={{ title: t('placesTitle') }}
+      />
+      <Stack.Screen
+        name="Feedback"
+        component={FeedbackScreen}
+        options={{
+          title: t('feedbackTitle'),
+          presentation: 'modal',
+        }}
+      />
+      <Stack.Screen
+        name="AdminDeck"
+        component={AdminDeckScreen}
+        options={{ title: t('masterDeckTitle') }}
+      />
+      <Stack.Screen
+        name="PitchDeck"
+        component={PitchDeckScreen}
+        options={{ title: t('pitchDeckTitle') }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+function RootNavigator() {
   return (
     <NavigationContainer
       linking={linking}
@@ -213,232 +362,7 @@ function RootNavigator() {
       theme={navTheme}
     >
       <StatusBar style="dark" />
-      <Stack.Navigator>
-        <Stack.Screen
-          name="MainTabs"
-          component={MainTabs}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="RecordInventory"
-          component={RecordInventoryScreen}
-          options={{
-            title: t('recordInventoryTitle'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="ProductScan"
-          component={ProductScanScreen}
-          options={{
-            title: t('productPhoto'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="KuormaScan"
-          component={KuormaScanScreen}
-          options={{
-            title: t('delivery'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="HavikkiScan"
-          component={HavikkiScanScreen}
-          options={{
-            title: t('foodWaste'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="Confirm"
-          component={ConfirmScreen}
-          options={{
-            title: t('confirm'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="BarcodeScan"
-          component={BarcodeScanScreen}
-          options={{
-            title: t('scanBarcode'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-            headerTransparent: Platform.OS !== 'web',
-            headerTitleStyle: { color: Platform.OS === 'web' ? colors.ink : '#fff' },
-          }}
-        />
-        <Stack.Screen
-          name="BatchConfirm"
-          component={BatchConfirmScreen}
-          options={{
-            title: t('confirmLines'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="FridgeReview"
-          component={FridgeReviewScreen}
-          options={{
-            title: t('fridgeReviewTitle'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="AddProduct"
-          component={AddProductScreen}
-          options={{
-            title: t('addProduct'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="ReportsChat"
-          component={ReportsChatScreen}
-          options={{
-            title: t('reports'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="HavikkiLog"
-          component={HavikkiLogScreen}
-          options={{
-            title: t('foodWasteLog'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="RecentActivity"
-          component={RecentActivityScreen}
-          options={{
-            title: t('recentActivityTitle'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="VerifyAmounts"
-          component={VerifyAmountsScreen}
-          options={{
-            title: t('verifyAmountsTitle'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="ExportPreview"
-          component={ExportPreviewScreen}
-          options={{
-            title: t('exportPreviewTitle'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="MonthWrapUp"
-          component={MonthWrapUpScreen}
-          options={{
-            title: t('monthWrapUpTitle'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="SheetImport"
-          component={SheetImportScanScreen}
-          options={{
-            title: t('sheetImportTitle'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="SheetImportReview"
-          component={SheetImportReviewScreen}
-          options={{
-            title: t('sheetImportReviewTitle'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="VideoDemo"
-          component={VideoDemoScreen}
-          options={{
-            title: t('videoDemo'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="UnitsGuide"
-          component={UnitsGuideScreen}
-          options={{
-            title: t('unitsGuide'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="ProductDetail"
-          component={ProductDetailScreen}
-          options={{
-            title: t('catalogDetailTitle'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="PriceComparison"
-          component={PriceComparisonScreen}
-          options={{
-            title: t('priceCompareTitle'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="Places"
-          component={PlacesScreen}
-          options={{
-            title: t('placesTitle'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="Feedback"
-          component={FeedbackScreen}
-          options={{
-            title: t('feedbackTitle'),
-            presentation: 'modal',
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="AdminDeck"
-          component={AdminDeckScreen}
-          options={{
-            title: t('masterDeckTitle'),
-            headerTintColor: colors.primary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        />
-      </Stack.Navigator>
+      <RootStack />
     </NavigationContainer>
   );
 }

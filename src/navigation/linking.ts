@@ -39,11 +39,13 @@ export const linking: LinkingOptions<RootStackParamList> = {
       SheetImportReview: 'import-sheet-review',
       VideoDemo: 'video-demo',
       UnitsGuide: 'units',
-      ProductDetail: 'catalog/:productId',
+      /** Avoid `catalog/:id` — that prefix collides with the Catalog tab path and can drop MainTabs from the stack on web. */
+      ProductDetail: 'product/:productId',
       PriceComparison: 'prices',
       Places: 'places',
       Feedback: 'feedback',
       AdminDeck: 'admin',
+      PitchDeck: 'pitch',
     },
   },
 };

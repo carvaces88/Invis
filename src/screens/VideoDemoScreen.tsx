@@ -2,19 +2,24 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../auth/AuthContext';
 import type { RootStackParamList } from '../data/types';
+import { useI18n } from '../i18n';
 import { isVideoAnalysisEnabled } from '../lib/vision';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'VideoDemo'>;
 
 /**
- * Stub for paid live-camera / video walkthrough demo.
- * Not enabled on free/trial — architecture hook only.
+ * Live-camera / video walkthrough demo.
+ * Paid for normal users; unlocked for investor walkthrough (isPro).
  */
 export function VideoDemoScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const enabled = isVideoAnalysisEnabled();
+  const { t } = useI18n();
+  const { isPro } = useAuth();
+  const flagOn = isVideoAnalysisEnabled();
+  const unlocked = isPro || flagOn;
 
   return (
     <View
@@ -26,23 +31,21 @@ export function VideoDemoScreen({ navigation }: Props) {
         },
       ]}
     >
-      <Text style={styles.kicker}>Paid demo · not in free/trial</Text>
-      <Text style={styles.title}>Live camera walkthrough</Text>
+      <Text style={[styles.kicker, unlocked && styles.kickerOn]}>
+        {unlocked ? t('videoDemoUnlockedKicker') : t('videoDemoLockedKicker')}
+      </Text>
+      <Text style={styles.title}>{t('videoDemoScreenTitle')}</Text>
       <Text style={styles.body}>
-        Later: stream frames + voice while walking the walk-in. Costs scale with
-        session minutes, so this stays behind a paid flag. Image scan remains
-        the default path.
+        {unlocked ? t('videoDemoUnlockedBody') : t('videoDemoLockedBody')}
       </Text>
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Status</Text>
+        <Text style={styles.cardTitle}>{t('videoDemoStatusTitle')}</Text>
         <Text style={styles.cardBody}>
-          {enabled
-            ? 'Video analysis flag is ON'
-            : 'Stub only — isVideoAnalysisEnabled() → false'}
+          {unlocked ? t('videoDemoStatusOn') : t('videoDemoStatusOff')}
         </Text>
       </View>
       <Pressable style={styles.btn} onPress={() => navigation.goBack()}>
-        <Text style={styles.btnText}>Back to photo scan</Text>
+        <Text style={styles.btnText}>{t('videoDemoBack')}</Text>
       </Pressable>
     </View>
   );
@@ -59,6 +62,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12,
     textTransform: 'uppercase',
+  },
+  kickerOn: {
+    color: colors.success,
   },
   title: {
     fontSize: 24,
