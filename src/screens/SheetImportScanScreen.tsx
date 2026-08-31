@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -14,21 +15,28 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RootStackParamList } from '../data/types';
 import { useI18n } from '../i18n';
 import { alertInfo } from '../lib/alertAck';
-import { analyzeInventaarioSheetImage } from '../lib/vision';
+import { analyzePriorStockListImages } from '../lib/vision';
 import { colors, radius, spacing } from '../theme/colors';
 
+const MAX_PHOTOS = 8;
+
 /**
- * Desktop-first: upload a photo of printed inventaariopohja → OCR → validate.
+ * Multi-photo prior stock list / inventaariopohja → OCR → validate.
  */
 export function SheetImportScanScreen() {
   const insets = useSafeAreaInsets();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { t } = useI18n();
-  const [uri, setUri] = useState<string | null>(null);
+  const [uris, setUris] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   async function pick(fromCamera: boolean) {
+    const remaining = MAX_PHOTOS - uris.length;
+    if (remaining <= 0) {
+      alertInfo(t('sheetImportTitle'), t('sheetImportMaxPhotos'));
+      return;
+    }
     const perm = fromCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -36,31 +44,45 @@ export function SheetImportScanScreen() {
       alertInfo(t('sheetImportTitle'), t('sheetImportNeedPermission'));
       return;
     }
-    const result = fromCamera
-      ? await ImagePicker.launchCameraAsync({ quality: 0.85 })
-      : await ImagePicker.launchImageLibraryAsync({
-          quality: 0.85,
-        });
-    if (!result.canceled && result.assets[0]) {
-      setUri(result.assets[0].uri);
+    if (fromCamera) {
+      const result = await ImagePicker.launchCameraAsync({ quality: 0.85 });
+      if (!result.canceled && result.assets[0]) {
+        setUris((prev) => [...prev, result.assets[0].uri].slice(0, MAX_PHOTOS));
+      }
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      quality: 0.85,
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+    });
+    if (!result.canceled && result.assets.length) {
+      setUris((prev) =>
+        [...prev, ...result.assets.map((a) => a.uri)].slice(0, MAX_PHOTOS),
+      );
     }
   }
 
+  function removeAt(index: number) {
+    setUris((prev) => prev.filter((_, i) => i !== index));
+  }
+
   async function analyze() {
-    if (!uri) {
+    if (!uris.length) {
       alertInfo(t('sheetImportTitle'), t('sheetImportNeedPhoto'));
       return;
     }
     setBusy(true);
     try {
-      const document = await analyzeInventaarioSheetImage(uri);
+      const document = await analyzePriorStockListImages(uris);
       if (!document.lines.length) {
         alertInfo(t('sheetImportTitle'), t('sheetImportEmpty'));
         return;
       }
       navigation.navigate('SheetImportReview', {
         document,
-        imageUri: uri,
+        imageUri: uris[0],
+        imageUris: uris,
       });
     } catch (err) {
       alertInfo(
@@ -83,13 +105,39 @@ export function SheetImportScanScreen() {
       <Text style={styles.title}>{t('sheetImportTitle')}</Text>
       <Text style={styles.sub}>{t('sheetImportSub')}</Text>
 
-      <View style={styles.preview}>
-        {uri ? (
-          <Image source={{ uri }} style={styles.image} resizeMode="contain" />
+      <ScrollView
+        horizontal
+        style={styles.previewScroll}
+        contentContainerStyle={styles.previewRow}
+        showsHorizontalScrollIndicator={false}
+      >
+        {uris.length === 0 ? (
+          <View style={styles.previewEmpty}>
+            <Text style={styles.placeholder}>{t('sheetImportPlaceholder')}</Text>
+          </View>
         ) : (
-          <Text style={styles.placeholder}>{t('sheetImportPlaceholder')}</Text>
+          uris.map((uri, i) => (
+            <View key={`${uri}-${i}`} style={styles.thumbWrap}>
+              <Image source={{ uri }} style={styles.thumb} resizeMode="cover" />
+              <Pressable
+                style={styles.removeBtn}
+                onPress={() => removeAt(i)}
+                accessibilityRole="button"
+                accessibilityLabel={t('sheetImportRemovePhoto')}
+              >
+                <Text style={styles.removeText}>×</Text>
+              </Pressable>
+            </View>
+          ))
         )}
-      </View>
+      </ScrollView>
+      {uris.length > 0 ? (
+        <Text style={styles.count}>
+          {t('sheetImportPhotoCount')
+            .replace('{n}', String(uris.length))
+            .replace('{max}', String(MAX_PHOTOS))}
+        </Text>
+      ) : null}
 
       <View style={styles.actions}>
         <Pressable
@@ -109,8 +157,8 @@ export function SheetImportScanScreen() {
       </View>
 
       <Pressable
-        style={[styles.analyze, (!uri || busy) && { opacity: 0.65 }]}
-        disabled={!uri || busy}
+        style={[styles.analyze, (!uris.length || busy) && { opacity: 0.65 }]}
+        disabled={!uris.length || busy}
         onPress={() => void analyze()}
         accessibilityRole="button"
       >
@@ -152,25 +200,57 @@ const styles = StyleSheet.create({
     color: colors.inkMuted,
     marginBottom: spacing.md,
   },
-  preview: {
-    flex: 1,
-    minHeight: 220,
-    maxHeight: 420,
+  previewScroll: {
+    maxHeight: 160,
+    marginBottom: spacing.sm,
+  },
+  previewRow: {
+    gap: spacing.sm,
+    alignItems: 'center',
+    minHeight: 140,
+  },
+  previewEmpty: {
+    minWidth: 280,
+    height: 140,
     borderRadius: radius.lg,
     backgroundColor: colors.bgElevated,
     borderWidth: 1,
     borderColor: colors.line,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-    marginBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
-  image: { width: '100%', height: '100%' },
+  thumbWrap: {
+    width: 120,
+    height: 140,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.bgElevated,
+  },
+  thumb: { width: '100%', height: '100%' },
+  removeBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeText: { color: '#fff', fontSize: 18, fontWeight: '700', lineHeight: 20 },
   placeholder: {
     color: colors.inkFaint,
     fontSize: 14,
     textAlign: 'center',
-    paddingHorizontal: spacing.lg,
+  },
+  count: {
+    fontSize: 12,
+    color: colors.inkFaint,
+    marginBottom: spacing.sm,
   },
   actions: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   btnPrimary: {

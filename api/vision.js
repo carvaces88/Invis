@@ -68,6 +68,24 @@ Rules:
 - title: sheet title + PVM date when visible.
 - confidence: overall OCR confidence 0–1.`;
 
+const PRIOR_LIST_SYSTEM_PROMPT = `You are Inventaario OCR for PRIOR STOCK LISTS: handwritten notes, phone photos of printed pages, or last-month inventory sheets.
+Return JSON only. Ground EVERY line on visible text in the photo(s). Do not invent products.
+
+Extract each product line as:
+- suggestedName: product / ingredient name (keep Finnish when printed; brand + title when both visible)
+- quantity: number when written (European decimals 0,5 → 0.5); null if only a name with no count
+- unit: POS code when written or clearly implied — L, KPL, PRK, RSA, PSS, PL, PLO, LTK, KG, RAS, PKT
+  Map words: jar/can/purkki → PRK; bag/pussi → PSS; bottle/pullo → PL; box/crate/bucket/laatikko → LTK; packet → PKT; tray/rasia → RSA; piece → KPL; kilo → KG; liter → L
+- unitPriceAlv0: only if a price is clearly printed and already 0% ALV; otherwise null (do NOT invent K-Ruoka prices)
+- aliases: optional short nicknames visible on the note
+- rawNotes: "handwritten" / "printed page" / section header when helpful
+
+Rules:
+- Multiple photos may be pages of the same list — merge all lines, skip obvious duplicates.
+- Skip headers, totals, signatures, and blank lines.
+- title: e.g. "Prior stock · March" or visible date/header.
+- confidence: overall OCR confidence 0–1.`;
+
 const VISION_SCHEMA = {
   type: 'OBJECT',
   properties: {
@@ -205,7 +223,7 @@ function mapFridgeDocument(raw, model, photoCount) {
   };
 }
 
-function mapSheetDocument(raw, model, photoCount) {
+function mapSheetDocument(raw, model, photoCount, kind) {
   const linesRaw = Array.isArray(raw.lines) ? raw.lines : [];
   const lines = linesRaw.map((row) => {
     const extract = mapExtract(row);
@@ -225,14 +243,19 @@ function mapSheetDocument(raw, model, photoCount) {
       : lines.length
         ? lines.reduce((s, l) => s + l.confidence, 0) / lines.length
         : 0.5;
+  const docKind = kind === 'prior_list' ? 'prior_list' : 'sheet';
   return {
-    kind: 'sheet',
-    title: raw.title ? String(raw.title).trim() : 'Inventaariopohja',
+    kind: docKind,
+    title: raw.title
+      ? String(raw.title).trim()
+      : docKind === 'prior_list'
+        ? 'Prior stock list'
+        : 'Inventaariopohja',
     lines,
     confidence,
     rawNotes: [
       raw.rawNotes ? String(raw.rawNotes) : null,
-      `Live Gemini sheet proxy (${model}) · ${photoCount} photo(s)`,
+      `Live Gemini ${docKind} proxy (${model}) · ${photoCount} photo(s)`,
     ]
       .filter(Boolean)
       .join(' · '),
@@ -276,10 +299,12 @@ module.exports = async function handler(req, res) {
         ? 'fridge'
         : body.mode === 'sheet'
           ? 'sheet'
-          : 'product';
+          : body.mode === 'prior_list'
+            ? 'prior_list'
+            : 'product';
 
     const payloads = images
-      .slice(0, mode === 'product' ? 4 : 2)
+      .slice(0, mode === 'product' ? 4 : mode === 'prior_list' ? 8 : 2)
       .map((img) => ({
         mimeType: String(img.mimeType || 'image/jpeg'),
         data: String(img.base64 || '').replace(/\s/g, ''),
@@ -293,34 +318,44 @@ module.exports = async function handler(req, res) {
 
     const isFridge = mode === 'fridge';
     const isSheet = mode === 'sheet';
+    const isPriorList = mode === 'prior_list';
+    const isDocList = isSheet || isPriorList;
     const parts = [
       ...payloads.map((p) => ({
         inlineData: { mimeType: p.mimeType, data: p.data },
       })),
       {
-        text: isSheet
+        text: isPriorList
           ? [
-              SHEET_SYSTEM_PROMPT,
+              PRIOR_LIST_SYSTEM_PROMPT,
               hint ? `Optional staff notes (may be wrong): ${hint}` : null,
-              'OCR this inventaariopohja clipboard photo. Extract every NIMIKE row with YKSIKKÖ, MÄÄRÄ (handwritten), HINTA.',
+              `OCR ${payloads.length} photo(s) of a prior stock list / handwritten note / printed page. Extract every product line with name, quantity when present, and unit.`,
             ]
               .filter(Boolean)
               .join('\n')
-          : isFridge
+          : isSheet
             ? [
-                FRIDGE_SYSTEM_PROMPT,
+                SHEET_SYSTEM_PROMPT,
                 hint ? `Optional staff notes (may be wrong): ${hint}` : null,
-                'Analyze this fridge/shelf panorama. List every distinct product with estimated count.',
+                'OCR this inventaariopohja clipboard photo. Extract every NIMIKE row with YKSIKKÖ, MÄÄRÄ (handwritten), HINTA.',
               ]
                 .filter(Boolean)
                 .join('\n')
-            : [
-                SYSTEM_PROMPT,
-                hint ? `Optional staff hint (may be wrong): ${hint}` : null,
-                `Analyze ${payloads.length} close-up photo(s) of one product.`,
-              ]
-                .filter(Boolean)
-                .join('\n'),
+            : isFridge
+              ? [
+                  FRIDGE_SYSTEM_PROMPT,
+                  hint ? `Optional staff notes (may be wrong): ${hint}` : null,
+                  'Analyze this fridge/shelf panorama. List every distinct product with estimated count.',
+                ]
+                  .filter(Boolean)
+                  .join('\n')
+              : [
+                  SYSTEM_PROMPT,
+                  hint ? `Optional staff hint (may be wrong): ${hint}` : null,
+                  `Analyze ${payloads.length} close-up photo(s) of one product.`,
+                ]
+                  .filter(Boolean)
+                  .join('\n'),
       },
     ];
 
@@ -331,9 +366,9 @@ module.exports = async function handler(req, res) {
       body: JSON.stringify({
         contents: [{ role: 'user', parts }],
         generationConfig: {
-          temperature: isSheet ? 0.1 : 0.2,
+          temperature: isDocList ? 0.1 : 0.2,
           responseMimeType: 'application/json',
-          responseSchema: isFridge || isSheet ? FRIDGE_SCHEMA : VISION_SCHEMA,
+          responseSchema: isFridge || isDocList ? FRIDGE_SCHEMA : VISION_SCHEMA,
         },
       }),
     });
@@ -371,8 +406,10 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    if (isSheet) {
-      res.status(200).json(mapSheetDocument(parsed, model, payloads.length));
+    if (isDocList) {
+      res
+        .status(200)
+        .json(mapSheetDocument(parsed, model, payloads.length, mode));
       return;
     }
 

@@ -44,6 +44,7 @@ import { ReportsChatScreen } from './src/screens/ReportsChatScreen';
 import { ScanScreen } from './src/screens/ScanScreen';
 import { SheetImportReviewScreen } from './src/screens/SheetImportReviewScreen';
 import { SheetImportScanScreen } from './src/screens/SheetImportScanScreen';
+import { InventoryPhotosScreen } from './src/screens/InventoryPhotosScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { UnitsGuideScreen } from './src/screens/UnitsGuideScreen';
 import { VerifyAmountsScreen } from './src/screens/VerifyAmountsScreen';
@@ -370,6 +371,15 @@ function RootNavigator() {
           component={SheetImportReviewScreen}
           options={{
             title: t('sheetImportReviewTitle'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="InventoryPhotos"
+          component={InventoryPhotosScreen}
+          options={{
+            title: t('inventoryPhotosTitle'),
             headerTintColor: colors.primary,
             headerStyle: { backgroundColor: colors.bg },
           }}

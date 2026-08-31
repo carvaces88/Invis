@@ -51,6 +51,11 @@ export function MoreScreen() {
       route: 'SheetImport' as const,
     },
     {
+      title: t('inventoryPhotosOpen'),
+      subtitle: t('inventoryPhotosOpenSub'),
+      route: 'InventoryPhotos' as const,
+    },
+    {
       title: t('monthWrapUpOpen'),
       subtitle: t('monthWrapUpOpenSub'),
       route: 'MonthWrapUp' as const,

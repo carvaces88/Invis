@@ -8,6 +8,7 @@ import {
   analyzeFridgeShelfWithGemini,
   analyzeImagesWithGemini,
   analyzeInventaarioSheetWithGemini,
+  analyzePriorStockListWithGemini,
   isRealImageUri,
 } from './geminiVision';
 import {
@@ -137,6 +138,26 @@ export async function analyzeInventaarioSheetImage(
     return await analyzeInventaarioSheetWithGemini(imageUri, trimmed);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Sheet OCR failed';
+    throw new Error(msg);
+  }
+}
+
+/**
+ * Prior stock list / handwritten notes / printed pages (multi-photo) → review rows.
+ */
+export async function analyzePriorStockListImages(
+  imageUris: string[],
+  hint?: string,
+): Promise<DocumentExtract> {
+  const trimmed = hint?.trim() || undefined;
+  const real = imageUris.filter(isRealImageUri);
+  if (!real.length) {
+    throw new Error('Upload photos of the prior stock list first.');
+  }
+  try {
+    return await analyzePriorStockListWithGemini(real, trimmed);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Prior list OCR failed';
     throw new Error(msg);
   }
 }

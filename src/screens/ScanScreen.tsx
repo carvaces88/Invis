@@ -59,6 +59,12 @@ export function ScanScreen() {
       tone: 'primary' as const,
     },
     {
+      title: t('inventoryPhotosOpen'),
+      subtitle: t('inventoryPhotosOpenSub'),
+      onPress: () => navigation.navigate('InventoryPhotos'),
+      tone: 'primary' as const,
+    },
+    {
       title: t('delivery'),
       subtitle: t('deliverySub'),
       onPress: () => navigation.navigate('KuormaScan'),

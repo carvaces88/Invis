@@ -400,7 +400,7 @@ function CatalogMatchPicker({
  * Desktop-friendly validation table: edit OCR rows, sort A–Z, write absolute stock.
  */
 export function SheetImportReviewScreen({ route, navigation }: Props) {
-  const { document } = route.params;
+  const { document, imageUri, imageUris } = route.params;
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const wide = width >= 900;
@@ -412,6 +412,7 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
     setActivePlaceId,
     upsertCountedProduct,
     addProduct,
+    savePriorStockList,
   } = useInventory();
 
   const [placeId, setPlaceId] = useState(activePlaceId);
@@ -589,6 +590,13 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
       setActivePlaceId(placeId);
       let written = 0;
       let created = 0;
+      const snapshotLines: {
+        name: string;
+        quantity: number | null;
+        unit: UnitCode | null;
+        aliases?: string[];
+        matchedProductId?: string | null;
+      }[] = [];
 
       for (const d of selected) {
         const qty = parseFiNumber(d.qty);
@@ -610,7 +618,16 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
           productId = product.id;
           created += 1;
         }
-        if (!productId) continue;
+        if (!productId) {
+          snapshotLines.push({
+            name: formatProductDisplayName(d.name) || d.extract.suggestedName,
+            quantity: qty,
+            unit,
+            aliases: d.extract.aliases,
+            matchedProductId: null,
+          });
+          continue;
+        }
 
         if (qty != null && qty >= 0) {
           upsertCountedProduct({
@@ -622,7 +639,26 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
           });
           written += 1;
         }
+        snapshotLines.push({
+          name: formatProductDisplayName(d.name) || d.extract.suggestedName,
+          quantity: qty,
+          unit,
+          aliases: d.extract.aliases,
+          matchedProductId: productId,
+        });
       }
+
+      const sourceUris =
+        imageUris?.filter(Boolean) ??
+        (imageUri ? [imageUri] : []);
+      savePriorStockList({
+        id: `prior-${Date.now()}`,
+        title: document.title || t('sheetImportTitle'),
+        importedAt: new Date().toISOString(),
+        placeId,
+        sourceImageUris: sourceUris,
+        lines: snapshotLines,
+      });
 
       setWriteDone(true);
       alertAck(

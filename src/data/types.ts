@@ -260,13 +260,44 @@ export interface DocumentExtract {
   /**
    * kuorma = delivery in · havikki = waste out · fridge = multi-item shelf count
    * · sheet = printed inventaariopohja / clipboard inventory form
+   * · prior_list = handwritten note or printed prior-month stock list
    */
-  kind: 'kuorma' | 'havikki' | 'fridge' | 'sheet';
+  kind: 'kuorma' | 'havikki' | 'fridge' | 'sheet' | 'prior_list';
   title?: string;
   station?: string;
   lines: VisionExtract[];
   confidence: number;
   rawNotes?: string;
+}
+
+/** One digitized line from an imported prior stock list (cross-ref corpus). */
+export interface PriorStockListLine {
+  name: string;
+  quantity: number | null;
+  unit: UnitCode | null;
+  aliases?: string[];
+  /** Catalog product id when confirmed during import review */
+  matchedProductId?: string | null;
+}
+
+/** Snapshot of last imported prior stock list (photos + lines). */
+export interface PriorStockListSnapshot {
+  id: string;
+  title: string;
+  importedAt: string;
+  placeId?: string;
+  sourceImageUris: string[];
+  lines: PriorStockListLine[];
+}
+
+/** Photo saved into the inventory album for a place/session date. */
+export interface InventoryPhoto {
+  id: string;
+  uri: string;
+  placeId: string;
+  sessionDate: string;
+  createdAt: string;
+  note?: string;
 }
 
 export type ProductMatchKind =
@@ -348,12 +379,16 @@ export type RootStackParamList = {
   ExportPreview: undefined;
   /** End-of-month finalize · summary · Restolution report */
   MonthWrapUp: undefined;
-  /** Photo of printed inventaariopohja → OCR → validate → absolute counts */
+  /** Multi-photo prior stock list / inventaariopohja → OCR → validate → absolute counts */
   SheetImport: undefined;
   SheetImportReview: {
     document: DocumentExtract;
     imageUri?: string;
+    /** All source photos (multi-page import) */
+    imageUris?: string[];
   };
+  /** Browse inventory session photos by place / date */
+  InventoryPhotos: undefined;
   /** Optional feedback / comments (strongly nudged after sign-in) */
   Feedback: { nudged?: boolean } | undefined;
   /** Cesar / Elena / Ivan: people, sign-ins, feedback */

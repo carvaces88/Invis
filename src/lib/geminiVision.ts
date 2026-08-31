@@ -858,6 +858,24 @@ Rules:
 - title: sheet title + PVM date when visible (e.g. "Inventaariopohja RR · 1.3.2024").
 - confidence: overall OCR confidence 0–1.`;
 
+const PRIOR_LIST_SYSTEM_PROMPT = `You are Inventaario OCR for PRIOR STOCK LISTS: handwritten notes, phone photos of printed pages, or last-month inventory sheets.
+Return JSON only. Ground EVERY line on visible text in the photo(s). Do not invent products.
+
+Extract each product line as:
+- suggestedName: product / ingredient name (keep Finnish when printed; brand + title when both visible)
+- quantity: number when written (European decimals 0,5 → 0.5); null if only a name with no count
+- unit: POS code when written or clearly implied — L, KPL, PRK, RSA, PSS, PL, PLO, LTK, KG, RAS, PKT
+  Map words: jar/can/purkki → PRK; bag/pussi → PSS; bottle/pullo → PL; box/crate/bucket/laatikko → LTK; packet → PKT; tray/rasia → RSA; piece → KPL; kilo → KG; liter → L
+- unitPriceAlv0: only if a price is clearly printed and already 0% ALV; otherwise null (do NOT invent K-Ruoka prices)
+- aliases: optional short nicknames visible on the note
+- rawNotes: "handwritten" / "printed page" / section header when helpful
+
+Rules:
+- Multiple photos may be pages of the same list — merge all lines, skip obvious duplicates.
+- Skip headers, totals, signatures, and blank lines.
+- title: e.g. "Prior stock · March" or visible date/header.
+- confidence: overall OCR confidence 0–1.`;
+
 /**
  * Printed inventaariopohja / clipboard sheet photo → DocumentExtract (kind sheet).
  */
@@ -872,12 +890,44 @@ export async function analyzeInventaarioSheetWithGemini(
   const payload = await imageUriToPayload(imageUri);
   const apiKey = getGeminiApiKey();
   if (apiKey) {
-    return callGeminiSheetDirect([payload], apiKey, hint);
+    return callGeminiSheetDirect([payload], apiKey, hint, 'sheet');
   }
 
   const proxyUrl = getVisionProxyUrl();
   if (proxyUrl) {
-    return callVisionSheetProxy([payload], proxyUrl, hint);
+    return callVisionSheetProxy([payload], proxyUrl, hint, 'sheet');
+  }
+
+  throw new Error(
+    'Live vision is not configured. Set EXPO_PUBLIC_GEMINI_API_KEY or GEMINI_API_KEY on /api/vision.',
+  );
+}
+
+/**
+ * Handwritten / printed prior stock list (1–8 photos) → DocumentExtract (kind prior_list).
+ */
+export async function analyzePriorStockListWithGemini(
+  imageUris: string[],
+  hint?: string,
+): Promise<DocumentExtract> {
+  const real = imageUris.filter(isRealImageUri).slice(0, 8);
+  if (!real.length) {
+    throw new Error('Upload photos of the prior stock list first.');
+  }
+
+  const payloads: ImagePayload[] = [];
+  for (const uri of real) {
+    payloads.push(await imageUriToPayload(uri));
+  }
+
+  const apiKey = getGeminiApiKey();
+  if (apiKey) {
+    return callGeminiSheetDirect(payloads, apiKey, hint, 'prior_list');
+  }
+
+  const proxyUrl = getVisionProxyUrl();
+  if (proxyUrl) {
+    return callVisionSheetProxy(payloads, proxyUrl, hint, 'prior_list');
   }
 
   throw new Error(
@@ -888,6 +938,7 @@ export async function analyzeInventaarioSheetWithGemini(
 function toSheetDocument(
   raw: Record<string, unknown>,
   noteSuffix: string,
+  kind: 'sheet' | 'prior_list' = 'sheet',
 ): DocumentExtract {
   const linesRaw = Array.isArray(raw.lines) ? raw.lines : [];
   const lines = linesRaw
@@ -909,7 +960,9 @@ function toSheetDocument(
   const title =
     typeof raw.title === 'string' && raw.title.trim()
       ? raw.title.trim()
-      : 'Inventaariopohja';
+      : kind === 'prior_list'
+        ? 'Prior stock list'
+        : 'Inventaariopohja';
   const rawNotes = [
     typeof raw.rawNotes === 'string' && raw.rawNotes.trim()
       ? raw.rawNotes.trim()
@@ -919,7 +972,7 @@ function toSheetDocument(
     .filter(Boolean)
     .join(' · ');
   return {
-    kind: 'sheet',
+    kind,
     title,
     lines,
     confidence,
@@ -931,12 +984,13 @@ async function callVisionSheetProxy(
   payloads: ImagePayload[],
   proxyUrl: string,
   hint?: string,
+  mode: 'sheet' | 'prior_list' = 'sheet',
 ): Promise<DocumentExtract> {
   const res = await fetch(proxyUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({
-      mode: 'sheet',
+      mode,
       hint: hint?.trim() || undefined,
       images: payloads.map((p) => ({
         mimeType: p.mimeType,
@@ -953,9 +1007,12 @@ async function callVisionSheetProxy(
     throw new Error('Vision proxy returned an empty sheet extract');
   }
   const note = hint?.trim();
+  const kind = mode === 'prior_list' ? 'prior_list' : 'sheet';
   return {
-    kind: 'sheet',
-    title: body.title ?? 'Inventaariopohja',
+    kind,
+    title:
+      body.title ??
+      (kind === 'prior_list' ? 'Prior stock list' : 'Inventaariopohja'),
     lines: body.lines.map((l) => ({
       ...l,
       unit: (l.unit as VisionExtract['unit']) ?? null,
@@ -970,10 +1027,13 @@ async function callVisionSheetProxy(
     })),
     confidence: body.confidence ?? 0.5,
     rawNotes: note
-      ? [body.rawNotes ?? 'Live Gemini sheet (proxy)', `Staff notes: ${note}`]
+      ? [
+          body.rawNotes ?? `Live Gemini ${kind} (proxy)`,
+          `Staff notes: ${note}`,
+        ]
           .filter(Boolean)
           .join(' · ')
-      : (body.rawNotes ?? 'Live Gemini sheet (proxy)'),
+      : (body.rawNotes ?? `Live Gemini ${kind} (proxy)`),
   };
 }
 
@@ -981,17 +1041,24 @@ async function callGeminiSheetDirect(
   payloads: ImagePayload[],
   apiKey: string,
   hint?: string,
+  mode: 'sheet' | 'prior_list' = 'sheet',
 ): Promise<DocumentExtract> {
   const note = hint?.trim();
+  const system =
+    mode === 'prior_list' ? PRIOR_LIST_SYSTEM_PROMPT : SHEET_SYSTEM_PROMPT;
+  const task =
+    mode === 'prior_list'
+      ? `OCR ${payloads.length} photo(s) of a prior stock list / handwritten note / printed page. Extract every product line with name, quantity when present, and unit.`
+      : 'OCR this inventaariopohja clipboard photo. Extract every NIMIKE row with YKSIKKÖ, MÄÄRÄ (handwritten), HINTA.';
   const parts: GeminiPart[] = [
     ...payloads.map((p) => ({
       inlineData: { mimeType: p.mimeType, data: p.base64 },
     })),
     {
       text: [
-        SHEET_SYSTEM_PROMPT,
+        system,
         note ? `Optional staff notes (may be wrong): ${note}` : null,
-        'OCR this inventaariopohja clipboard photo. Extract every NIMIKE row with YKSIKKÖ, MÄÄRÄ (handwritten), HINTA.',
+        task,
       ]
         .filter(Boolean)
         .join('\n'),
@@ -1041,7 +1108,8 @@ async function callGeminiSheetDirect(
 
   const doc = toSheetDocument(
     parsed,
-    `Live Gemini sheet (${model}) · ${payloads.length} photo(s)`,
+    `Live Gemini ${mode} (${model}) · ${payloads.length} photo(s)`,
+    mode,
   );
   if (!note) return doc;
   return {

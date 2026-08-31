@@ -33,8 +33,10 @@ import type {
   InventoryActivityEntry,
   InventoryLine,
   InventoryPeriodSnapshot,
+  InventoryPhoto,
   InventorySession,
   Place,
+  PriorStockListSnapshot,
   Product,
   Recipe,
   StockMovement,
@@ -54,11 +56,37 @@ const PLACES_KEY = 'invis.places';
 const SITE_NAME_KEY = 'invis.siteName';
 const ACTIVE_PLACE_KEY = 'invis.activePlaceId';
 const PERIOD_SNAPSHOT_KEY = 'invis.periodSnapshot';
+const PRIOR_STOCK_LIST_KEY = 'invis.priorStockList';
+const INVENTORY_PHOTOS_KEY = 'invis.inventoryPhotos';
 /** Once set, never re-inject SEED_QTY on startup — stay empty until user records */
 const INVENTORY_CLEARED_KEY = 'invis.inventoryCleared';
 /** Soft prompt window when adding the same product+place again */
 export const RECENT_ADD_WINDOW_MS = 2 * 60 * 1000;
 const MAX_ACTIVITY = 20;
+const MAX_INVENTORY_PHOTOS = 80;
+
+function isPriorStockListSnapshot(v: unknown): v is PriorStockListSnapshot {
+  if (!v || typeof v !== 'object') return false;
+  const s = v as PriorStockListSnapshot;
+  return (
+    typeof s.id === 'string' &&
+    typeof s.importedAt === 'string' &&
+    Array.isArray(s.lines) &&
+    Array.isArray(s.sourceImageUris)
+  );
+}
+
+function isInventoryPhoto(v: unknown): v is InventoryPhoto {
+  if (!v || typeof v !== 'object') return false;
+  const p = v as InventoryPhoto;
+  return (
+    typeof p.id === 'string' &&
+    typeof p.uri === 'string' &&
+    typeof p.placeId === 'string' &&
+    typeof p.sessionDate === 'string' &&
+    typeof p.createdAt === 'string'
+  );
+}
 
 function isInventorySession(v: unknown): v is InventorySession {
   if (!v || typeof v !== 'object') return false;
@@ -274,6 +302,18 @@ type Store = {
     notes?: string;
   }) => void;
   replaceProducts: (products: Product[]) => void;
+  /** Last imported prior stock list (cross-ref corpus) */
+  priorStockList: PriorStockListSnapshot | null;
+  savePriorStockList: (snapshot: PriorStockListSnapshot) => void;
+  clearPriorStockList: () => void;
+  /** Photos saved into the inventory album */
+  inventoryPhotos: InventoryPhoto[];
+  addInventoryPhoto: (args: {
+    uri: string;
+    placeId?: string;
+    note?: string;
+  }) => InventoryPhoto | null;
+  removeInventoryPhoto: (id: string) => void;
 };
 
 const InventoryContext = createContext<Store | null>(null);
@@ -476,6 +516,10 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const [lastRecordUnit, setLastRecordUnitState] = useState<UnitCode>('KPL');
   const [catalogReady, setCatalogReady] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
+  const [priorStockList, setPriorStockList] =
+    useState<PriorStockListSnapshot | null>(null);
+  const [inventoryPhotos, setInventoryPhotos] = useState<InventoryPhoto[]>([]);
+  const [vaultReady, setVaultReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -494,6 +538,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           siteRaw,
           activeRaw,
           snapshotRaw,
+          priorListRaw,
+          photosRaw,
         ] = await Promise.all([
           AsyncStorage.getItem(CUSTOM_PRODUCTS_KEY),
           AsyncStorage.getItem(ALIAS_EXTRAS_KEY),
@@ -507,12 +553,34 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(SITE_NAME_KEY),
           AsyncStorage.getItem(ACTIVE_PLACE_KEY),
           AsyncStorage.getItem(PERIOD_SNAPSHOT_KEY),
+          AsyncStorage.getItem(PRIOR_STOCK_LIST_KEY),
+          AsyncStorage.getItem(INVENTORY_PHOTOS_KEY),
         ]);
         if (cancelled) return;
         let customs: Product[] = [];
         let extras: AliasExtras = {};
         let packs: PackExtras = {};
         let fields: CatalogFieldExtras = {};
+        if (priorListRaw) {
+          try {
+            const parsed = JSON.parse(priorListRaw) as unknown;
+            if (isPriorStockListSnapshot(parsed)) setPriorStockList(parsed);
+          } catch {
+            /* ignore */
+          }
+        }
+        if (photosRaw) {
+          try {
+            const parsed = JSON.parse(photosRaw) as unknown;
+            if (Array.isArray(parsed)) {
+              setInventoryPhotos(
+                parsed.filter(isInventoryPhoto).slice(0, MAX_INVENTORY_PHOTOS),
+              );
+            }
+          } catch {
+            /* ignore */
+          }
+        }
         if (customsRaw) {
           const parsed = JSON.parse(customsRaw) as Product[];
           if (Array.isArray(parsed)) customs = parsed;
@@ -626,6 +694,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           setCatalogReady(true);
           setSessionReady(true);
           setPlacesReady(true);
+          setVaultReady(true);
         }
       }
     })();
@@ -697,6 +766,26 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     if (!placesReady) return;
     void AsyncStorage.setItem(ACTIVE_PLACE_KEY, activePlaceId).catch(() => {});
   }, [activePlaceId, placesReady]);
+
+  useEffect(() => {
+    if (!vaultReady) return;
+    if (priorStockList) {
+      void AsyncStorage.setItem(
+        PRIOR_STOCK_LIST_KEY,
+        JSON.stringify(priorStockList),
+      ).catch(() => {});
+    } else {
+      void AsyncStorage.removeItem(PRIOR_STOCK_LIST_KEY).catch(() => {});
+    }
+  }, [priorStockList, vaultReady]);
+
+  useEffect(() => {
+    if (!vaultReady) return;
+    void AsyncStorage.setItem(
+      INVENTORY_PHOTOS_KEY,
+      JSON.stringify(inventoryPhotos),
+    ).catch(() => {});
+  }, [inventoryPhotos, vaultReady]);
 
   useEffect(() => {
     if (!placesReady || !periodSnapshot) return;
@@ -1381,6 +1470,39 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     setCustomProducts(next.filter((p) => p.id.startsWith('custom-')));
   }, []);
 
+  const savePriorStockList = useCallback((snapshot: PriorStockListSnapshot) => {
+    setPriorStockList(snapshot);
+  }, []);
+
+  const clearPriorStockList = useCallback(() => {
+    setPriorStockList(null);
+  }, []);
+
+  const addInventoryPhoto = useCallback(
+    (args: { uri: string; placeId?: string; note?: string }) => {
+      const uri = args.uri?.trim();
+      if (!uri) return null;
+      const placeId = args.placeId ?? activePlaceId;
+      const photo: InventoryPhoto = {
+        id: `iphoto-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        uri,
+        placeId,
+        sessionDate: session.date,
+        createdAt: new Date().toISOString(),
+        note: args.note?.trim() || undefined,
+      };
+      setInventoryPhotos((prev) =>
+        [photo, ...prev].slice(0, MAX_INVENTORY_PHOTOS),
+      );
+      return photo;
+    },
+    [activePlaceId, session.date],
+  );
+
+  const removeInventoryPhoto = useCallback((id: string) => {
+    setInventoryPhotos((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
   const value = useMemo(
     () => ({
       products,
@@ -1419,6 +1541,12 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       applyStockDelta,
       recordHavikki,
       replaceProducts,
+      priorStockList,
+      savePriorStockList,
+      clearPriorStockList,
+      inventoryPhotos,
+      addInventoryPhoto,
+      removeInventoryPhoto,
     }),
     [
       products,
@@ -1456,6 +1584,12 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       applyStockDelta,
       recordHavikki,
       replaceProducts,
+      priorStockList,
+      savePriorStockList,
+      clearPriorStockList,
+      inventoryPhotos,
+      addInventoryPhoto,
+      removeInventoryPhoto,
     ],
   );
 

@@ -28,6 +28,7 @@ import { PackCheckModal } from '../components/PackCheckModal';
 import { PhotoCaptureTip } from '../components/PhotoCaptureTip';
 import { PlaceSelect } from '../components/PlaceSelect';
 import { VoiceDictationBar } from '../components/VoiceDictationBar';
+import { ProductThumb } from '../components/ProductThumb';
 import { useI18n } from '../i18n';
 import { alertAck, alertInfo } from '../lib/alertAck';
 import { confirmIfRecentAdd } from '../lib/confirmIfRecentAdd';
@@ -36,6 +37,7 @@ import {
   searchProducts,
   similarProductCandidates,
 } from '../lib/fuzzyMatch';
+import { resolveCountPhrase } from '../lib/priorStockCrossRef';
 import {
   baseUnitLabelEn,
   baseUnitLabelFi,
@@ -83,6 +85,8 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
     siteName,
     lastRecordUnit,
     setLastRecordUnit,
+    priorStockList,
+    addInventoryPhoto,
   } = useInventory();
 
   const heroFridge = route.params?.heroFridge === true;
@@ -112,6 +116,7 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
     name: string;
     candidates: ProductMatch[];
   } | null>(null);
+  const [crossRefHint, setCrossRefHint] = useState<string | null>(null);
 
   const QTY_PRESETS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
 
@@ -209,12 +214,82 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
     setQuery(match.product.officialName);
     const mapped = friendlyOptionForCode(match.product.unit);
     if (mapped) setUnitOption(mapped);
+    setCrossRefHint(null);
+  }
+
+  function applyCrossRef(text: string) {
+    const hit = resolveCountPhrase(text, priorStockList, products);
+    if (!hit) {
+      setCrossRefHint(null);
+      return;
+    }
+
+    const looksLikeCount =
+      /\d/.test(text) ||
+      /\b(one|two|three|four|five|six|seven|eight|nine|ten|yksi|kaksi|kolme|buckets?|jars?|cans?|boxes|box|mayo|mayonnaise)\b/i.test(
+        text,
+      );
+    if (!looksLikeCount && hit.source !== 'prior_list') {
+      setCrossRefHint(null);
+      return;
+    }
+
+    if (hit.extract.quantity != null && hit.extract.quantity > 0) {
+      setQty(String(hit.extract.quantity));
+      setQtyOther(false);
+    }
+    if (hit.extract.unit) {
+      const mapped = friendlyOptionForCode(hit.extract.unit);
+      if (mapped) {
+        setUnitOption(mapped);
+        setLastRecordUnit(mapped.code);
+      }
+    }
+    if (hit.match) {
+      setSelected(hit.match);
+      setQuery(hit.match.product.officialName);
+      setCrossRefHint(
+        hit.source === 'prior_list'
+          ? t('crossRefPriorHit')
+              .replace(
+                '{prior}',
+                hit.priorLineName ?? hit.extract.suggestedName,
+              )
+              .replace('{name}', hit.match.product.officialName)
+          : t('crossRefCatalogHit').replace(
+              '{name}',
+              hit.match.product.officialName,
+            ),
+      );
+    } else if (hit.source === 'prior_list' && hit.priorLineName) {
+      setQuery(hit.priorLineName);
+      setCrossRefHint(
+        t('crossRefPriorOnly').replace('{prior}', hit.priorLineName),
+      );
+    } else {
+      setCrossRefHint(null);
+    }
   }
 
   function onQueryChange(text: string) {
     setQuery(text);
     if (selected && text !== selected.product.officialName) {
       setSelected(null);
+    }
+    applyCrossRef(text);
+  }
+
+  function savePhotoToAlbum() {
+    if (!uri) {
+      alertInfo(t('inventoryPhotosTitle'), t('inventoryPhotosNeedPhoto'));
+      return;
+    }
+    const saved = addInventoryPhoto({ uri, placeId: activePlaceId });
+    if (saved) {
+      alertAck(
+        t('inventoryPhotosSavedTitle'),
+        t('inventoryPhotosSavedBody'),
+      );
     }
   }
 
@@ -242,14 +317,15 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
   }
 
   function resetFormAfterSave() {
-    setSelected(null);
     setQuery('');
+    setSelected(null);
+    setCrossRefHint(null);
     setQty('1');
     setQtyOther(false);
+    setUnitOption(defaultUnitOption());
     setUri(null);
     setPhotoQty('');
     setPhotoDetails('');
-    setUnitOption(defaultUnitOption());
     setPackCheck(null);
     setDidYouMean(null);
   }
@@ -635,6 +711,15 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
           </Text>
         )}
       </Pressable>
+      {uri ? (
+        <Pressable
+          style={styles.saveAlbum}
+          onPress={savePhotoToAlbum}
+          accessibilityRole="button"
+        >
+          <Text style={styles.saveAlbumText}>{t('inventoryPhotosSave')}</Text>
+        </Pressable>
+      ) : null}
       {!uri ? (
         <Pressable
           style={[styles.analyzeFresh, busy && { opacity: 0.7 }]}
@@ -669,6 +754,14 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
         autoCorrect={false}
         style={styles.input}
       />
+      {crossRefHint ? (
+        <View style={styles.crossRefBanner}>
+          {selected ? (
+            <ProductThumb product={selected.product} size={40} showBeta={false} />
+          ) : null}
+          <Text style={styles.crossRefText}>{crossRefHint}</Text>
+        </View>
+      ) : null}
       {selected ? (
         <View style={styles.selectedBanner}>
           <Text style={styles.selectedName}>{selected.product.officialName}</Text>
@@ -1041,6 +1134,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14,
   },
+  saveAlbum: {
+    marginTop: spacing.sm,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    backgroundColor: colors.primarySoft,
+  },
+  saveAlbumText: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.line,
@@ -1081,6 +1186,24 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     color: colors.inkMuted,
     fontSize: 14,
+  },
+  crossRefBanner: {
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.success,
+    padding: spacing.sm,
+  },
+  crossRefText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.ink,
+    lineHeight: 18,
   },
   selectedBanner: {
     marginTop: spacing.sm,
