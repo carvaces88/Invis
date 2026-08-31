@@ -3,7 +3,6 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
-  Platform,
   StyleSheet,
   View,
 } from 'react-native';
@@ -20,8 +19,8 @@ const BODY_WIDTH = 36;
 const BODY_TOP = 8;
 const BODY_HEIGHT = 56;
 
-/** Closed → open: left-hinged swing toward camera / left. */
-const OPEN_ANGLE = '-75deg';
+/** Closed → open: door slides left off the body (px). */
+const OPEN_SLIDE_X = -(BODY_WIDTH + 2);
 
 type Props = {
   accessibilityLabel: string;
@@ -29,8 +28,8 @@ type Props = {
 };
 
 /**
- * Brand fridge mark with a looping hinged door open/close.
- * One door panel rotates on Y with left-edge hinge — normal fridge swing.
+ * Brand fridge mark with a looping sliding door open/close.
+ * Door translates on X — charcoal panel slides left to reveal sage shelves.
  */
 export function AnimatedFridgeLogo({
   accessibilityLabel,
@@ -100,14 +99,9 @@ export function AnimatedFridgeLogo({
     };
   }, [open]);
 
-  const doorRotateY = open.interpolate({
+  const doorTranslateX = open.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', OPEN_ANGLE],
-  });
-
-  const handleOpacity = open.interpolate({
-    inputRange: [0, 0.55, 1],
-    outputRange: [1, 0.85, 1],
+    outputRange: [0, OPEN_SLIDE_X],
   });
 
   const scale = size / SIZE;
@@ -137,19 +131,12 @@ export function AnimatedFridgeLogo({
           style={[
             styles.door,
             {
-              // RN 0.86+ — hinge on left edge of the door
-              transformOrigin: 'left center',
-              transform: [
-                { perspective: 1100 },
-                { rotateY: doorRotateY },
-              ],
+              transform: [{ translateX: doorTranslateX }],
             },
           ]}
         >
           <View style={styles.doorEdge} />
-          <Animated.View
-            style={[styles.handle, { opacity: handleOpacity }]}
-          />
+          <View style={styles.handle} />
         </Animated.View>
       </View>
     </View>
@@ -158,16 +145,12 @@ export function AnimatedFridgeLogo({
 
 const styles = StyleSheet.create({
   root: {
-    overflow: 'visible',
+    overflow: 'hidden',
   },
   stage: {
     width: SIZE,
     height: SIZE,
-    overflow: 'visible',
-    ...Platform.select({
-      web: { perspective: 1100 } as object,
-      default: {},
-    }),
+    overflow: 'hidden',
   },
   body: {
     position: 'absolute',
@@ -226,12 +209,7 @@ const styles = StyleSheet.create({
     height: BODY_HEIGHT,
     borderRadius: 7,
     backgroundColor: INK,
-    backfaceVisibility: 'hidden',
     zIndex: 2,
-    ...Platform.select({
-      web: { transformStyle: 'preserve-3d' } as object,
-      default: {},
-    }),
   },
   doorEdge: {
     position: 'absolute',
