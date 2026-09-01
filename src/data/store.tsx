@@ -28,6 +28,13 @@ import {
 } from '../data/periodSnapshot';
 import { DEFAULT_PORTION_ERROR_PERCENT, SEED_RECIPES } from '../data/seedRecipes';
 import { isStorageType, storageTypeFromKind } from '../data/storageTypes';
+import {
+  WORKSPACE_STORAGE_KEYS,
+  type AliasExtras,
+  type CatalogFieldExtras,
+  type PackExtras,
+  type WorkspaceSnapshotPayload,
+} from '../lib/workspaceSnapshot';
 import type {
   HavikkiEntry,
   InventoryActivityEntry,
@@ -45,21 +52,21 @@ import type {
   UnitCode,
 } from '../data/types';
 
-const CUSTOM_PRODUCTS_KEY = 'invis.customProducts';
-const ALIAS_EXTRAS_KEY = 'invis.productAliasExtras';
-const PACK_EXTRAS_KEY = 'invis.productPackExtras';
-const CATALOG_FIELD_EXTRAS_KEY = 'invis.productCatalogFieldExtras';
-const LAST_UNIT_KEY = 'invis.lastRecordUnit';
-const ACTIVITY_KEY = 'invis.recentActivity';
-const SESSION_KEY = 'invis.inventorySession';
-const PLACES_KEY = 'invis.places';
-const SITE_NAME_KEY = 'invis.siteName';
-const ACTIVE_PLACE_KEY = 'invis.activePlaceId';
-const PERIOD_SNAPSHOT_KEY = 'invis.periodSnapshot';
-const PRIOR_STOCK_LIST_KEY = 'invis.priorStockList';
-const INVENTORY_PHOTOS_KEY = 'invis.inventoryPhotos';
+const CUSTOM_PRODUCTS_KEY = WORKSPACE_STORAGE_KEYS.customProducts;
+const ALIAS_EXTRAS_KEY = WORKSPACE_STORAGE_KEYS.aliasExtras;
+const PACK_EXTRAS_KEY = WORKSPACE_STORAGE_KEYS.packExtras;
+const CATALOG_FIELD_EXTRAS_KEY = WORKSPACE_STORAGE_KEYS.catalogFieldExtras;
+const LAST_UNIT_KEY = WORKSPACE_STORAGE_KEYS.lastRecordUnit;
+const ACTIVITY_KEY = WORKSPACE_STORAGE_KEYS.activity;
+const SESSION_KEY = WORKSPACE_STORAGE_KEYS.session;
+const PLACES_KEY = WORKSPACE_STORAGE_KEYS.places;
+const SITE_NAME_KEY = WORKSPACE_STORAGE_KEYS.siteName;
+const ACTIVE_PLACE_KEY = WORKSPACE_STORAGE_KEYS.activePlaceId;
+const PERIOD_SNAPSHOT_KEY = WORKSPACE_STORAGE_KEYS.periodSnapshot;
+const PRIOR_STOCK_LIST_KEY = WORKSPACE_STORAGE_KEYS.priorStockList;
+const INVENTORY_PHOTOS_KEY = WORKSPACE_STORAGE_KEYS.inventoryPhotos;
 /** Once set, never re-inject SEED_QTY on startup — stay empty until user records */
-const INVENTORY_CLEARED_KEY = 'invis.inventoryCleared';
+const INVENTORY_CLEARED_KEY = WORKSPACE_STORAGE_KEYS.inventoryCleared;
 /** Soft prompt window when adding the same product+place again */
 export const RECENT_ADD_WINDOW_MS = 2 * 60 * 1000;
 const MAX_ACTIVITY = 20;
@@ -137,21 +144,6 @@ function reconcileSessionLines(
     });
   return appendMissingEventPlaceLines([...kept, ...missing], products);
 }
-
-type AliasExtras = Record<string, string[]>;
-type PackExtras = Record<
-  string,
-  { unitsPerPack: number; packBaseUnit: UnitCode }
->;
-type CatalogFieldExtras = Record<
-  string,
-  {
-    packSize?: string;
-    imageUrl?: string;
-    sourceUrl?: string;
-    ean?: string;
-  }
->;
 
 export type AddQuantityResult = {
   quantityBefore: number;
@@ -334,6 +326,12 @@ type Store = {
     note?: string;
   }) => InventoryPhoto | null;
   removeInventoryPhoto: (id: string) => void;
+  /** True after AsyncStorage hydration finishes (catalog + session + vault). */
+  storeHydrated: boolean;
+  /** Apply a cloud workspace snapshot to local state + AsyncStorage. */
+  applyWorkspaceSnapshot: (snapshot: WorkspaceSnapshotPayload) => void;
+  /** Current persisted workspace for cloud sync. */
+  getWorkspaceSnapshot: () => WorkspaceSnapshotPayload;
 };
 
 const InventoryContext = createContext<Store | null>(null);
@@ -540,6 +538,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     useState<PriorStockListSnapshot | null>(null);
   const [inventoryPhotos, setInventoryPhotos] = useState<InventoryPhoto[]>([]);
   const [vaultReady, setVaultReady] = useState(false);
+  const [inventoryCleared, setInventoryCleared] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -651,6 +650,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         }
 
         const cleared = clearedRaw === '1';
+        setInventoryCleared(cleared);
         const defaultPlaceId = loadedPlaces[0]?.id ?? DEFAULT_PLACE_ID;
         let restored: InventorySession | null = null;
         if (sessionRaw) {
@@ -1540,6 +1540,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
 
   const clearAllInventory = useCallback(() => {
     const nowDate = todayIsoDate();
+    setInventoryCleared(true);
     setSession((prev) => {
       const next: InventorySession = {
         ...prev,
@@ -1698,6 +1699,128 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     setInventoryPhotos((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
+  const applyWorkspaceSnapshot = useCallback(
+    (snapshot: WorkspaceSnapshotPayload) => {
+      const loadedPlaces =
+        snapshot.places.length > 0
+          ? snapshot.places.map(migratePlace)
+          : SEED_PLACES.map(migratePlace);
+      const defaultPlaceId = loadedPlaces[0]?.id ?? DEFAULT_PLACE_ID;
+      const merged = mergeCatalog(
+        SEED_PRODUCTS,
+        snapshot.customProducts,
+        snapshot.aliasExtras,
+        snapshot.packExtras,
+        snapshot.catalogFieldExtras,
+      );
+
+      setCustomProducts(snapshot.customProducts);
+      setAliasExtras(snapshot.aliasExtras);
+      setPackExtras(snapshot.packExtras);
+      setCatalogFieldExtras(snapshot.catalogFieldExtras);
+      setProducts(merged);
+      setLastRecordUnitState(snapshot.lastRecordUnit);
+      setRecentActivity(snapshot.recentActivity.slice(0, MAX_ACTIVITY));
+      setPlaces(loadedPlaces);
+      setSiteNameState(snapshot.siteName.trim() || SEED_SITE_NAME);
+      setActivePlaceIdState(
+        loadedPlaces.some((p) => p.id === snapshot.activePlaceId)
+          ? snapshot.activePlaceId
+          : defaultPlaceId,
+      );
+      setInventoryCleared(snapshot.inventoryCleared);
+      setPriorStockList(snapshot.priorStockList);
+      setInventoryPhotos(
+        snapshot.inventoryPhotos.filter(isInventoryPhoto).slice(0, MAX_INVENTORY_PHOTOS),
+      );
+
+      const nextSession = {
+        ...snapshot.session,
+        status:
+          snapshot.session.status === 'done' ? 'done' : 'in_progress',
+        lines: reconcileSessionLines(
+          snapshot.session.lines,
+          merged,
+          defaultPlaceId,
+        ),
+      } as InventorySession;
+      setSession(nextSession);
+      setPeriodSnapshot(
+        ensurePeriodSnapshot(snapshot.periodSnapshot, nextSession.lines),
+      );
+
+      void AsyncStorage.multiSet([
+        [CUSTOM_PRODUCTS_KEY, JSON.stringify(snapshot.customProducts)],
+        [ALIAS_EXTRAS_KEY, JSON.stringify(snapshot.aliasExtras)],
+        [PACK_EXTRAS_KEY, JSON.stringify(snapshot.packExtras)],
+        [CATALOG_FIELD_EXTRAS_KEY, JSON.stringify(snapshot.catalogFieldExtras)],
+        [LAST_UNIT_KEY, snapshot.lastRecordUnit],
+        [ACTIVITY_KEY, JSON.stringify(snapshot.recentActivity.slice(0, MAX_ACTIVITY))],
+        [SESSION_KEY, JSON.stringify(nextSession)],
+        [PLACES_KEY, JSON.stringify(loadedPlaces)],
+        [SITE_NAME_KEY, snapshot.siteName.trim() || SEED_SITE_NAME],
+        [ACTIVE_PLACE_KEY, snapshot.activePlaceId],
+        [
+          PERIOD_SNAPSHOT_KEY,
+          JSON.stringify(
+            ensurePeriodSnapshot(snapshot.periodSnapshot, nextSession.lines),
+          ),
+        ],
+        [INVENTORY_PHOTOS_KEY, JSON.stringify(snapshot.inventoryPhotos)],
+      ]).catch(() => {});
+      if (snapshot.inventoryCleared) {
+        void AsyncStorage.setItem(INVENTORY_CLEARED_KEY, '1').catch(() => {});
+      } else {
+        void AsyncStorage.removeItem(INVENTORY_CLEARED_KEY).catch(() => {});
+      }
+      if (snapshot.priorStockList) {
+        void AsyncStorage.setItem(
+          PRIOR_STOCK_LIST_KEY,
+          JSON.stringify(snapshot.priorStockList),
+        ).catch(() => {});
+      } else {
+        void AsyncStorage.removeItem(PRIOR_STOCK_LIST_KEY).catch(() => {});
+      }
+    },
+    [],
+  );
+
+  const getWorkspaceSnapshot = useCallback((): WorkspaceSnapshotPayload => {
+    return {
+      customProducts,
+      aliasExtras,
+      packExtras,
+      catalogFieldExtras,
+      lastRecordUnit,
+      recentActivity,
+      session,
+      inventoryCleared,
+      places,
+      siteName,
+      activePlaceId,
+      periodSnapshot,
+      priorStockList,
+      inventoryPhotos,
+    };
+  }, [
+    customProducts,
+    aliasExtras,
+    packExtras,
+    catalogFieldExtras,
+    lastRecordUnit,
+    recentActivity,
+    session,
+    inventoryCleared,
+    places,
+    siteName,
+    activePlaceId,
+    periodSnapshot,
+    priorStockList,
+    inventoryPhotos,
+  ]);
+
+  const storeHydrated = catalogReady && sessionReady && placesReady && vaultReady;
+
   const value = useMemo(
     () => ({
       products,
@@ -1743,6 +1866,9 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       inventoryPhotos,
       addInventoryPhoto,
       removeInventoryPhoto,
+      storeHydrated,
+      applyWorkspaceSnapshot,
+      getWorkspaceSnapshot,
     }),
     [
       products,
@@ -1787,6 +1913,9 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       inventoryPhotos,
       addInventoryPhoto,
       removeInventoryPhoto,
+      storeHydrated,
+      applyWorkspaceSnapshot,
+      getWorkspaceSnapshot,
     ],
   );
 

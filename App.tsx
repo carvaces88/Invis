@@ -14,6 +14,7 @@ import { enableScreens } from 'react-native-screens';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { ChefNudgeProvider } from './src/components/ChefNudge';
 import { VenueFromGate } from './src/components/VenueFromGate';
+import { WorkspaceCloudSync } from './src/components/WorkspaceCloudSync';
 import { InventoryProvider } from './src/data/store';
 import type { MainTabParamList, RootStackParamList } from './src/data/types';
 import { LocaleProvider, useI18n } from './src/i18n';
@@ -520,6 +521,7 @@ export default function App() {
             <InventoryProvider>
               <ChefNudgeProvider>
                 <VenueFromGate />
+                <WorkspaceCloudSync />
                 <AuthGate />
               </ChefNudgeProvider>
             </InventoryProvider>
