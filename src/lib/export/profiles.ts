@@ -16,6 +16,7 @@ import {
 
 /** Preset column sets for inventory export / on-screen spreadsheet */
 export type ExportProfileId =
+  | 'simplified'
   | 'amounts'
   | 'withPrice'
   | 'nameQty'
@@ -64,6 +65,12 @@ export type ExportCellContext = {
 
 export const EXPORT_PROFILES: ExportProfile[] = [
   {
+    id: 'simplified',
+    /** Daily kitchen sheet — collapsible code, storage, name, unit, qty, 0% ALV price & total. */
+    columns: ['productCode', 'storage', 'name', 'unit', 'qty', 'price', 'total'],
+    includeTotals: true,
+  },
+  {
     id: 'restolution',
     /**
      * Exact Restolution import column order (bilingual headers in files).
@@ -100,7 +107,10 @@ export const EXPORT_PROFILES: ExportProfile[] = [
   },
 ];
 
-/** Primary purpose of the app: Restolution-readable inventory sheets. */
+/** Default on-screen Inventory tab column layout. */
+export const DEFAULT_VIEW_PROFILE: ExportProfileId = 'simplified';
+
+/** Default when exporting files without an explicit profile (Restolution import). */
 export const DEFAULT_EXPORT_PROFILE: ExportProfileId = 'restolution';
 
 /**
@@ -333,12 +343,14 @@ export function totalsFooterCells(
 }
 
 export type ExportProfileTitleKey =
+  | 'exportProfileSimplified'
   | 'exportProfileAmounts'
   | 'exportProfileWithPrice'
   | 'exportProfileNameQty'
   | 'exportProfileRestolution';
 
 export type ExportProfileHintKey =
+  | 'exportProfileSimplifiedHint'
   | 'exportProfileAmountsHint'
   | 'exportProfileWithPriceHint'
   | 'exportProfileNameQtyHint'
@@ -346,6 +358,8 @@ export type ExportProfileHintKey =
 
 export function profileTitleKey(id: ExportProfileId): ExportProfileTitleKey {
   switch (id) {
+    case 'simplified':
+      return 'exportProfileSimplified';
     case 'amounts':
       return 'exportProfileAmounts';
     case 'withPrice':
@@ -359,6 +373,8 @@ export function profileTitleKey(id: ExportProfileId): ExportProfileTitleKey {
 
 export function profileHintKey(id: ExportProfileId): ExportProfileHintKey {
   switch (id) {
+    case 'simplified':
+      return 'exportProfileSimplifiedHint';
     case 'amounts':
       return 'exportProfileAmountsHint';
     case 'withPrice':

@@ -271,14 +271,10 @@ export const fi: Messages = {
   photoOptionalDetailsPlaceholder:
     'esim. ylähyly, vasen ovi, noin 3 majoneesia…',
   recordAnalyzePhoto: 'Analysoi kuva',
-  recordAnalyzeDemo: 'Aja demo (AI → vahvistus)',
   recordAnalyzeFridge: 'Analysoi jääkaappi / hylly',
-  recordAnalyzeFridgeDemo: 'Aja hyllydemo (majoneesi → vahvistus)',
-  recordAnalyzeFridgeFreshDemo: 'Aja tuoredemo (korianteri → vahvistus)',
-  recordAnalyzeFreshDemo: 'Aja tuoredemo (korianteri → vahvistus)',
   recordAnalyzeFailedTitle: 'Kuvan analyysi epäonnistui',
   recordAnalyzeFailedBody:
-    'Kuvaa ei voitu lukea. Tarkista yhteys, kokeile selkeämpää kuvaa tai aja demo ilman kuvaa.',
+    'Kuvaa ei voitu lukea. Tarkista yhteys tai kokeile selkeämpää kuvaa.',
   photoNeedPermission: 'Salli kamera tai kuvakirjasto jatkaaksesi.',
   recordItemName: 'Tuotenimi',
   recordItemPlaceholder: 'Kokeile “2 ämpäriä majoa” tai “cilantro”…',

@@ -61,10 +61,8 @@ import { useUnitSystem } from '../lib/unitSystem';
 import {
   analyzeFridgePanoramaImage,
   analyzeInventoryImage,
-  isLiveVisionEnabled,
   isRealImageUri,
 } from '../lib/vision';
-import { resolveDemoShelfUri } from '../data/seedKruoka';
 import { colors, radius, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RecordInventory'>;
@@ -162,12 +160,8 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
     return n;
   }
 
-  async function analyzePhoto(demoKind: 'default' | 'fresh' = 'default') {
-    if (
-      photoMode !== 'fridge' &&
-      isLiveVisionEnabled() &&
-      !isRealImageUri(uri)
-    ) {
+  async function analyzePhoto() {
+    if (!isRealImageUri(uri)) {
       alertInfo(
         t('addProductNeedPhotoTitle'),
         t('addProductNeedPhotoBody'),
@@ -178,24 +172,18 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
     thinkingChef(true);
     try {
       if (photoMode === 'fridge') {
-        const shelfUri =
-          uri ??
-          (demoKind === 'fresh' ? 'demo-fresh' : resolveDemoShelfUri('mayo1'));
         const details = photoDetails.trim() || undefined;
-        const document = await analyzeFridgePanoramaImage(shelfUri, details);
+        const document = await analyzeFridgePanoramaImage(uri, details);
         thinkingChef(false);
         yesChef();
         navigation.navigate('FridgeReview', {
           document,
-          imageUri: shelfUri,
+          imageUri: uri,
         });
         return;
       }
-      const hint =
-        demoKind === 'fresh'
-          ? query.trim() || 'cilantro'
-          : query.trim() || undefined;
-      const extract = await analyzeInventoryImage(uri ?? 'demo', hint);
+      const hint = query.trim() || undefined;
+      const extract = await analyzeInventoryImage(uri, hint);
       const preQty = parsePhotoQty();
       const withQty =
         preQty != null ? { ...extract, quantity: preQty } : extract;
@@ -203,7 +191,7 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
       yesChef();
       navigation.navigate('Confirm', {
         extract: withQty,
-        imageUri: uri ?? undefined,
+        imageUri: uri,
       });
     } catch (e) {
       thinkingChef(false);
@@ -700,25 +688,23 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
           <Text style={styles.barcodeBtnText}>{t('scanBarcode')}</Text>
         </Pressable>
       ) : null}
-      <Pressable
-        style={[styles.analyze, busy && { opacity: 0.7 }]}
-        disabled={busy}
-        onPress={() => analyzePhoto('default')}
-      >
-        {busy ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.analyzeText}>
-            {photoMode === 'fridge'
-              ? uri
+      {uri ? (
+        <Pressable
+          style={[styles.analyze, busy && { opacity: 0.7 }]}
+          disabled={busy}
+          onPress={() => analyzePhoto()}
+        >
+          {busy ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.analyzeText}>
+              {photoMode === 'fridge'
                 ? t('recordAnalyzeFridge')
-                : t('recordAnalyzeFridgeDemo')
-              : uri
-                ? t('recordAnalyzePhoto')
-                : t('recordAnalyzeDemo')}
-          </Text>
-        )}
-      </Pressable>
+                : t('recordAnalyzePhoto')}
+            </Text>
+          )}
+        </Pressable>
+      ) : null}
       {uri ? (
         <Pressable
           style={styles.saveAlbum}
@@ -726,20 +712,6 @@ export function RecordInventoryScreen({ navigation, route }: Props) {
           accessibilityRole="button"
         >
           <Text style={styles.saveAlbumText}>{t('inventoryPhotosSave')}</Text>
-        </Pressable>
-      ) : null}
-      {!uri ? (
-        <Pressable
-          style={[styles.analyzeFresh, busy && { opacity: 0.7 }]}
-          disabled={busy}
-          onPress={() => analyzePhoto('fresh')}
-          accessibilityRole="button"
-        >
-          <Text style={styles.analyzeFreshText}>
-            {photoMode === 'fridge'
-              ? t('recordAnalyzeFridgeFreshDemo')
-              : t('recordAnalyzeFreshDemo')}
-          </Text>
         </Pressable>
       ) : null}
 
@@ -1128,20 +1100,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   analyzeText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  analyzeFresh: {
-    marginTop: spacing.sm,
-    backgroundColor: colors.bgElevated,
-    borderWidth: 1,
-    borderColor: colors.primaryMid,
-    paddingVertical: 12,
-    borderRadius: radius.md,
-    alignItems: 'center',
-  },
-  analyzeFreshText: {
-    color: colors.primaryMid,
-    fontWeight: '700',
-    fontSize: 14,
-  },
   saveAlbum: {
     marginTop: spacing.sm,
     paddingVertical: 10,

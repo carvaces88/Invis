@@ -274,14 +274,10 @@ export const en = {
   photoOptionalDetailsPlaceholder:
     'e.g. top shelf, left door, roughly 3 mayo…',
   recordAnalyzePhoto: 'Analyze photo',
-  recordAnalyzeDemo: 'Run demo (AI → confirm)',
   recordAnalyzeFridge: 'Analyze fridge / shelf',
-  recordAnalyzeFridgeDemo: 'Run shelf demo (mayo → confirm)',
-  recordAnalyzeFridgeFreshDemo: 'Run fresh demo (cilantro → confirm)',
-  recordAnalyzeFreshDemo: 'Run fresh demo (cilantro → confirm)',
   recordAnalyzeFailedTitle: 'Photo analysis failed',
   recordAnalyzeFailedBody:
-    'Could not read this photo. Check your connection, try a clearer shot, or run a demo without a photo.',
+    'Could not read this photo. Check your connection or try a clearer shot.',
   photoNeedPermission: 'Allow camera or photo library access to continue.',
   recordItemName: 'Item name',
   recordItemPlaceholder: 'Try “2 buckets of mayo” or “cilantro”…',

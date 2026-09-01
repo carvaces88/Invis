@@ -13,6 +13,7 @@ import type {
 import { UNIT_CODES } from '../data/units';
 import { normalizeEanDigits } from './packaging';
 import { generateProductAliases, mergeAliasLists } from './productAliases';
+import { parseSheetImportInsights } from './sheetImportInsights';
 import { getGeminiApiKey, getGeminiModel, getVisionProxyUrl } from './visionConfig';
 
 const UNIT_SET = new Set<string>(UNIT_CODES);
@@ -624,6 +625,64 @@ const FRIDGE_SCHEMA = {
   required: ['lines', 'confidence'],
 } as const;
 
+const PRIOR_LIST_LINE_SCHEMA = {
+  ...FRIDGE_LINE_SCHEMA,
+  properties: {
+    ...FRIDGE_LINE_SCHEMA.properties,
+    sourcePage: {
+      type: 'integer',
+      nullable: true,
+      description: '1-based photo index when multiple pages',
+    },
+    crossedOut: {
+      type: 'boolean',
+      nullable: true,
+      description: 'True when the handwritten line is struck through',
+    },
+  },
+} as const;
+
+const SHEET_INSIGHT_SCHEMA = {
+  type: 'object',
+  properties: {
+    kind: {
+      type: 'string',
+      enum: ['duplicate', 'crossed_off', 'qty_mismatch'],
+    },
+    itemName: { type: 'string' },
+    confidence: { type: 'number' },
+    pages: {
+      type: 'array',
+      items: { type: 'integer' },
+      nullable: true,
+    },
+    page: { type: 'integer', nullable: true },
+    quantityA: { type: 'number', nullable: true },
+    quantityB: { type: 'number', nullable: true },
+    pageA: { type: 'integer', nullable: true },
+    pageB: { type: 'integer', nullable: true },
+  },
+  required: ['kind', 'itemName', 'confidence'],
+} as const;
+
+const PRIOR_LIST_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: { type: 'string', nullable: true },
+    confidence: { type: 'number' },
+    rawNotes: { type: 'string', nullable: true },
+    lines: {
+      type: 'array',
+      items: PRIOR_LIST_LINE_SCHEMA,
+    },
+    insights: {
+      type: 'array',
+      items: SHEET_INSIGHT_SCHEMA,
+    },
+  },
+  required: ['lines', 'confidence'],
+} as const;
+
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0;
   return Math.min(1, Math.max(0, n));
@@ -653,10 +712,17 @@ function toFridgeLine(raw: Record<string, unknown>): VisionExtract {
       ? raw.aiDescription.trim()
       : undefined;
   const crop = parseCrop(raw.crop);
+  const sourcePage =
+    typeof raw.sourcePage === 'number' && Number.isFinite(raw.sourcePage)
+      ? Math.max(1, Math.round(raw.sourcePage))
+      : undefined;
+  const crossedOut = raw.crossedOut === true;
   return {
     ...base,
     aiDescription,
     crop,
+    sourcePage,
+    crossedOut: crossedOut || undefined,
   };
 }
 
@@ -898,13 +964,21 @@ Extract each product line as:
   Map words: jar/can/purkki → PRK; bag/pussi → PSS; bottle/pullo → PL; box/crate/bucket/laatikko → LTK; packet → PKT; tray/rasia → RSA; piece → KPL; kilo → KG; liter → L
 - unitPriceAlv0: only if a price is clearly printed and already 0% ALV; otherwise null (do NOT invent K-Ruoka prices)
 - aliases: optional short nicknames visible on the note
+- sourcePage: 1-based photo index (photo 1 = first image, photo 2 = second, …) when multiple photos
+- crossedOut: true ONLY when the line is visibly struck through / scribbled out on the sheet
 - rawNotes: "handwritten" / "printed page" / section header when helpful
 
 Rules:
-- Multiple photos may be pages of the same list — merge all lines, skip obvious duplicates.
+- Multiple photos may be pages of the same list — merge duplicate product rows into one line for \`lines\`, but report cross-page issues in \`insights\`.
 - Skip headers, totals, signatures, and blank lines.
 - title: e.g. "Prior stock · March" or visible date/header.
-- confidence: overall OCR confidence 0–1.`;
+- confidence: overall OCR confidence 0–1.
+
+Cross-page insights (\`insights\` array — ONLY when you clearly see the issue; confidence ≥ 0.55):
+- duplicate: same product name appears on two+ pages (before merge). itemName, pages [1,2,…], confidence.
+- crossed_off: line struck through on a page. itemName, page (1-based), confidence.
+- qty_mismatch: same product with different handwritten quantities on different pages. itemName, quantityA, quantityB, pageA, pageB, confidence.
+- Leave \`insights\` empty when single photo, no cross-page issues, or unsure — do NOT guess.`;
 
 /**
  * Printed inventaariopohja / clipboard sheet photo → DocumentExtract (kind sheet).
@@ -1001,12 +1075,15 @@ function toSheetDocument(
   ]
     .filter(Boolean)
     .join(' · ');
+  const insights =
+    kind === 'prior_list' ? parseSheetImportInsights(raw.insights) : undefined;
   return {
     kind,
     title,
     lines,
     confidence,
     rawNotes,
+    insights: insights?.length ? insights : undefined,
   };
 }
 
@@ -1038,6 +1115,8 @@ async function callVisionSheetProxy(
   }
   const note = hint?.trim();
   const kind = mode === 'prior_list' ? 'prior_list' : 'sheet';
+  const insights =
+    kind === 'prior_list' ? parseSheetImportInsights(body.insights) : undefined;
   return {
     kind,
     title:
@@ -1064,6 +1143,7 @@ async function callVisionSheetProxy(
           .filter(Boolean)
           .join(' · ')
       : (body.rawNotes ?? `Live Gemini ${kind} (proxy)`),
+    insights: insights?.length ? insights : undefined,
   };
 }
 
@@ -1078,7 +1158,7 @@ async function callGeminiSheetDirect(
     mode === 'prior_list' ? PRIOR_LIST_SYSTEM_PROMPT : SHEET_SYSTEM_PROMPT;
   const task =
     mode === 'prior_list'
-      ? `OCR ${payloads.length} photo(s) of a prior stock list / handwritten note / printed page. Extract every product line with name, quantity when present, and unit.`
+      ? `OCR ${payloads.length} photo(s) of a prior stock list / handwritten note / printed page. Extract every product line with name, quantity when present, and unit. When ${payloads.length > 1 ? 'multiple photos' : 'one photo'}, fill insights only for clear cross-page issues.`
       : 'OCR this inventaariopohja clipboard photo. Extract every NIMIKE row with YKSIKKÖ, MÄÄRÄ (handwritten), HINTA.';
   const parts: GeminiPart[] = [
     ...payloads.map((p) => ({
@@ -1097,6 +1177,8 @@ async function callGeminiSheetDirect(
 
   const model = getGeminiModel();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const responseSchema =
+    mode === 'prior_list' ? PRIOR_LIST_SCHEMA : FRIDGE_SCHEMA;
 
   const res = await fetch(url, {
     method: 'POST',
@@ -1109,7 +1191,7 @@ async function callGeminiSheetDirect(
       generationConfig: {
         temperature: 0.1,
         responseMimeType: 'application/json',
-        responseSchema: FRIDGE_SCHEMA,
+        responseSchema,
       },
     }),
   });

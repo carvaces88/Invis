@@ -234,6 +234,30 @@ export interface VisionExtract {
   imageUrl?: string | null;
   aliases?: string[];
   ingredientType?: IngredientType | null;
+  /** 1-based source page when multi-photo prior list import */
+  sourcePage?: number | null;
+  /** Handwritten line visibly struck through on the sheet */
+  crossedOut?: boolean;
+}
+
+/** Cross-page insight from multi-photo handwritten sheet import (vision-backed). */
+export type SheetImportInsightKind =
+  | 'duplicate'
+  | 'crossed_off'
+  | 'qty_mismatch';
+
+export interface SheetImportInsight {
+  kind: SheetImportInsightKind;
+  itemName: string;
+  confidence: number;
+  /** 1-based page numbers (duplicate / general) */
+  pages?: number[];
+  /** Single page for crossed-off lines */
+  page?: number;
+  quantityA?: number;
+  quantityB?: number;
+  pageA?: number;
+  pageB?: number;
 }
 
 /** Prefill payload after analyzing one or more close-up product photos */
@@ -268,6 +292,8 @@ export interface DocumentExtract {
   lines: VisionExtract[];
   confidence: number;
   rawNotes?: string;
+  /** Multi-page prior-list cross-checks (Gemini structured output only) */
+  insights?: SheetImportInsight[];
 }
 
 /** One digitized line from an imported prior stock list (cross-ref corpus). */

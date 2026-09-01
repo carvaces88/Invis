@@ -12,6 +12,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaceSelect } from '../components/PlaceSelect';
+import { SheetImportInsightCards } from '../components/SheetImportInsightCards';
 import { useInventory } from '../data/store';
 import { UNIT_CODES, UNIT_GUIDE } from '../data/units';
 import type {
@@ -727,6 +728,12 @@ export function SheetImportReviewScreen({ route, navigation }: Props) {
             .replace('{unmatched}', String(stats.unmatched))}
         </Text>
         <Text style={styles.metaHint}>{t('sheetImportMatchHint')}</Text>
+
+        <SheetImportInsightCards
+          insights={document.insights}
+          lines={document.lines}
+          pageCount={imageUris?.length ?? (imageUri ? 1 : 0)}
+        />
       </View>
 
       <ScrollView

@@ -78,13 +78,21 @@ Extract each product line as:
   Map words: jar/can/purkki → PRK; bag/pussi → PSS; bottle/pullo → PL; box/crate/bucket/laatikko → LTK; packet → PKT; tray/rasia → RSA; piece → KPL; kilo → KG; liter → L
 - unitPriceAlv0: only if a price is clearly printed and already 0% ALV; otherwise null (do NOT invent K-Ruoka prices)
 - aliases: optional short nicknames visible on the note
+- sourcePage: 1-based photo index (photo 1 = first image, photo 2 = second, …) when multiple photos
+- crossedOut: true ONLY when the line is visibly struck through / scribbled out on the sheet
 - rawNotes: "handwritten" / "printed page" / section header when helpful
 
 Rules:
-- Multiple photos may be pages of the same list — merge all lines, skip obvious duplicates.
+- Multiple photos may be pages of the same list — merge duplicate product rows into one line for \`lines\`, but report cross-page issues in \`insights\`.
 - Skip headers, totals, signatures, and blank lines.
 - title: e.g. "Prior stock · March" or visible date/header.
-- confidence: overall OCR confidence 0–1.`;
+- confidence: overall OCR confidence 0–1.
+
+Cross-page insights (\`insights\` array — ONLY when you clearly see the issue; confidence ≥ 0.55):
+- duplicate: same product name appears on two+ pages (before merge). itemName, pages [1,2,…], confidence.
+- crossed_off: line struck through on a page. itemName, page (1-based), confidence.
+- qty_mismatch: same product with different handwritten quantities on different pages. itemName, quantityA, quantityB, pageA, pageB, confidence.
+- Leave \`insights\` empty when single photo, no cross-page issues, or unsure — do NOT guess.`;
 
 const VISION_SCHEMA = {
   type: 'OBJECT',
@@ -149,6 +157,47 @@ const FRIDGE_SCHEMA = {
   required: ['lines', 'confidence'],
 };
 
+const PRIOR_LIST_LINE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    ...FRIDGE_LINE_SCHEMA.properties,
+    sourcePage: { type: 'INTEGER', nullable: true },
+    crossedOut: { type: 'BOOLEAN', nullable: true },
+  },
+  required: FRIDGE_LINE_SCHEMA.required,
+};
+
+const SHEET_INSIGHT_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    kind: {
+      type: 'STRING',
+      enum: ['duplicate', 'crossed_off', 'qty_mismatch'],
+    },
+    itemName: { type: 'STRING' },
+    confidence: { type: 'NUMBER' },
+    pages: { type: 'ARRAY', items: { type: 'INTEGER' }, nullable: true },
+    page: { type: 'INTEGER', nullable: true },
+    quantityA: { type: 'NUMBER', nullable: true },
+    quantityB: { type: 'NUMBER', nullable: true },
+    pageA: { type: 'INTEGER', nullable: true },
+    pageB: { type: 'INTEGER', nullable: true },
+  },
+  required: ['kind', 'itemName', 'confidence'],
+};
+
+const PRIOR_LIST_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    title: { type: 'STRING', nullable: true },
+    confidence: { type: 'NUMBER' },
+    rawNotes: { type: 'STRING', nullable: true },
+    lines: { type: 'ARRAY', items: PRIOR_LIST_LINE_SCHEMA },
+    insights: { type: 'ARRAY', items: SHEET_INSIGHT_SCHEMA },
+  },
+  required: ['lines', 'confidence'],
+};
+
 function mapExtract(raw) {
   const suggestedName = String(raw.suggestedName || '').trim() || 'Unknown product';
   const confidence =
@@ -197,7 +246,67 @@ function mapExtract(raw) {
             height: Math.max(0, Math.min(1, raw.crop.height)),
           }
         : undefined,
+    sourcePage:
+      typeof raw.sourcePage === 'number' && Number.isFinite(raw.sourcePage)
+        ? Math.max(1, Math.round(raw.sourcePage))
+        : undefined,
+    crossedOut: raw.crossedOut === true ? true : undefined,
   };
+}
+
+const INSIGHT_KINDS = new Set(['duplicate', 'crossed_off', 'qty_mismatch']);
+const MIN_INSIGHT_CONFIDENCE = 0.55;
+
+function parseSheetImportInsights(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue;
+    const kind = row.kind;
+    if (typeof kind !== 'string' || !INSIGHT_KINDS.has(kind)) continue;
+    const itemName =
+      (typeof row.itemName === 'string' && row.itemName.trim()) ||
+      (typeof row.suggestedName === 'string' && row.suggestedName.trim()) ||
+      '';
+    if (!itemName) continue;
+    const confidence =
+      typeof row.confidence === 'number' && Number.isFinite(row.confidence)
+        ? Math.max(0, Math.min(1, row.confidence))
+        : 0;
+    if (confidence < MIN_INSIGHT_CONFIDENCE) continue;
+    const pages = Array.isArray(row.pages)
+      ? row.pages
+          .filter((p) => typeof p === 'number' && Number.isFinite(p))
+          .map((p) => Math.max(1, Math.round(p)))
+      : undefined;
+    out.push({
+      kind,
+      itemName,
+      confidence,
+      pages: pages && pages.length ? pages : undefined,
+      page:
+        typeof row.page === 'number' && Number.isFinite(row.page)
+          ? Math.max(1, Math.round(row.page))
+          : undefined,
+      quantityA:
+        typeof row.quantityA === 'number' && Number.isFinite(row.quantityA)
+          ? row.quantityA
+          : undefined,
+      quantityB:
+        typeof row.quantityB === 'number' && Number.isFinite(row.quantityB)
+          ? row.quantityB
+          : undefined,
+      pageA:
+        typeof row.pageA === 'number' && Number.isFinite(row.pageA)
+          ? Math.max(1, Math.round(row.pageA))
+          : undefined,
+      pageB:
+        typeof row.pageB === 'number' && Number.isFinite(row.pageB)
+          ? Math.max(1, Math.round(row.pageB))
+          : undefined,
+    });
+  }
+  return out;
 }
 
 function mapFridgeDocument(raw, model, photoCount) {
@@ -244,6 +353,8 @@ function mapSheetDocument(raw, model, photoCount, kind) {
         ? lines.reduce((s, l) => s + l.confidence, 0) / lines.length
         : 0.5;
   const docKind = kind === 'prior_list' ? 'prior_list' : 'sheet';
+  const insights =
+    docKind === 'prior_list' ? parseSheetImportInsights(raw.insights) : [];
   return {
     kind: docKind,
     title: raw.title
@@ -259,6 +370,7 @@ function mapSheetDocument(raw, model, photoCount, kind) {
     ]
       .filter(Boolean)
       .join(' · '),
+    ...(insights.length ? { insights } : {}),
   };
 }
 
@@ -329,7 +441,7 @@ module.exports = async function handler(req, res) {
           ? [
               PRIOR_LIST_SYSTEM_PROMPT,
               hint ? `Optional staff notes (may be wrong): ${hint}` : null,
-              `OCR ${payloads.length} photo(s) of a prior stock list / handwritten note / printed page. Extract every product line with name, quantity when present, and unit.`,
+              `OCR ${payloads.length} photo(s) of a prior stock list / handwritten note / printed page. Extract every product line with name, quantity when present, and unit. When ${payloads.length > 1 ? 'multiple photos' : 'one photo'}, fill insights only for clear cross-page issues.`,
             ]
               .filter(Boolean)
               .join('\n')
@@ -368,7 +480,11 @@ module.exports = async function handler(req, res) {
         generationConfig: {
           temperature: isDocList ? 0.1 : 0.2,
           responseMimeType: 'application/json',
-          responseSchema: isFridge || isDocList ? FRIDGE_SCHEMA : VISION_SCHEMA,
+          responseSchema: isPriorList
+            ? PRIOR_LIST_SCHEMA
+            : isFridge || isSheet
+              ? FRIDGE_SCHEMA
+              : VISION_SCHEMA,
         },
       }),
     });

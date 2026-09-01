@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExportColumnsSheet } from '../components/ExportColumnsSheet';
+import { InventoryColumnHead } from '../components/InventoryColumnHead';
 import { PlaceSelect } from '../components/PlaceSelect';
 import {
   StorageTypeSelect,
@@ -26,11 +27,17 @@ import type {
 } from '../data/types';
 import { useI18n } from '../i18n';
 import { alertAck, alertConfirm, alertInfo } from '../lib/alertAck';
+import {
+  applyColumnOrder,
+  columnOrdersEqual,
+  moveColumnBy,
+  moveColumnTo,
+} from '../lib/export/columnOrder';
 import { exportSessionDocx } from '../lib/export/docx';
 import { exportSessionExcel } from '../lib/export/excel';
 import { exportSessionPdf } from '../lib/export/pdf';
 import {
-  DEFAULT_EXPORT_PROFILE,
+  DEFAULT_VIEW_PROFILE,
   cellDisplay,
   columnHeader,
   getExportProfile,
@@ -41,8 +48,12 @@ import {
   type ExportProfileId,
 } from '../lib/export/profiles';
 import {
+  clearColumnOrder,
+  loadColumnOrders,
   loadViewProfile,
+  saveColumnOrder,
   saveViewProfile,
+  type ColumnOrderByProfile,
 } from '../lib/export/viewProfileStorage';
 import { FOOD_ALV_RATE, formatMoney } from '../lib/alv';
 import { formatUpdatedLabel } from '../lib/relativeTime';
@@ -68,6 +79,10 @@ function money(n: number) {
   return formatMoney(n);
 }
 
+/** Product code column — collapsed by default to save sheet width. */
+const PRODUCT_CODE_W_EXPANDED = 110;
+const PRODUCT_CODE_W_COLLAPSED = 36;
+
 /** Restolution export keeps its fixed import columns; on-screen view adds Storage. */
 function withViewStorageColumn(columns: ExportColumnId[]): ExportColumnId[] {
   if (columns.includes('storage')) return columns;
@@ -82,7 +97,10 @@ function withViewStorageColumn(columns: ExportColumnId[]): ExportColumnId[] {
   return ['storage', ...columns];
 }
 
-function colStyle(col: ExportColumnId) {
+function colStyle(
+  col: ExportColumnId,
+  opts?: { productCodeOpen?: boolean },
+) {
   switch (col) {
     case 'name':
       return styles.colName;
@@ -99,7 +117,7 @@ function colStyle(col: ExportColumnId) {
     case 'date':
       return styles.colDate;
     case 'productCode':
-      return styles.colCode;
+      return opts?.productCodeOpen ? styles.colCode : styles.colCodeCollapsed;
     case 'openingStock':
     case 'purchases':
     case 'closingStock':
@@ -112,7 +130,10 @@ function colStyle(col: ExportColumnId) {
   }
 }
 
-function tableMinWidth(columns: ExportColumnId[]): number {
+function tableMinWidth(
+  columns: ExportColumnId[],
+  productCodeOpen = false,
+): number {
   return columns.reduce((sum, col) => {
     switch (col) {
       case 'name':
@@ -129,7 +150,10 @@ function tableMinWidth(columns: ExportColumnId[]): number {
       case 'date':
         return sum + 88;
       case 'productCode':
-        return sum + 120;
+        return (
+          sum +
+          (productCodeOpen ? PRODUCT_CODE_W_EXPANDED : PRODUCT_CODE_W_COLLAPSED)
+        );
       case 'openingStock':
       case 'purchases':
       case 'closingStock':
@@ -203,12 +227,23 @@ export function InventaarioScreen() {
     () => ({ session, ...exportCtx }),
     [session, exportCtx],
   );
+  /** Product code values hidden until the column header is tapped. */
+  const [productCodeOpen, setProductCodeOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportKind, setExportKind] = useState<ExportKind | null>(null);
   const [columnsSheetOpen, setColumnsSheetOpen] = useState(false);
   const [viewProfileId, setViewProfileId] = useState<ExportProfileId>(
-    DEFAULT_EXPORT_PROFILE,
+    DEFAULT_VIEW_PROFILE,
   );
+  /** Per-profile on-screen column order overrides (export profiles stay fixed). */
+  const [columnOrders, setColumnOrders] = useState<ColumnOrderByProfile>({});
+  const [draggingCol, setDraggingCol] = useState<ExportColumnId | null>(null);
+  const [dropTargetCol, setDropTargetCol] = useState<ExportColumnId | null>(
+    null,
+  );
+  /** Native: long-press grab handle arms ◂/▸ nudges for this column. */
+  const [armedCol, setArmedCol] = useState<ExportColumnId | null>(null);
+  const draggingColRef = useRef<ExportColumnId | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftQty, setDraftQty] = useState('');
   const [showFullSheet, setShowFullSheet] = useState(false);
@@ -271,9 +306,13 @@ export function InventaarioScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    void loadViewProfile().then((id) => {
-      if (!cancelled) setViewProfileId(id);
-    });
+    void Promise.all([loadViewProfile(), loadColumnOrders()]).then(
+      ([id, orders]) => {
+        if (cancelled) return;
+        setViewProfileId(id);
+        setColumnOrders(orders);
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -283,15 +322,25 @@ export function InventaarioScreen() {
     () => getExportProfile(viewProfileId),
     [viewProfileId],
   );
-  /** On-screen columns — Storage is always visible (profile + Restolution inject). */
-  const columns = useMemo(
+  /** Profile default on-screen columns (Storage always injected). */
+  const defaultColumns = useMemo(
     () => withViewStorageColumn(viewProfile.columns),
     [viewProfile.columns],
   );
+  /** On-screen columns — profile defaults + optional user drag order. */
+  const columns = useMemo(
+    () => applyColumnOrder(defaultColumns, columnOrders[viewProfileId]),
+    [defaultColumns, columnOrders, viewProfileId],
+  );
+  const columnOrderCustomized = !columnOrdersEqual(columns, defaultColumns);
   const showPriceCols =
     columns.includes('price') || columns.includes('total');
   const needsHScroll = viewProfileId === 'restolution' || columns.length > 5;
-  const minTableWidth = tableMinWidth(columns);
+  const minTableWidth = tableMinWidth(columns, productCodeOpen);
+  const colOpts = useMemo(
+    () => ({ productCodeOpen }),
+    [productCodeOpen],
+  );
 
   const alvFactor = showWithAlv && showPriceCols ? 1 + FOOD_ALV_RATE : 1;
   const alvPercentLabel = String(Math.round(FOOD_ALV_RATE * 100));
@@ -410,8 +459,39 @@ export function InventaarioScreen() {
 
   function applyViewProfile(profileId: ExportProfileId) {
     setViewProfileId(profileId);
+    setArmedCol(null);
+    draggingColRef.current = null;
+    setDraggingCol(null);
+    setDropTargetCol(null);
     setColumnsSheetOpen(false);
     void saveViewProfile(profileId);
+  }
+
+  function persistColumnOrder(next: ExportColumnId[]) {
+    setColumnOrders((prev) => ({ ...prev, [viewProfileId]: next }));
+    void saveColumnOrder(viewProfileId, next);
+  }
+
+  function reorderColumn(from: ExportColumnId, to: ExportColumnId) {
+    const next = moveColumnTo(columns, from, to);
+    if (columnOrdersEqual(next, columns)) return;
+    persistColumnOrder(next);
+  }
+
+  function nudgeColumn(col: ExportColumnId, delta: -1 | 1) {
+    const next = moveColumnBy(columns, col, delta);
+    if (columnOrdersEqual(next, columns)) return;
+    persistColumnOrder(next);
+  }
+
+  function resetColumnOrder() {
+    setArmedCol(null);
+    setColumnOrders((prev) => {
+      const next = { ...prev };
+      delete next[viewProfileId];
+      return next;
+    });
+    void clearColumnOrder(viewProfileId);
   }
 
   async function runExport(kind: ExportKind, profileId: ExportProfileId) {
@@ -609,12 +689,36 @@ export function InventaarioScreen() {
           </Text>
         );
       case 'date':
-      case 'productCode':
         return (
-          <Text key={col} style={[styles.td, colStyle(col)]} numberOfLines={2}>
+          <Text key={col} style={[styles.td, colStyle(col, colOpts)]} numberOfLines={2}>
             {cellDisplay(col, item, cellCtx) || '—'}
           </Text>
         );
+      case 'productCode': {
+        const code = cellDisplay(col, item, cellCtx);
+        if (!productCodeOpen) {
+          return (
+            <View
+              key={col}
+              style={colStyle(col, colOpts)}
+              accessibilityLabel={
+                code && code !== '—'
+                  ? t('colProductCodeCollapsedA11y').replace('{code}', code)
+                  : t('colProductCode')
+              }
+            />
+          );
+        }
+        return (
+          <Text
+            key={col}
+            style={[styles.td, colStyle(col, colOpts)]}
+            numberOfLines={2}
+          >
+            {code || '—'}
+          </Text>
+        );
+      }
       case 'openingStock':
       case 'purchases':
       case 'usage':
@@ -635,32 +739,152 @@ export function InventaarioScreen() {
 
   const listPadBottom = TAB_BAR_CLEARANCE + Math.max(insets.bottom, 8);
 
+  function wrapColumnHead(
+    col: ExportColumnId,
+    body: React.ReactNode,
+    headStyle?: object,
+  ) {
+    const colIdx = columns.indexOf(col);
+    return (
+      <InventoryColumnHead
+        key={col}
+        col={col}
+        style={[colStyle(col, colOpts), headStyle]}
+        dropTarget={
+          dropTargetCol === col && draggingCol != null && draggingCol !== col
+        }
+        armed={armedCol === col}
+        canMoveLeft={colIdx > 0}
+        canMoveRight={colIdx >= 0 && colIdx < columns.length - 1}
+        onMoveBy={(delta) => nudgeColumn(col, delta)}
+        onDragStartCol={(c) => {
+          draggingColRef.current = c;
+          setDraggingCol(c);
+          setArmedCol(null);
+        }}
+        onDragOverCol={(c) => {
+          if (draggingColRef.current && c !== draggingColRef.current) {
+            setDropTargetCol(c);
+          }
+        }}
+        onDropOnCol={(to, from) => {
+          const src = from ?? draggingColRef.current;
+          if (src) reorderColumn(src, to);
+          draggingColRef.current = null;
+          setDraggingCol(null);
+          setDropTargetCol(null);
+        }}
+        onDragEnd={() => {
+          draggingColRef.current = null;
+          setDraggingCol(null);
+          setDropTargetCol(null);
+        }}
+        onArm={setArmedCol}
+        dragHint={t('columnDragToReorder')}
+        moveLeftLabel={t('columnMoveLeft')}
+        moveRightLabel={t('columnMoveRight')}
+      >
+        {body}
+      </InventoryColumnHead>
+    );
+  }
+
   const tableHead = (
     <View style={styles.tableHead}>
       {columns.map((col) => {
         if (col === 'unit') {
-          return <UnitColumnLegend key={col} />;
+          return wrapColumnHead(col, <UnitColumnLegend />);
+        }
+        if (col === 'productCode') {
+          return wrapColumnHead(
+            col,
+            <Pressable
+              onPress={() => setProductCodeOpen((open) => !open)}
+              style={[styles.colCodeToggle]}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: productCodeOpen }}
+              accessibilityLabel={
+                productCodeOpen
+                  ? t('colProductCodeCollapse')
+                  : t('colProductCodeExpand')
+              }
+            >
+              <Text style={styles.colCodeToggleLabel} numberOfLines={2}>
+                {productCodeOpen
+                  ? t('colProductCode')
+                  : t('colProductCodeShort')}
+              </Text>
+              <Text style={styles.colCodeToggleChevron}>
+                {productCodeOpen ? '◂' : '▸'}
+              </Text>
+            </Pressable>,
+          );
         }
         if (compareMonths && (col === 'qty' || col === 'closingStock')) {
           const qtyCol =
             col === 'closingStock' ? styles.colMove : styles.colQty;
+          // Body renders two cells; header must span the same total width.
           return (
-            <React.Fragment key={col}>
-              <Text
-                style={[styles.th, qtyCol]}
-                numberOfLines={2}
-                accessibilityLabel={t('inventoryLastMonth')}
-              >
-                {t('inventoryLastMonth')}
-              </Text>
-              <Text
-                style={[styles.th, qtyCol]}
-                numberOfLines={2}
-                accessibilityLabel={t('inventoryThisMonth')}
-              >
-                {t('inventoryThisMonth')}
-              </Text>
-            </React.Fragment>
+            <InventoryColumnHead
+              key={col}
+              col={col}
+              style={styles.compareHeadShell}
+              dropTarget={
+                dropTargetCol === col &&
+                draggingCol != null &&
+                draggingCol !== col
+              }
+              armed={armedCol === col}
+              canMoveLeft={columns.indexOf(col) > 0}
+              canMoveRight={
+                columns.indexOf(col) >= 0 &&
+                columns.indexOf(col) < columns.length - 1
+              }
+              onMoveBy={(delta) => nudgeColumn(col, delta)}
+              onDragStartCol={(c) => {
+                draggingColRef.current = c;
+                setDraggingCol(c);
+                setArmedCol(null);
+              }}
+              onDragOverCol={(c) => {
+                if (draggingColRef.current && c !== draggingColRef.current) {
+                  setDropTargetCol(c);
+                }
+              }}
+              onDropOnCol={(to, from) => {
+                const src = from ?? draggingColRef.current;
+                if (src) reorderColumn(src, to);
+                draggingColRef.current = null;
+                setDraggingCol(null);
+                setDropTargetCol(null);
+              }}
+              onDragEnd={() => {
+                draggingColRef.current = null;
+                setDraggingCol(null);
+                setDropTargetCol(null);
+              }}
+              onArm={setArmedCol}
+              dragHint={t('columnDragToReorder')}
+              moveLeftLabel={t('columnMoveLeft')}
+              moveRightLabel={t('columnMoveRight')}
+            >
+              <View style={styles.compareHeadPair}>
+                <Text
+                  style={[styles.th, qtyCol]}
+                  numberOfLines={2}
+                  accessibilityLabel={t('inventoryLastMonth')}
+                >
+                  {t('inventoryLastMonth')}
+                </Text>
+                <Text
+                  style={[styles.th, qtyCol]}
+                  numberOfLines={2}
+                  accessibilityLabel={t('inventoryThisMonth')}
+                >
+                  {t('inventoryThisMonth')}
+                </Text>
+              </View>
+            </InventoryColumnHead>
           );
         }
         // Locale labels on-screen (not bilingual FI/EN) so mobile headers
@@ -670,15 +894,15 @@ export function InventaarioScreen() {
           viewProfile.finnishExportHeaders && RESTOLUTION_FI_HEADERS[col]
             ? RESTOLUTION_FI_HEADERS[col]!
             : label;
-        return (
+        return wrapColumnHead(
+          col,
           <Text
-            key={col}
-            style={[styles.th, colStyle(col)]}
+            style={[styles.th, colStyle(col, colOpts)]}
             numberOfLines={2}
             accessibilityLabel={a11y}
           >
             {label}
-          </Text>
+          </Text>,
         );
       })}
     </View>
@@ -1050,6 +1274,21 @@ export function InventaarioScreen() {
               {t(profileTitleKey(viewProfileId))}
             </Text>
           </Pressable>
+          {columnOrderCustomized ? (
+            <Pressable
+              onPress={resetColumnOrder}
+              style={({ pressed }) => [
+                styles.resetOrderBtn,
+                pressed && { opacity: 0.85 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('columnResetOrder')}
+            >
+              <Text style={styles.resetOrderBtnText}>
+                {t('columnResetOrder')}
+              </Text>
+            </Pressable>
+          ) : null}
           {(['xlsx', 'pdf', 'docx'] as const).map((kind) => (
             <Pressable
               key={kind}
@@ -1211,7 +1450,7 @@ export function InventaarioScreen() {
                             </Text>
                           );
                         default:
-                          return <View key={col} style={colStyle(col)} />;
+                          return <View key={col} style={colStyle(col, colOpts)} />;
                       }
                     })}
                   </View>
@@ -1440,6 +1679,26 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
   },
+  resetOrderBtn: {
+    backgroundColor: colors.bgElevated,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    ...shadows.soft,
+  },
+  resetOrderBtnText: {
+    color: colors.inkMuted,
+    fontWeight: '600',
+    fontSize: 11,
+  },
+  compareHeadShell: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  compareHeadPair: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
   exportBtn: {
     backgroundColor: colors.primarySoft,
     paddingHorizontal: 12,
@@ -1557,7 +1816,37 @@ const styles = StyleSheet.create({
   colPrice: { width: 52, textAlign: 'right', paddingTop: 1 },
   colTotal: { width: 52, textAlign: 'right', paddingTop: 1 },
   colDate: { width: 88, textAlign: 'left', paddingTop: 1, paddingRight: 4 },
-  colCode: { width: 110, textAlign: 'left', paddingTop: 1, paddingRight: 4 },
+  colCode: {
+    width: PRODUCT_CODE_W_EXPANDED,
+    textAlign: 'left',
+    paddingTop: 1,
+    paddingRight: 4,
+  },
+  colCodeCollapsed: {
+    width: PRODUCT_CODE_W_COLLAPSED,
+    flexGrow: 0,
+    flexShrink: 0,
+    paddingTop: 1,
+  },
+  colCodeToggle: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 2,
+  },
+  colCodeToggleLabel: {
+    flex: 1,
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.primary,
+    letterSpacing: 0.3,
+  },
+  colCodeToggleChevron: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.primary,
+    lineHeight: 14,
+  },
   colMove: {
     width: 96,
     flexGrow: 0,
