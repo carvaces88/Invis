@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -16,6 +16,8 @@ type Props = {
   style?: StyleProp<ViewStyle>;
   /** Visual drop-target highlight while dragging over this header. */
   dropTarget?: boolean;
+  /** This column is the active HTML5 drag source. */
+  dragging?: boolean;
   /** This column is armed for ◂/▸ nudges (long-press / tap handle). */
   armed?: boolean;
   canMoveLeft?: boolean;
@@ -32,16 +34,69 @@ type Props = {
   children: React.ReactNode;
 };
 
+/** Desktop web: hover + fine pointer (vs touch / coarse). */
+function useDesktopPointer() {
+  const [desktop, setDesktop] = useState(false);
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.matchMedia) {
+      return;
+    }
+    const mq = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const sync = () => setDesktop(mq.matches);
+    sync();
+    mq.addEventListener?.('change', sync);
+    return () => mq.removeEventListener?.('change', sync);
+  }, []);
+  return desktop;
+}
+
+/** Small pill ghost instead of the browser’s default translucent DOM clone. */
+function setCleanDragGhost(
+  dataTransfer: {
+    setDragImage?: (image: Element, x: number, y: number) => void;
+  },
+  label: string,
+) {
+  if (typeof document === 'undefined' || !dataTransfer.setDragImage) return;
+  const ghost = document.createElement('div');
+  ghost.textContent = `⠿  ${label}`;
+  ghost.setAttribute(
+    'style',
+    [
+      'position:fixed',
+      'top:-1000px',
+      'left:-1000px',
+      'padding:6px 10px',
+      'border-radius:8px',
+      `background:${colors.bgElevated}`,
+      `color:${colors.primary}`,
+      `border:1px solid ${colors.primaryMid}`,
+      'font:600 12px/1.2 system-ui,sans-serif',
+      'box-shadow:0 6px 18px rgba(11,31,51,0.14)',
+      'opacity:0.95',
+      'pointer-events:none',
+      'white-space:nowrap',
+      'z-index:99999',
+    ].join(';'),
+  );
+  document.body.appendChild(ghost);
+  dataTransfer.setDragImage(ghost, 16, 14);
+  requestAnimationFrame(() => {
+    ghost.remove();
+  });
+}
+
 /**
- * Inventory sheet column header shell — grab handle + ◂/▸ nudges.
- * Web desktop: HTML5 drag-and-drop on the handle.
- * Touch / mobile web / native: long-press (or tap) handle → ◂/▸.
- * Handle sits above the label so fixed column widths still match body cells.
+ * Inventory sheet column header — discreet grab handle + optional ◂/▸.
+ * Desktop web: hover-revealed handle, custom drag ghost, subtle drop target.
+ * Touch / mobile web / native: visible handle; tap/long-press → ◂/▸.
+ * Handle sits inline with the label so the header reads as one row.
  */
 export function InventoryColumnHead({
   col,
   style,
   dropTarget,
+  dragging,
   armed,
   canMoveLeft,
   canMoveRight,
@@ -57,8 +112,15 @@ export function InventoryColumnHead({
   children,
 }: Props) {
   const isWeb = Platform.OS === 'web';
+  const desktop = useDesktopPointer();
+  const [hovered, setHovered] = useState(false);
+  const [grabbing, setGrabbing] = useState(false);
   /** Skip arming onPress after an HTML5 drag (mouseup still fires press). */
   const skippedPressAfterDrag = useRef(false);
+  const wrapRef = useRef<View>(null);
+
+  const handleEmphasis =
+    !desktop || hovered || armed || dragging || grabbing;
 
   const dropProps = isWeb
     ? ({
@@ -85,6 +147,8 @@ export function InventoryColumnHead({
           e.preventDefault?.();
           onDragOverCol?.(col);
         },
+        onMouseEnter: () => setHovered(true),
+        onMouseLeave: () => setHovered(false),
       } as object)
     : null;
 
@@ -96,17 +160,34 @@ export function InventoryColumnHead({
           dataTransfer?: {
             setData?: (type: string, value: string) => void;
             effectAllowed?: string;
+            setDragImage?: (image: Element, x: number, y: number) => void;
           };
         }) => {
           e.stopPropagation?.();
           skippedPressAfterDrag.current = true;
+          setGrabbing(true);
           e.dataTransfer?.setData?.('text/plain', col);
           if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+          // Prefer a short readable ghost from the header label when possible.
+          let ghostLabel: string = col;
+          try {
+            const node = wrapRef.current as unknown as {
+              textContent?: string;
+            } | null;
+            const raw = (node?.textContent ?? '')
+              .replace(/[⠿◂▸]/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+            if (raw) ghostLabel = raw.length > 22 ? `${raw.slice(0, 20)}…` : raw;
+          } catch {
+            /* ignore */
+          }
+          if (e.dataTransfer) setCleanDragGhost(e.dataTransfer, ghostLabel);
           onDragStartCol?.(col);
         },
         onDragEnd: () => {
+          setGrabbing(false);
           onDragEnd?.();
-          // Clear after the trailing click/press event.
           setTimeout(() => {
             skippedPressAfterDrag.current = false;
           }, 0);
@@ -120,15 +201,25 @@ export function InventoryColumnHead({
 
   return (
     <View
+      ref={wrapRef}
       style={[
         styles.wrap,
         style,
         dropTarget && styles.dropTarget,
+        (dragging || grabbing) && styles.draggingSource,
         armed && styles.armed,
+        isWeb && desktop
+          ? ({
+              // Soft hover wash so the handle “belongs” to the header.
+              ...(hovered && !dragging && !dropTarget
+                ? { backgroundColor: 'rgba(11, 79, 138, 0.06)' }
+                : null),
+            } as object)
+          : null,
       ]}
       {...dropProps}
     >
-      <View style={styles.handleRow}>
+      <View style={styles.inner}>
         {armed ? (
           <Pressable
             onPress={() => onMoveBy?.(-1)}
@@ -148,7 +239,9 @@ export function InventoryColumnHead({
           {...handleDragProps}
           onPress={() => {
             if (skippedPressAfterDrag.current) return;
-            // Tap/click arms ◂/▸ — works on mobile web where HTML5 drag fails.
+            // Desktop already has HTML5 drag — skip ◂/▸ arming on click
+            // so headers don’t jump. Touch / coarse pointer still arms.
+            if (desktop) return;
             toggleArm();
           }}
           onLongPress={() => {
@@ -162,11 +255,22 @@ export function InventoryColumnHead({
           accessibilityHint={dragHint}
           style={({ pressed }) => [
             styles.handle,
-            (pressed || armed) && styles.handleActive,
-            isWeb ? ({ cursor: 'grab' } as object) : null,
+            handleEmphasis && styles.handleReady,
+            (pressed || armed || grabbing) && styles.handleActive,
+            isWeb
+              ? ({
+                  cursor: grabbing || dragging ? 'grabbing' : 'grab',
+                } as object)
+              : null,
           ]}
         >
-          <Text style={styles.handleGlyph} accessible={false}>
+          <Text
+            style={[
+              styles.handleGlyph,
+              !handleEmphasis && styles.handleGlyphQuiet,
+            ]}
+            accessible={false}
+          >
             ⠿
           </Text>
         </Pressable>
@@ -185,8 +289,8 @@ export function InventoryColumnHead({
             <Text style={styles.nudgeText}>▸</Text>
           </Pressable>
         ) : null}
+        <View style={styles.body}>{children}</View>
       </View>
-      <View style={styles.body}>{children}</View>
     </View>
   );
 }
@@ -195,55 +299,74 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'column',
     alignItems: 'stretch',
+    justifyContent: 'center',
+    ...(Platform.OS === 'web'
+      ? ({
+          transitionProperty: 'background-color, opacity, box-shadow',
+          transitionDuration: '120ms',
+          userSelect: 'none',
+        } as object)
+      : null),
+  },
+  inner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+    gap: 2,
   },
   dropTarget: {
-    backgroundColor: colors.bgElevated,
+    backgroundColor: colors.primarySoft,
     borderRadius: radius.sm,
     ...(Platform.OS === 'web'
       ? ({
-          outlineWidth: 2,
-          outlineColor: colors.primary,
-          outlineStyle: 'solid',
+          boxShadow: `inset 3px 0 0 ${colors.primary}`,
         } as object)
-      : null),
+      : {
+          borderLeftWidth: 3,
+          borderLeftColor: colors.primary,
+        }),
+  },
+  draggingSource: {
+    opacity: 0.4,
   },
   armed: {
     backgroundColor: colors.bgElevated,
     borderRadius: radius.sm,
   },
-  handleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    minHeight: 18,
-    marginBottom: 2,
-    gap: 1,
-  },
   handle: {
-    paddingHorizontal: 4,
-    paddingVertical: 1,
+    paddingHorizontal: 2,
+    paddingVertical: 2,
     borderRadius: radius.sm,
-    backgroundColor: colors.bgElevated,
-    borderWidth: 1,
-    borderColor: colors.primaryMid,
-    minWidth: 22,
+    minWidth: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    // Reserved footprint so hover emphasis never jumps layout.
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+  },
+  handleReady: {
+    backgroundColor: 'rgba(11, 79, 138, 0.08)',
+    borderColor: 'rgba(26, 107, 176, 0.35)',
   },
   handleActive: {
     backgroundColor: colors.primarySoft,
     borderColor: colors.primary,
   },
   handleGlyph: {
-    fontSize: 13,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 14,
     color: colors.primary,
-    opacity: 1,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: -1,
+    opacity: 0.9,
+  },
+  handleGlyphQuiet: {
+    opacity: 0.28,
   },
   nudge: {
-    paddingHorizontal: 3,
-    minWidth: 18,
+    paddingHorizontal: 2,
+    minWidth: 16,
     minHeight: 18,
     alignItems: 'center',
     justifyContent: 'center',
@@ -252,12 +375,13 @@ const styles = StyleSheet.create({
   },
   nudgeDim: { opacity: 0.35 },
   nudgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     color: colors.primary,
     lineHeight: 14,
   },
   body: {
+    flex: 1,
     minWidth: 0,
   },
 });

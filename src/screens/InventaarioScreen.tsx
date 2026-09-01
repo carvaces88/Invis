@@ -131,6 +131,27 @@ function colStyle(
   }
 }
 
+/** Header label alignment only — column width lives on InventoryColumnHead. */
+function colHeadAlign(col: ExportColumnId) {
+  switch (col) {
+    case 'unit':
+      return styles.headAlignCenter;
+    case 'qty':
+    case 'price':
+    case 'total':
+    case 'openingStock':
+    case 'purchases':
+    case 'closingStock':
+    case 'usage':
+    case 'need':
+    case 'variance':
+    case 'turnover':
+      return styles.headAlignRight;
+    default:
+      return styles.headAlignLeft;
+  }
+}
+
 function tableMinWidth(
   columns: ExportColumnId[],
   productCodeOpen = false,
@@ -755,6 +776,7 @@ export function InventaarioScreen() {
         dropTarget={
           dropTargetCol === col && draggingCol != null && draggingCol !== col
         }
+        dragging={draggingCol === col}
         armed={armedCol === col}
         canMoveLeft={colIdx > 0}
         canMoveRight={colIdx >= 0 && colIdx < columns.length - 1}
@@ -823,8 +845,6 @@ export function InventaarioScreen() {
           );
         }
         if (compareMonths && (col === 'qty' || col === 'closingStock')) {
-          const qtyCol =
-            col === 'closingStock' ? styles.colMove : styles.colQty;
           // Body renders two cells; header must span the same total width.
           return (
             <InventoryColumnHead
@@ -836,6 +856,7 @@ export function InventaarioScreen() {
                 draggingCol != null &&
                 draggingCol !== col
               }
+              dragging={draggingCol === col}
               armed={armedCol === col}
               canMoveLeft={columns.indexOf(col) > 0}
               canMoveRight={
@@ -872,14 +893,14 @@ export function InventaarioScreen() {
             >
               <View style={styles.compareHeadPair}>
                 <Text
-                  style={[styles.th, qtyCol]}
+                  style={[styles.th, styles.headAlignRight]}
                   numberOfLines={2}
                   accessibilityLabel={t('inventoryLastMonth')}
                 >
                   {t('inventoryLastMonth')}
                 </Text>
                 <Text
-                  style={[styles.th, qtyCol]}
+                  style={[styles.th, styles.headAlignRight]}
                   numberOfLines={2}
                   accessibilityLabel={t('inventoryThisMonth')}
                 >
@@ -899,7 +920,7 @@ export function InventaarioScreen() {
         return wrapColumnHead(
           col,
           <Text
-            style={[styles.th, colStyle(col, colOpts)]}
+            style={[styles.th, colHeadAlign(col)]}
             numberOfLines={2}
             accessibilityLabel={a11y}
           >
@@ -1775,7 +1796,7 @@ const styles = StyleSheet.create({
   },
   tableHead: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'flex-start',
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
@@ -1794,6 +1815,9 @@ const styles = StyleSheet.create({
     lineHeight: 13,
     overflow: 'hidden',
   },
+  headAlignLeft: { textAlign: 'left' },
+  headAlignCenter: { textAlign: 'center' },
+  headAlignRight: { textAlign: 'right' },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
