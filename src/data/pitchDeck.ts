@@ -73,7 +73,7 @@ export function projectionArrEur(kitchens: number, m = pitchMarket): number {
 /**
  * Approximate share of Finnish full-service restaurant density by region
  * (pitch visualization — edit as research tightens).
- * Positions are % within the stylized Finland map frame.
+ * Positions are % within the Finland map frame (viewBox 0 0 1000 1000).
  */
 export const finlandRestaurantRegions = [
   {
@@ -81,8 +81,8 @@ export const finlandRestaurantRegions = [
     name: 'Uusimaa',
     city: 'Helsinki metro',
     pct: 38.5,
-    topPct: 72,
-    leftPct: 58,
+    topPct: 84,
+    leftPct: 56,
     size: 'lg' as const,
   },
   {
@@ -90,8 +90,8 @@ export const finlandRestaurantRegions = [
     name: 'Pirkanmaa',
     city: 'Tampere',
     pct: 9.2,
-    topPct: 58,
-    leftPct: 42,
+    topPct: 72,
+    leftPct: 48,
     size: 'md' as const,
   },
   {
@@ -99,8 +99,8 @@ export const finlandRestaurantRegions = [
     name: 'Varsinais-Suomi',
     city: 'Turku',
     pct: 8.1,
-    topPct: 68,
-    leftPct: 28,
+    topPct: 82,
+    leftPct: 34,
     size: 'md' as const,
   },
   {
@@ -108,7 +108,7 @@ export const finlandRestaurantRegions = [
     name: 'Pohjois-Pohjanmaa',
     city: 'Oulu',
     pct: 5.4,
-    topPct: 32,
+    topPct: 42,
     leftPct: 48,
     size: 'sm' as const,
   },
@@ -117,8 +117,8 @@ export const finlandRestaurantRegions = [
     name: 'Keski-Suomi',
     city: 'Jyväskylä',
     pct: 4.6,
-    topPct: 48,
-    leftPct: 50,
+    topPct: 62,
+    leftPct: 54,
     size: 'sm' as const,
   },
   {

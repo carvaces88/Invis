@@ -27,6 +27,11 @@ import {
   pitchVision,
   type PitchHorizonId,
 } from '../data/pitchDeck';
+import {
+  FINLAND_MAP_VIEWBOX,
+  finlandMapRegions,
+  type FinlandPitchRegionId,
+} from '../data/finlandMap';
 import { spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PitchDeck'>;
@@ -332,45 +337,31 @@ function GrowthRing({
   );
 }
 
-/** Stylized Finland silhouette + region % labels (choropleth-style) */
+const FINLAND_REGION_FILL: Record<FinlandPitchRegionId, string> = {
+  uusimaa: '#0D9488',
+  pirkanmaa: '#14B8A6',
+  varsinais: '#2DD4BF',
+  'pohjois-pohjanmaa': '#5EEAD4',
+  'keski-suomi': '#67E8F9',
+  other: '#E2E8F0',
+};
+
+/** Accurate Finland admin regions + restaurant-density labels */
 function FinlandMap() {
   const mapW = Math.min(Dimensions.get('window').width - spacing.lg * 2, 420);
+  const mapH = Math.round(mapW * 1.05);
   return (
-    <View style={styles.mapFrame}>
-      <Svg width={mapW} height={280} viewBox="0 0 200 320">
-        {/* Simplified Finland outline */}
-        <Path
-          d="M95 12 L118 28 L125 55 L132 78 L128 105 L135 130 L130 155 L138 175 L125 195 L118 220 L108 245 L95 268 L78 285 L62 295 L48 288 L42 265 L38 240 L45 215 L40 190 L48 165 L42 140 L50 115 L45 90 L55 65 L70 40 L82 22 Z"
-          fill="#E8EEF2"
-          stroke="#CBD5E1"
-          strokeWidth={2}
-        />
-        {/* Density blobs */}
-        <Path
-          d="M100 230 L125 245 L115 275 L85 270 L88 245 Z"
-          fill="#99F6E4"
-          opacity={0.95}
-        />
-        <Path
-          d="M70 200 L95 205 L90 235 L65 228 Z"
-          fill="#5EEAD4"
-          opacity={0.85}
-        />
-        <Path
-          d="M55 215 L78 220 L72 248 L50 240 Z"
-          fill="#2DD4BF"
-          opacity={0.8}
-        />
-        <Path
-          d="M95 95 L115 105 L108 130 L90 122 Z"
-          fill="#A5F3FC"
-          opacity={0.75}
-        />
-        <Path
-          d="M95 155 L112 162 L105 185 L90 178 Z"
-          fill="#67E8F9"
-          opacity={0.7}
-        />
+    <View style={[styles.mapFrame, { height: mapH }]}>
+      <Svg width={mapW} height={mapH} viewBox={FINLAND_MAP_VIEWBOX}>
+        {finlandMapRegions.map((region) => (
+          <Path
+            key={region.code}
+            d={region.path}
+            fill={FINLAND_REGION_FILL[region.pitchRegionId]}
+            stroke="#FFFFFF"
+            strokeWidth={1.2}
+          />
+        ))}
       </Svg>
       {finlandRestaurantRegions
         .filter((r) => r.id !== 'other')
@@ -1092,7 +1083,6 @@ const styles = StyleSheet.create({
   insightMapCol: { width: '100%' },
   insightRight: { width: '100%' },
   mapFrame: {
-    height: 280,
     backgroundColor: T.white,
     borderRadius: 16,
     borderWidth: 1,
