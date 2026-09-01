@@ -44,4 +44,5 @@ Prefer `Product.productCode` (Restolution codes like `M1001`), then `Product.ean
 - Do not add Päivämäärä / Yksikkö to the Restolution profile — they are not in the Restolution template.
 - Other profiles (amounts, withPrice, nameQty) stay available for casual lists; Restolution stays first/default.
 - Tarve may be 0 until meal-plan/covers wiring exists; keep the column.
+- PDF export for Restolution must be **landscape** with `table-layout: fixed` and % column widths so all 9 columns fit on one page (never assume horizontal scroll).
 ---

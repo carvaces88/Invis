@@ -71,8 +71,9 @@ export async function shareOrDownloadBase64(options: {
 
 /**
  * expo-print's printToFileAsync on web only calls window.print() on the
- * current document (ignoring html). Open the export HTML in a hidden iframe
- * and print that instead so the user can Save as PDF.
+ * current document (ignoring html). Open the export HTML in a dedicated
+ * window/tab and print that — mobile Safari often prints the parent page
+ * when printing from a 0×0 iframe, which clips the Restolution sheet.
  */
 export async function printHtmlOrSharePdf(options: {
   html: string;
@@ -98,21 +99,45 @@ export async function printHtmlOrSharePdf(options: {
 
 function printHtmlInBrowser(html: string, filename: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    if (typeof document === 'undefined') {
+    if (typeof document === 'undefined' || typeof window === 'undefined') {
       reject(new Error('Browser print is unavailable'));
       return;
     }
 
+    // Prefer a real window: iframe print on iOS Safari reprints the app UI.
+    const printWindow = window.open('', '_blank');
+    if (printWindow?.document) {
+      try {
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+        const run = () => {
+          try {
+            printWindow.focus();
+            printWindow.print();
+            resolve(filename);
+          } catch (e) {
+            reject(e instanceof Error ? e : new Error('Print failed'));
+          }
+        };
+        setTimeout(run, 300);
+        return;
+      } catch {
+        try {
+          printWindow.close();
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    // Fallback when popups are blocked: full-viewport offscreen iframe.
     const iframe = document.createElement('iframe');
     iframe.setAttribute('title', filename);
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.opacity = '0';
-    iframe.style.pointerEvents = 'none';
+    iframe.setAttribute(
+      'style',
+      'position:fixed;inset:0;width:100vw;height:100vh;border:0;opacity:0;pointer-events:none;z-index:-1;',
+    );
     document.body.appendChild(iframe);
 
     const cleanup = () => {
@@ -131,7 +156,7 @@ function printHtmlInBrowser(html: string, filename: string): Promise<string> {
     doc.write(html);
     doc.close();
 
-    const runPrint = () => {
+    setTimeout(() => {
       try {
         win.focus();
         win.print();
@@ -141,9 +166,6 @@ function printHtmlInBrowser(html: string, filename: string): Promise<string> {
       } finally {
         setTimeout(cleanup, 1_000);
       }
-    };
-
-    // Allow layout/styles to settle before opening the print dialog.
-    setTimeout(runPrint, 250);
+    }, 300);
   });
 }
