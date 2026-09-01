@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ColumnReorderSheet } from '../components/ColumnReorderSheet';
 import { ExportColumnsSheet } from '../components/ExportColumnsSheet';
 import { InventoryColumnHead } from '../components/InventoryColumnHead';
 import { PlaceSelect } from '../components/PlaceSelect';
@@ -232,6 +233,7 @@ export function InventaarioScreen() {
   const [exporting, setExporting] = useState(false);
   const [exportKind, setExportKind] = useState<ExportKind | null>(null);
   const [columnsSheetOpen, setColumnsSheetOpen] = useState(false);
+  const [reorderSheetOpen, setReorderSheetOpen] = useState(false);
   const [viewProfileId, setViewProfileId] = useState<ExportProfileId>(
     DEFAULT_VIEW_PROFILE,
   );
@@ -241,7 +243,7 @@ export function InventaarioScreen() {
   const [dropTargetCol, setDropTargetCol] = useState<ExportColumnId | null>(
     null,
   );
-  /** Native: long-press grab handle arms ◂/▸ nudges for this column. */
+  /** Long-press / tap grab handle arms ◂/▸ nudges for this column. */
   const [armedCol, setArmedCol] = useState<ExportColumnId | null>(null);
   const draggingColRef = useRef<ExportColumnId | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1274,6 +1276,23 @@ export function InventaarioScreen() {
               {t(profileTitleKey(viewProfileId))}
             </Text>
           </Pressable>
+          <Pressable
+            onPress={() => {
+              setArmedCol(null);
+              setReorderSheetOpen(true);
+            }}
+            style={({ pressed }) => [
+              styles.reorderBtn,
+              pressed && { opacity: 0.85 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t('columnReorderBtn')}
+          >
+            <Text style={styles.reorderBtnText}>{t('columnReorderBtn')}</Text>
+          </Pressable>
+          <Text style={styles.columnDragHint} numberOfLines={1}>
+            {t('columnDragHintNearColumns')}
+          </Text>
           {columnOrderCustomized ? (
             <Pressable
               onPress={resetColumnOrder}
@@ -1327,6 +1346,17 @@ export function InventaarioScreen() {
         initialProfile={viewProfileId}
         onClose={() => setColumnsSheetOpen(false)}
         onConfirm={applyViewProfile}
+      />
+
+      <ColumnReorderSheet
+        visible={reorderSheetOpen}
+        columns={columns}
+        canReset={columnOrderCustomized}
+        onClose={() => setReorderSheetOpen(false)}
+        onMoveBy={(col, delta) => nudgeColumn(col, delta)}
+        onReset={() => {
+          resetColumnOrder();
+        }}
       />
 
       {/*
@@ -1668,6 +1698,25 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     ...shadows.soft,
   },
+  reorderBtn: {
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.primaryMid,
+  },
+  reorderBtnText: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  columnDragHint: {
+    color: colors.inkMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    paddingHorizontal: 4,
+  },
   columnsBtnText: {
     color: colors.primary,
     fontWeight: '700',
@@ -1729,12 +1778,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'flex-start',
     paddingHorizontal: spacing.md,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
     backgroundColor: colors.primarySoft,
     zIndex: 20,
-    overflow: 'hidden',
+    // Keep visible — do not clip grab handles / ◂▸ nudges.
+    overflow: 'visible',
   },
   th: {
     fontSize: 10,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   Platform,
   Pressable,
@@ -16,7 +16,7 @@ type Props = {
   style?: StyleProp<ViewStyle>;
   /** Visual drop-target highlight while dragging over this header. */
   dropTarget?: boolean;
-  /** Native: this column is armed for ◂/▸ nudges. */
+  /** This column is armed for ◂/▸ nudges (long-press / tap handle). */
   armed?: boolean;
   canMoveLeft?: boolean;
   canMoveRight?: boolean;
@@ -33,8 +33,9 @@ type Props = {
 };
 
 /**
- * Inventory sheet column header shell — grab handle + optional native nudge.
- * Web uses HTML5 drag-and-drop; native uses long-press then ◂/▸.
+ * Inventory sheet column header shell — grab handle + ◂/▸ nudges.
+ * Web desktop: HTML5 drag-and-drop on the handle.
+ * Touch / mobile web / native: long-press (or tap) handle → ◂/▸.
  * Handle sits above the label so fixed column widths still match body cells.
  */
 export function InventoryColumnHead({
@@ -56,6 +57,8 @@ export function InventoryColumnHead({
   children,
 }: Props) {
   const isWeb = Platform.OS === 'web';
+  /** Skip arming onPress after an HTML5 drag (mouseup still fires press). */
+  const skippedPressAfterDrag = useRef(false);
 
   const dropProps = isWeb
     ? ({
@@ -96,15 +99,24 @@ export function InventoryColumnHead({
           };
         }) => {
           e.stopPropagation?.();
+          skippedPressAfterDrag.current = true;
           e.dataTransfer?.setData?.('text/plain', col);
           if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
           onDragStartCol?.(col);
         },
         onDragEnd: () => {
           onDragEnd?.();
+          // Clear after the trailing click/press event.
+          setTimeout(() => {
+            skippedPressAfterDrag.current = false;
+          }, 0);
         },
       } as object)
     : null;
+
+  function toggleArm() {
+    onArm?.(armed ? null : col);
+  }
 
   return (
     <View
@@ -117,11 +129,11 @@ export function InventoryColumnHead({
       {...dropProps}
     >
       <View style={styles.handleRow}>
-        {armed && !isWeb ? (
+        {armed ? (
           <Pressable
             onPress={() => onMoveBy?.(-1)}
             disabled={!canMoveLeft}
-            hitSlop={6}
+            hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={moveLeftLabel}
             style={({ pressed }) => [
@@ -134,17 +146,23 @@ export function InventoryColumnHead({
         ) : null}
         <Pressable
           {...handleDragProps}
+          onPress={() => {
+            if (skippedPressAfterDrag.current) return;
+            // Tap/click arms ◂/▸ — works on mobile web where HTML5 drag fails.
+            toggleArm();
+          }}
           onLongPress={() => {
-            if (!isWeb) onArm?.(armed ? null : col);
+            if (skippedPressAfterDrag.current) return;
+            toggleArm();
           }}
           delayLongPress={280}
-          hitSlop={4}
+          hitSlop={6}
           accessibilityRole="button"
           accessibilityLabel={dragHint}
           accessibilityHint={dragHint}
           style={({ pressed }) => [
             styles.handle,
-            pressed && styles.handlePressed,
+            (pressed || armed) && styles.handleActive,
             isWeb ? ({ cursor: 'grab' } as object) : null,
           ]}
         >
@@ -152,11 +170,11 @@ export function InventoryColumnHead({
             ⠿
           </Text>
         </Pressable>
-        {armed && !isWeb ? (
+        {armed ? (
           <Pressable
             onPress={() => onMoveBy?.(1)}
             disabled={!canMoveRight}
-            hitSlop={6}
+            hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={moveRightLabel}
             style={({ pressed }) => [
@@ -183,7 +201,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     ...(Platform.OS === 'web'
       ? ({
-          outlineWidth: 1,
+          outlineWidth: 2,
           outlineColor: colors.primary,
           outlineStyle: 'solid',
         } as object)
@@ -197,35 +215,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    minHeight: 12,
-    marginBottom: 1,
+    minHeight: 18,
+    marginBottom: 2,
+    gap: 1,
   },
   handle: {
-    paddingHorizontal: 1,
-    paddingVertical: 0,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
     borderRadius: radius.sm,
-  },
-  handlePressed: {
     backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.primaryMid,
+    minWidth: 22,
+    alignItems: 'center',
+  },
+  handleActive: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
   },
   handleGlyph: {
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: 13,
+    lineHeight: 15,
     color: colors.primary,
-    opacity: 0.65,
-    fontWeight: '700',
+    opacity: 1,
+    fontWeight: '800',
+    letterSpacing: -1,
   },
   nudge: {
-    paddingHorizontal: 2,
-    minWidth: 14,
+    paddingHorizontal: 3,
+    minWidth: 18,
+    minHeight: 18,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    backgroundColor: colors.primarySoft,
   },
   nudgeDim: { opacity: 0.35 },
   nudgeText: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '800',
     color: colors.primary,
-    lineHeight: 12,
+    lineHeight: 14,
   },
   body: {
     minWidth: 0,
