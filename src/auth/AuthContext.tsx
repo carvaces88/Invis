@@ -17,6 +17,8 @@ import {
   isMasterName,
   isValidEmail,
   normalizeGateName,
+  resolveAuthAccount,
+  resolveSyncEmail,
 } from '../lib/authAccounts';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
@@ -103,7 +105,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const raw = await AsyncStorage.getItem(SESSION_KEY);
         if (!cancelled && raw) {
           const parsed = JSON.parse(raw) as GateSession;
-          if (parsed?.name) setSession(parsed);
+          if (parsed?.name) {
+            const patchedEmail = resolveSyncEmail(parsed);
+            if (patchedEmail && parsed.email !== patchedEmail) {
+              parsed.email = patchedEmail;
+              await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(parsed));
+            }
+            setSession(parsed);
+          }
         }
       } catch {
         /* ignore */
@@ -145,11 +154,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    const account = resolveAuthAccount(name);
+    const syncEmail = bypass
+      ? (account?.email?.trim().toLowerCase() ?? null)
+      : email;
+
     const next: GateSession = {
       name:
         kitchen || beta || investor ? displayKitchenName(name) : name,
       venue: bypass ? null : venue,
-      email: bypass ? null : email,
+      email: syncEmail,
       kind: kitchen ? 'kitchen' : investor ? 'investor' : 'tester',
       enteredAt: new Date().toISOString(),
     };

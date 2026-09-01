@@ -17,7 +17,7 @@ export const AUTH_ACCOUNTS: Record<
 
 export const KITCHEN_NAMES = ['cesar', 'elena', 'ivan', 'guest'] as const;
 
-/** Named beta testers — enter without email; get a clean empty inventory workspace */
+/** Named beta testers — cloud sync via canonical account email (e.g. jani@invis.app) */
 export const BETA_TESTER_NAMES = ['jani'] as const;
 
 /** Investor walkthrough — full app + Pro unlock + pitch deck */
@@ -73,4 +73,15 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function isValidEmail(raw: string): boolean {
   return EMAIL_RE.test(raw.trim());
+}
+
+/** Email used for Supabase workspace_snapshots — gate email or known account alias. */
+export function resolveSyncEmail(session: {
+  name: string;
+  email: string | null;
+}): string | null {
+  const fromSession = session.email?.trim().toLowerCase();
+  if (fromSession) return fromSession;
+  const account = resolveAuthAccount(session.name);
+  return account?.email?.trim().toLowerCase() ?? null;
 }

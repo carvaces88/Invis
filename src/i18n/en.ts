@@ -21,6 +21,11 @@ export const en = {
   date: 'Date',
   colDate: 'Date',
   colProductCode: 'Product code',
+  colProductCodeShort: 'Code',
+  colProductCodeExpand: 'Show product codes',
+  colProductCodeCollapse: 'Hide product codes',
+  colProductCodeCollapsedA11y:
+    'Product code {code} — tap column header to show codes',
   colOpeningStock: 'Opening stock',
   colPurchases: 'Purchases',
   colClosingStock: 'Closing stock',
@@ -196,6 +201,10 @@ export const en = {
     'Same layouts as export — pick what appears in the on-screen sheet.',
   spreadsheetApplyColumns: 'Show columns',
   spreadsheetColumnsBtn: 'Columns',
+  columnDragToReorder: 'Drag to reorder columns',
+  columnMoveLeft: 'Move column left',
+  columnMoveRight: 'Move column right',
+  columnResetOrder: 'Reset column order',
 
 
   fridgeReviewKicker: 'Fridge / shelf',
@@ -738,6 +747,9 @@ export const en = {
   exportDocxFailed: 'Word export failed. Use Excel or PDF.',
   exportChooseData: 'What info or data do you want to export?',
   exportChooseDataSub: 'Choose columns for {format}, then continue.',
+  exportProfileSimplified: 'Simplified (recommended)',
+  exportProfileSimplifiedHint:
+    'Collapsible code · storage · name · unit · qty · price (0% ALV) · total — best for daily counting.',
   exportProfileAmounts: 'Name + amounts',
   exportProfileAmountsHint: 'Product name, unit, and quantity — no prices.',
   exportProfileWithPrice: 'Name + amounts + price',
@@ -745,7 +757,7 @@ export const en = {
     'Includes unit price and line totals, plus a food total.',
   exportProfileNameQty: 'Name + quantity only',
   exportProfileNameQtyHint: 'Minimal list — name and qty, no unit or price.',
-  exportProfileRestolution: 'Restolution (recommended)',
+  exportProfileRestolution: 'Restolution',
   exportProfileRestolutionHint:
     'Product code, name, beginning/purchases/ending, usage, need, variance, turnover — bilingual headers Restolution reads.',
   exportContinue: 'Export',
@@ -784,7 +796,8 @@ export const en = {
   gateEmailPlaceholder: 'you@company.com',
   gateTesterHint:
     'Use the same email on phone and computer so inventory stays in sync — no password.',
-  gateKitchenHint: 'You can continue without email or venue.',
+  gateKitchenHint:
+    'Kitchen logins sync to the cloud automatically (same inventory on every device).',
   gateSubmit: 'Continue',
   gateEnterFailed: 'Could not continue — try again.',
   signInNotConfigured:

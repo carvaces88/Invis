@@ -21,6 +21,11 @@ export const fi: Messages = {
   date: 'Päivä',
   colDate: 'Päivämäärä',
   colProductCode: 'Tuotekoodi',
+  colProductCodeShort: 'Koodi',
+  colProductCodeExpand: 'Näytä tuotekoodit',
+  colProductCodeCollapse: 'Piilota tuotekoodit',
+  colProductCodeCollapsedA11y:
+    'Tuotekoodi {code} — napauta otsikkoa näyttääksesi koodit',
   colOpeningStock: 'Alkuvarasto',
   colPurchases: 'Ostot',
   colClosingStock: 'Loppuvarasto',
@@ -194,6 +199,10 @@ export const fi: Messages = {
     'Samat asettelut kuin viennissä — valitse mitä taulukossa näkyy.',
   spreadsheetApplyColumns: 'Näytä sarakkeet',
   spreadsheetColumnsBtn: 'Sarakkeet',
+  columnDragToReorder: 'Vedä järjestääksesi sarakkeet',
+  columnMoveLeft: 'Siirrä sarake vasemmalle',
+  columnMoveRight: 'Siirrä sarake oikealle',
+  columnResetOrder: 'Palauta sarakkeiden järjestys',
 
 
   fridgeReviewKicker: 'Jääkaappi / hylly',
@@ -732,6 +741,9 @@ export const fi: Messages = {
   exportDocxFailed: 'Word-vienti epäonnistui. Käytä Exceliä tai PDF:ää.',
   exportChooseData: 'Mitä tietoja haluat viedä?',
   exportChooseDataSub: 'Valitse sarakkeet muodolle {format} ja jatka.',
+  exportProfileSimplified: 'Yksinkertainen (suositus)',
+  exportProfileSimplifiedHint:
+    'Käännettävä koodi · varasto · nimi · yksikkö · määrä · hinta (0 % ALV) · yhteensä — paras päivittäiseen inventointiin.',
   exportProfileAmounts: 'Nimi + määrät',
   exportProfileAmountsHint: 'Tuotenimi, yksikkö ja määrä — ei hintoja.',
   exportProfileWithPrice: 'Nimi + määrät + hinta',
@@ -739,7 +751,7 @@ export const fi: Messages = {
     'Sisältää yksikköhinnan, rivisummat ja ruokahinnan yhteensä.',
   exportProfileNameQty: 'Vain nimi + määrä',
   exportProfileNameQtyHint: 'Minimalistinen lista — nimi ja määrä, ei yksikköä eikä hintaa.',
-  exportProfileRestolution: 'Restolution (suositus)',
+  exportProfileRestolution: 'Restolution',
   exportProfileRestolutionHint:
     'Tuotekoodi, tuote, alkuvarasto/ostot/loppuvarasto, ainekäyttö, tarve, ero, kiertonopeus — kaksikieliset otsikot Restolutionille.',
   exportContinue: 'Vie',
@@ -780,7 +792,7 @@ export const fi: Messages = {
   gateTesterHint:
     'Käytä samaa sähköpostia puhelimessa ja tietokoneella, jotta inventaario pysyy synkassa — ei salasanaa.',
   gateKitchenHint:
-    'Voit jatkaa ilman sähköpostia tai toimipistettä.',
+    'Keittiökirjautumiset synkataan pilveen (sama inventaario kaikilla laitteilla).',
   gateSubmit: 'Jatka',
   gateEnterFailed: 'Jatkaminen ei onnistunut — yritä uudelleen.',
   signInNotConfigured:

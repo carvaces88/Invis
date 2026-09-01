@@ -3,13 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../auth/AuthContext';
 import { useInventory } from '../data/store';
 import { isBetaTesterName } from '../lib/authAccounts';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 const WORKSPACE_OWNER_KEY = 'invis.workspaceOwner.v1';
 
 /**
  * When a named beta tester (e.g. Jani) first claims this device workspace,
- * wipe seed inventory so they start empty. Later visits keep their counts.
- * Also applies welcome-gate venue → site name for regular testers.
+ * wipe seed inventory so they start empty — only when cloud sync is off.
+ * With Supabase, cloud pull is the source of truth across devices.
  */
 export function VenueFromGate() {
   const { session } = useAuth();
@@ -35,7 +36,11 @@ export function VenueFromGate() {
         const prev = await AsyncStorage.getItem(WORKSPACE_OWNER_KEY);
         if (cancelled) return;
 
-        if (isBetaTesterName(session.name) && prev !== ownerKey) {
+        if (
+          isBetaTesterName(session.name) &&
+          prev !== ownerKey &&
+          !isSupabaseConfigured
+        ) {
           clearAllInventory();
           setSiteName('Jani · beta 1');
         }

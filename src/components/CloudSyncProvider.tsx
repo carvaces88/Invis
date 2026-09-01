@@ -10,6 +10,7 @@ import React, {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../auth/AuthContext';
 import { useInventory } from '../data/store';
+import { resolveSyncEmail } from '../lib/authAccounts';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { uploadInventoryPhotosForSync } from '../lib/workspacePhotoStorage';
 import {
@@ -85,7 +86,7 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
 
   const applyingRemoteRef = useRef(false);
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const email = session?.email?.trim().toLowerCase() ?? '';
+  const email = session ? resolveSyncEmail(session) : '';
 
   const pushSnapshot = useCallback(
     async (opts?: { refreshLocalPhotos?: boolean }) => {
