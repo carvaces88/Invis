@@ -521,6 +521,14 @@ export const fi: Messages = {
   sheetImportAlreadyBody:
     'Nämä lomakemäärät on jo kirjoitettu. Avataan inventaario, jotta et lisää niitä kahdesti.',
 
+  sheetImportInsightKicker: 'INVIS huomasi',
+  sheetImportInsightDuplicate:
+    'Huomasin — sinulla on tupla {item} (sivut {pages}).',
+  sheetImportInsightCrossedOff:
+    'Näyttää siltä, että yliviivasit {item} sivulla {page}.',
+  sheetImportInsightQtyMismatch:
+    '{item}: {qtyA} sivulla {pageA}, {qtyB} sivulla {pageB} — kannattaa tarkistaa.',
+
   inventoryPhotosTitle: 'Inventaariokuvat',
   inventoryPhotosOpen: 'Inventaariokuvat',
   inventoryPhotosOpenSub: 'Laskennan aikana tallennetut kuvat',
@@ -770,7 +778,7 @@ export const fi: Messages = {
   gateEmailRecommended: '(pakollinen uusille testaajille)',
   gateEmailPlaceholder: 'sina@yritys.fi',
   gateTesterHint:
-    'Käytämme sähköpostia vain testin seurantaan — ei salasanaa.',
+    'Käytä samaa sähköpostia puhelimessa ja tietokoneella, jotta inventaario pysyy synkassa — ei salasanaa.',
   gateKitchenHint:
     'Voit jatkaa ilman sähköpostia tai toimipistettä.',
   gateSubmit: 'Jatka',
@@ -821,4 +829,19 @@ export const fi: Messages = {
     'Uniikit henkilöt, jotka ovat avanneet Invisin. Nimet ja toimipisteet pysyvät piilossa tällä näkymällä.',
   tractionUsersLabel: 'Nykyiset käyttäjät',
   tractionEntriesMeta: '{n} porttikirjausta tässä otoksessa',
+
+  cloudSyncTitle: 'Pilvisync',
+  cloudSyncSub:
+    'Sama inventaario puhelimessa ja selaimessa, kun käytät samaa sähköpostia.',
+  cloudSyncOffline:
+    'Pilvisync pois päältä — Supabase-avaimet puuttuvat tästä buildista.',
+  cloudSyncNeedsEmail:
+    'Kirjaudu sähköpostilla jokaisella laitteella synkataksesi inventaarion.',
+  cloudSyncWorking: 'Synkataan…',
+  cloudSyncSynced: 'Ajan tasalla',
+  cloudSyncIdle: 'Odottaa synkronointia',
+  cloudSyncError: 'Synkkaus epäonnistui — napauta Synkkaa nyt',
+  cloudSyncNow: 'Synkkaa nyt',
+  cloudSyncLastAt: 'Viimeksi synkattu {time}',
+  cloudSyncNever: 'Ei vielä synkattu',
 };

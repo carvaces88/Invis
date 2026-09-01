@@ -14,6 +14,7 @@ import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/AuthContext';
+import { CloudSyncStatus } from '../components/CloudSyncStatus';
 import { InventoryValueModal } from '../components/InventoryValueModal';
 import { useInventory } from '../data/store';
 import type { MainTabParamList, RootStackParamList } from '../data/types';
@@ -133,6 +134,8 @@ export function MoreScreen() {
         </Text>
       ) : null}
       <Text style={styles.credit}>{t('kruokaPhotoCredit')}</Text>
+
+      <CloudSyncStatus />
 
       <Pressable
         style={({ pressed }) => [styles.card, pressed && styles.pressed]}

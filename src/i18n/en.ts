@@ -526,6 +526,14 @@ export const en = {
   sheetImportAlreadyBody:
     'These sheet counts were already written. Opening Inventory so you don’t add them twice.',
 
+  sheetImportInsightKicker: 'INVIS noticed',
+  sheetImportInsightDuplicate:
+    'Heads up — you have double {item} (pages {pages}).',
+  sheetImportInsightCrossedOff:
+    'Looks like you crossed off {item} on page {page}.',
+  sheetImportInsightQtyMismatch:
+    '{item} is {qtyA} on page {pageA} but {qtyB} on page {pageB} — worth a glance.',
+
   inventoryPhotosTitle: 'Inventory photos',
   inventoryPhotosOpen: 'Inventory photos',
   inventoryPhotosOpenSub: 'Album of photos saved while counting',
@@ -774,7 +782,8 @@ export const en = {
   gateEmail: 'Email',
   gateEmailRecommended: '(required for new testers)',
   gateEmailPlaceholder: 'you@company.com',
-  gateTesterHint: 'We use your email only to follow up on the test — no password.',
+  gateTesterHint:
+    'Use the same email on phone and computer so inventory stays in sync — no password.',
   gateKitchenHint: 'You can continue without email or venue.',
   gateSubmit: 'Continue',
   gateEnterFailed: 'Could not continue — try again.',
@@ -824,6 +833,19 @@ export const en = {
     'Unique people who have entered Invis. Names and venues stay private on this view.',
   tractionUsersLabel: 'Current users',
   tractionEntriesMeta: '{n} gate entries in this sample',
+
+  cloudSyncTitle: 'Cloud sync',
+  cloudSyncSub: 'Same inventory on phone and web when you use the same email.',
+  cloudSyncOffline: 'Cloud sync is off — Supabase keys missing in this build.',
+  cloudSyncNeedsEmail:
+    'Sign in with your email on each device to sync inventory across phone and web.',
+  cloudSyncWorking: 'Syncing…',
+  cloudSyncSynced: 'Up to date',
+  cloudSyncIdle: 'Waiting to sync',
+  cloudSyncError: 'Sync failed — tap Sync now to retry',
+  cloudSyncNow: 'Sync now',
+  cloudSyncLastAt: 'Last synced {time}',
+  cloudSyncNever: 'Not synced yet',
 } as const;
 
 export type MessageKey = keyof typeof en;
