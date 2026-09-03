@@ -277,19 +277,28 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         </Pressable>
       </View>
 
-      <Pressable
-        style={styles.banner}
-        onPress={() => setPicker('category')}
-        accessibilityRole="button"
-        accessibilityLabel={t('simpCountPickCategory')}
-      >
+      <View style={styles.categoryRow}>
+        <Pressable
+          style={styles.categoryPill}
+          onPress={() => setPicker('category')}
+          accessibilityRole="button"
+          accessibilityLabel={t('simpCountPickCategory')}
+        >
+          <Text style={styles.categoryPillText} numberOfLines={1}>
+            {categoryLabel}
+          </Text>
+          <Text style={styles.chevron}>▾</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.banner}>
         <View style={styles.bannerWash} />
         <Text style={styles.bannerTitle}>{categoryLabel.toUpperCase()}</Text>
         <Text style={styles.bannerTotal}>
           {t('simpCountTotal').replace('{amount}', formatMoney(total))}
         </Text>
         <Text style={styles.bannerHint}>{t('simpCountSwipeHint')}</Text>
-      </Pressable>
+      </View>
 
       {categoryId === 'stock_values' ? (
         <ScrollView
@@ -562,6 +571,28 @@ const styles = StyleSheet.create({
   chevron: {
     fontSize: 12,
     color: colors.inkMuted,
+  },
+  categoryRow: {
+    paddingHorizontal: spacing.md,
+    marginBottom: 12,
+  },
+  categoryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    backgroundColor: NEO_CARD,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: radius.pill,
+    ...neoShadow,
+  },
+  categoryPillText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.ink,
+    letterSpacing: 0.1,
   },
   banner: {
     marginHorizontal: spacing.md,
