@@ -406,86 +406,88 @@ export function GamifiedCountingView({
   };
 
   return (
-    <View style={[styles.root, { paddingTop: topInset + 10 }]}>
-      <Animated.View
-        style={[
-          styles.heroCard,
-          flashOk && styles.heroCardSuccess,
-          { transform: [{ scale: successScale }] },
-        ]}
-      >
-        <FireBurst burstKey={fireKey} />
-        <View style={styles.heroTop}>
-          <Animated.View
-            style={[
-              styles.nameSwipeZone,
-              { transform: [{ translateX: namePan }] },
-            ]}
-            {...nameResponder.panHandlers}
-          >
-            <Text style={styles.heroName} numberOfLines={2}>
-              {name}
-            </Text>
-            {alsoAs ? (
-              <Text style={styles.alsoAs} numberOfLines={2}>
-                {alsoAs}
+    <View style={[styles.root, { paddingTop: topInset + 8 }]}>
+      <View style={styles.body}>
+        <Animated.View
+          style={[
+            styles.heroCard,
+            flashOk && styles.heroCardSuccess,
+            { transform: [{ scale: successScale }] },
+          ]}
+        >
+          <FireBurst burstKey={fireKey} />
+          <View style={styles.heroTop}>
+            <Animated.View
+              style={[
+                styles.nameSwipeZone,
+                { transform: [{ translateX: namePan }] },
+              ]}
+              {...nameResponder.panHandlers}
+            >
+              <Text style={styles.heroName} numberOfLines={2}>
+                {name}
               </Text>
-            ) : null}
-            <Text style={styles.swipeHint}>{t('simpCountGameSwipeHint')}</Text>
-          </Animated.View>
-          <Pressable
-            style={styles.unitPill}
-            onPress={() => setUnitOpen(true)}
-            accessibilityRole="button"
-            accessibilityLabel={t('simpCountColUnit')}
-          >
-            <Text style={styles.unitText}>{item.unit}</Text>
-            <Text style={styles.chevron}>▾</Text>
-          </Pressable>
-        </View>
-        <View style={styles.displayWell}>
-          <Text style={styles.displayText}>{display}</Text>
-        </View>
-        <Text style={styles.progress}>
-          {t('simpCountGameProgress')
-            .replace('{n}', String(index + 1))
-            .replace('{total}', String(items.length))}
-        </Text>
-        {flashOk ? (
-          <Text style={styles.successLabel}>{t('simpCountGameSuccess')}</Text>
-        ) : null}
-      </Animated.View>
-
-      <View style={styles.pad}>
-        {(
-          [
-            ['1', '2', '3'],
-            ['4', '5', '6'],
-            ['7', '8', '9'],
-            ['−', '0', '+'],
-          ] as const
-        ).map((row) => (
-          <View key={row.join('-')} style={styles.padRow}>
-            {row.map((key) => (
-              <Pressable
-                key={key}
-                style={styles.padKey}
-                onPress={() => {
-                  if (key === '−') nudge(-1);
-                  else if (key === '+') nudge(1);
-                  else pushDigit(key);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={key}
-              >
-                <Text style={styles.padKeyText}>{key}</Text>
-              </Pressable>
-            ))}
+              {alsoAs ? (
+                <Text style={styles.alsoAs} numberOfLines={2}>
+                  {alsoAs}
+                </Text>
+              ) : null}
+              <Text style={styles.swipeHint}>{t('simpCountGameSwipeHint')}</Text>
+            </Animated.View>
+            <Pressable
+              style={styles.unitPill}
+              onPress={() => setUnitOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t('simpCountColUnit')}
+            >
+              <Text style={styles.unitText}>{item.unit}</Text>
+              <Text style={styles.chevron}>▾</Text>
+            </Pressable>
           </View>
-        ))}
+          <View style={styles.displayWell}>
+            <Text style={styles.progressAbove}>
+              {t('simpCountGameProgress')
+                .replace('{n}', String(index + 1))
+                .replace('{total}', String(items.length))}
+            </Text>
+            <Text style={styles.displayText}>{display}</Text>
+          </View>
+          {flashOk ? (
+            <Text style={styles.successLabel}>{t('simpCountGameSuccess')}</Text>
+          ) : null}
+        </Animated.View>
+
+        <View style={styles.pad}>
+          {(
+            [
+              ['1', '2', '3'],
+              ['4', '5', '6'],
+              ['7', '8', '9'],
+              ['−', '0', '+'],
+            ] as const
+          ).map((row) => (
+            <View key={row.join('-')} style={styles.padRow}>
+              {row.map((key) => (
+                <Pressable
+                  key={key}
+                  style={styles.padKey}
+                  onPress={() => {
+                    if (key === '−') nudge(-1);
+                    else if (key === '+') nudge(1);
+                    else pushDigit(key);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={key}
+                >
+                  <Text style={styles.padKeyText}>{key}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ))}
+        </View>
       </View>
 
-      <View style={[styles.dock, { paddingBottom: Math.max(bottomInset, 12) }]}>
+      <View style={[styles.dock, { paddingBottom: Math.max(bottomInset, 10) }]}>
         <Pressable
           style={styles.backWide}
           onPress={() => {
@@ -504,7 +506,7 @@ export function GamifiedCountingView({
           accessibilityRole="button"
           accessibilityLabel={t('simpCountCalculator')}
         >
-          <CalcIcon size={22} color={colors.inkMuted} />
+          <CalcIcon size={22} color={colors.primary} />
         </Pressable>
 
         <Pressable
@@ -654,6 +656,10 @@ const styles = StyleSheet.create({
     backgroundColor: NEO_BG,
     paddingHorizontal: spacing.md,
   },
+  body: {
+    flex: 1,
+    minHeight: 0,
+  },
   empty: {
     fontSize: 16,
     color: colors.inkMuted,
@@ -663,11 +669,14 @@ const styles = StyleSheet.create({
   },
   heroCard: {
     backgroundColor: NEO_CARD,
-    borderRadius: 28,
-    padding: spacing.lg,
+    borderRadius: 24,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: 12,
     ...neoShadow,
-    marginBottom: 18,
+    marginBottom: 10,
     overflow: 'hidden',
+    flexShrink: 0,
   },
   heroCardSuccess: {
     borderWidth: 1.5,
@@ -688,17 +697,17 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 14,
+    marginBottom: 10,
   },
   nameSwipeZone: {
     flex: 1,
-    minHeight: 56,
+    minHeight: 48,
     justifyContent: 'center',
   },
   heroName: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: colors.inkMuted,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#000000',
   },
   alsoAs: {
     marginTop: 4,
@@ -728,16 +737,22 @@ const styles = StyleSheet.create({
     color: colors.inkFaint,
   },
   displayWell: {
-    borderRadius: 18,
-    paddingVertical: 28,
+    borderRadius: 16,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: NEO_BG,
     ...neoInset,
   },
+  progressAbove: {
+    marginBottom: 2,
+    fontSize: 11,
+    color: colors.inkFaint,
+    textAlign: 'center',
+  },
   displayText: {
-    fontSize: 56,
+    fontSize: 44,
     fontWeight: '700',
     color: colors.ink,
     letterSpacing: 1,
@@ -757,67 +772,69 @@ const styles = StyleSheet.create({
   },
   pad: {
     flex: 1,
-    gap: 12,
-    justifyContent: 'center',
-    paddingBottom: 88,
+    minHeight: 0,
+    gap: 8,
+    justifyContent: 'flex-end',
+    paddingBottom: 4,
   },
   padRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
+    flex: 1,
+    maxHeight: 68,
+    minHeight: 44,
   },
   padKey: {
     flex: 1,
-    aspectRatio: 1.35,
-    maxHeight: 78,
-    borderRadius: 22,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: NEO_CARD,
     ...neoShadow,
   },
   padKeyText: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '500',
     color: colors.inkMuted,
   },
   dock: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingTop: 10,
+    paddingTop: 8,
     backgroundColor: NEO_BG,
-    gap: 10,
+    gap: 8,
+    flexShrink: 0,
   },
   backWide: {
     flex: 1.4,
-    minHeight: 64,
-    borderRadius: 18,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
+    minHeight: 52,
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: NEO_CARD,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
     ...neoShadow,
   },
   backWideText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: colors.inkMuted,
     textAlign: 'center',
-    lineHeight: 17,
+    lineHeight: 16,
   },
   dockBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: NEO_CARD,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
     ...neoShadow,
   },
   dockFx: {
@@ -895,15 +912,15 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   dockNav: {
-    fontSize: 28,
-    fontWeight: '500',
-    color: colors.inkMuted,
+    fontSize: 26,
+    fontWeight: '600',
+    color: colors.primary,
     marginTop: -2,
   },
   dockNext: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: GRADIENT_TEAL,
@@ -923,10 +940,11 @@ const styles = StyleSheet.create({
       : null),
   },
   dockNextGlyph: {
-    fontSize: 32,
-    fontWeight: '500',
+    fontSize: 30,
+    fontWeight: '700',
     color: colors.ink,
     marginTop: -2,
+    zIndex: 1,
   },
   backdrop: {
     flex: 1,
