@@ -14,6 +14,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GamifiedCountingView } from '../components/GamifiedCountingView';
+import { CalcIcon } from '../components/CalcIcon';
 import {
   alsoKnownAsLabel,
   categoryTotal,
@@ -582,8 +583,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
           accessibilityRole="button"
           accessibilityLabel={t('simpCountCalculator')}
         >
-          <Text style={styles.dockCalcGlyph}>123</Text>
-          <Text style={styles.dockCalcLabel}>{t('simpCountCalculator')}</Text>
+          <CalcIcon size={24} color={colors.ink} />
         </Pressable>
 
         <Pressable
@@ -597,8 +597,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
           accessibilityRole="button"
           accessibilityLabel={t('simpCountGameMode')}
         >
-          <Text style={styles.dockGameGlyph}>▶</Text>
-          <Text style={styles.dockGameLabel}>{t('simpCountGameMode')}</Text>
+          <Text style={styles.dockGameGlyph}>🔥</Text>
         </Pressable>
       </View>
 
@@ -1031,38 +1030,35 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   dockCalc: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    minWidth: 132,
+    width: 52,
     height: 52,
-    paddingHorizontal: 16,
     borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: GRADIENT_TEAL,
-    ...neoShadow,
+    ...Platform.select({
+      web: {
+        boxShadow:
+          '6px 6px 14px rgba(163, 177, 198, 0.45), -5px -5px 12px rgba(255,255,255,0.85)',
+      } as object,
+      default: {
+        shadowColor: '#9AA8B8',
+        shadowOffset: { width: 4, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        elevation: 3,
+      },
+    }),
   },
   dockCalcDisabled: {
     opacity: 0.45,
   },
-  dockCalcGlyph: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.ink,
-    letterSpacing: 0.4,
-  },
-  dockCalcLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.ink,
-  },
   dockGame: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    minWidth: 118,
+    width: 52,
     height: 52,
-    paddingHorizontal: 14,
     borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: GRADIENT_PINK,
     ...Platform.select({
       web: {
@@ -1079,14 +1075,7 @@ const styles = StyleSheet.create({
     }),
   },
   dockGameGlyph: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.ink,
-  },
-  dockGameLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.ink,
+    fontSize: 22,
   },
   calcSheet: {
     backgroundColor: NEO_CARD,

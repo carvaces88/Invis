@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { CalcIcon } from './CalcIcon';
 import type { SimplifiedCountItem } from '../data/simplifiedCountingSeed';
 import {
   alsoKnownAsLabel,
@@ -502,7 +503,7 @@ export function GamifiedCountingView({
           accessibilityRole="button"
           accessibilityLabel={t('simpCountCalculator')}
         >
-          <Text style={styles.dockFx}>ƒx</Text>
+          <CalcIcon size={22} color={colors.inkMuted} />
         </Pressable>
 
         <Pressable
