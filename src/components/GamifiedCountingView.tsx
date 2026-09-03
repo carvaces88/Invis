@@ -27,14 +27,7 @@ const NEO_CARD = '#EEF1F5';
 const GRADIENT_TEAL = '#B8E8D8';
 const GRADIENT_PINK = '#F5C6D0';
 const SWIPE_X = 64;
-const CONFETTI_COLORS = [
-  '#F5C6D0',
-  '#B8E8D8',
-  '#FFE08A',
-  '#A8C5F0',
-  '#F7A8A8',
-  '#C5F0B8',
-];
+const FIRE_EMOJIS = ['🔥', '🔥', '✨', '🔥', '🧡', '🔥', '💛', '🔥'] as const;
 
 const neoShadow = Platform.select({
   web: {
@@ -65,88 +58,90 @@ function formatQty(n: number): string {
   return String(Math.round(n * 100) / 100);
 }
 
-type ConfettiPiece = {
+type FireSpark = {
   id: number;
   x: Animated.Value;
   y: Animated.Value;
-  rot: Animated.Value;
+  scale: Animated.Value;
   opacity: Animated.Value;
-  color: string;
+  emoji: string;
   size: number;
 };
 
-function ConfettiBurst({ burstKey }: { burstKey: number }) {
-  const pieces = useMemo(() => {
-    if (burstKey <= 0) return [] as ConfettiPiece[];
-    return Array.from({ length: 18 }, (_, i) => ({
+function FireBurst({ burstKey }: { burstKey: number }) {
+  const sparks = useMemo(() => {
+    if (burstKey <= 0) return [] as FireSpark[];
+    return Array.from({ length: 14 }, (_, i) => ({
       id: burstKey * 100 + i,
       x: new Animated.Value(0),
       y: new Animated.Value(0),
-      rot: new Animated.Value(0),
+      scale: new Animated.Value(0.35),
       opacity: new Animated.Value(1),
-      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-      size: 6 + (i % 5) * 2,
+      emoji: FIRE_EMOJIS[i % FIRE_EMOJIS.length],
+      size: 18 + (i % 5) * 4,
     }));
   }, [burstKey]);
 
   useEffect(() => {
-    if (pieces.length === 0) return;
-    const anims = pieces.map((p, i) => {
-      const angle = (Math.PI * 2 * i) / pieces.length;
-      const dist = 50 + (i % 4) * 28;
+    if (sparks.length === 0) return;
+    const anims = sparks.map((p, i) => {
+      const drift = ((i % 7) - 3) * 18;
+      const rise = -(70 + (i % 5) * 22);
       return Animated.parallel([
         Animated.timing(p.x, {
-          toValue: Math.cos(angle) * dist,
-          duration: 700 + (i % 5) * 60,
+          toValue: drift,
+          duration: 650 + (i % 4) * 80,
           useNativeDriver: true,
         }),
         Animated.timing(p.y, {
-          toValue: Math.sin(angle) * dist * 0.55 + 90 + (i % 3) * 20,
-          duration: 750 + (i % 4) * 50,
+          toValue: rise,
+          duration: 700 + (i % 5) * 70,
           useNativeDriver: true,
         }),
-        Animated.timing(p.rot, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
+        Animated.sequence([
+          Animated.timing(p.scale, {
+            toValue: 1.15 + (i % 3) * 0.15,
+            duration: 220,
+            useNativeDriver: true,
+          }),
+          Animated.timing(p.scale, {
+            toValue: 0.55,
+            duration: 480,
+            useNativeDriver: true,
+          }),
+        ]),
         Animated.timing(p.opacity, {
           toValue: 0,
-          duration: 850,
+          duration: 780,
           useNativeDriver: true,
         }),
       ]);
     });
-    Animated.stagger(12, anims).start();
-  }, [pieces]);
+    Animated.stagger(28, anims).start();
+  }, [sparks]);
 
-  if (pieces.length === 0) return null;
+  if (sparks.length === 0) return null;
 
   return (
-    <View pointerEvents="none" style={styles.confettiLayer}>
-      {pieces.map((p) => (
-        <Animated.View
+    <View pointerEvents="none" style={styles.fireLayer}>
+      {sparks.map((p) => (
+        <Animated.Text
           key={p.id}
           style={[
-            styles.confettiBit,
+            styles.fireSpark,
             {
-              width: p.size,
-              height: p.size * 0.55,
-              backgroundColor: p.color,
+              fontSize: p.size,
               opacity: p.opacity,
               transform: [
                 { translateX: p.x },
                 { translateY: p.y },
-                {
-                  rotate: p.rot.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0deg', `${120 + (p.id % 7) * 40}deg`],
-                  }),
-                },
+                { scale: p.scale },
               ],
             },
           ]}
-        />
+        >
+          {p.emoji}
+        </Animated.Text>
       ))}
     </View>
   );
@@ -178,7 +173,7 @@ export function GamifiedCountingView({
   const [digits, setDigits] = useState('');
   const [unitOpen, setUnitOpen] = useState(false);
   const [typing, setTyping] = useState(false);
-  const [confettiKey, setConfettiKey] = useState(0);
+  const [fireKey, setFireKey] = useState(0);
   const [flashOk, setFlashOk] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [fxOpen, setFxOpen] = useState(false);
@@ -227,22 +222,22 @@ export function GamifiedCountingView({
   }, [digits, item, onSetQuantity]);
 
   const playSuccess = useCallback(() => {
-    setConfettiKey((k) => k + 1);
+    setFireKey((k) => k + 1);
     setFlashOk(true);
     successScale.setValue(0.92);
     Animated.sequence([
       Animated.spring(successScale, {
-        toValue: 1.06,
-        friction: 4,
+        toValue: 1.08,
+        friction: 3,
         useNativeDriver: true,
       }),
       Animated.spring(successScale, {
         toValue: 1,
-        friction: 6,
+        friction: 5,
         useNativeDriver: true,
       }),
     ]).start();
-    setTimeout(() => setFlashOk(false), 700);
+    setTimeout(() => setFlashOk(false), 850);
   }, [successScale]);
 
   const goNext = useCallback(
@@ -418,7 +413,7 @@ export function GamifiedCountingView({
           { transform: [{ scale: successScale }] },
         ]}
       >
-        <ConfettiBurst burstKey={confettiKey} />
+        <FireBurst burstKey={fireKey} />
         <View style={styles.heroTop}>
           <Animated.View
             style={[
@@ -670,17 +665,17 @@ const styles = StyleSheet.create({
   },
   heroCardSuccess: {
     borderWidth: 1.5,
-    borderColor: 'rgba(31,122,77,0.35)',
+    borderColor: 'rgba(255,120,40,0.45)',
+    backgroundColor: '#FFF6EE',
   },
-  confettiLayer: {
+  fireLayer: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5,
   },
-  confettiBit: {
+  fireSpark: {
     position: 'absolute',
-    borderRadius: 2,
   },
   heroTop: {
     flexDirection: 'row',
@@ -742,9 +737,9 @@ const styles = StyleSheet.create({
   },
   successLabel: {
     marginTop: 6,
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.success,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#D9480F',
     textAlign: 'center',
   },
   pad: {
