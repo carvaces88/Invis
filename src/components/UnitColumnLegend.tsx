@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,49 +12,31 @@ import { useI18n } from '../i18n';
 import { colors, radius, spacing } from '../theme/colors';
 
 /**
- * Unit column header control — one hover/tap menu for all YKSIKKÖ meanings.
+ * Unit column header control — one menu for all YKSIKKÖ meanings.
+ * Uses a Modal (not an absolute bubble) so Inventory tableHead can keep
+ * overflow:'hidden' and horizontal ScrollView pans stay reliable on web.
  */
 export function UnitColumnLegend() {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
-  const [hovered, setHovered] = useState(false);
-
-  const tipVisible = open || (Platform.OS === 'web' && hovered);
 
   return (
     <View style={styles.wrap}>
       <Pressable
         onPress={() => setOpen((v) => !v)}
-        onHoverIn={() => setHovered(true)}
-        onHoverOut={() => setHovered(false)}
         accessibilityRole="button"
         accessibilityLabel={t('unitColumnLegendA11y')}
         style={({ pressed }) => [
           styles.chip,
-          (pressed || tipVisible) && styles.chipOn,
+          (pressed || open) && styles.chipOn,
         ]}
       >
         <Text style={styles.label}>{t('unit')}</Text>
         <Text style={styles.q}>?</Text>
       </Pressable>
 
-      {tipVisible && Platform.OS === 'web' ? (
-        <View style={styles.bubble} pointerEvents="none">
-          <Text style={styles.bubbleTitle}>{t('unitColumnLegendTitle')}</Text>
-          {UNIT_GUIDE.map((row) => (
-            <View key={row.id} style={styles.bubbleRow}>
-              <Text style={styles.bubbleCode}>{row.code}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.bubbleFi}>{row.fiName}</Text>
-                <Text style={styles.bubbleEn}>{row.enName}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : null}
-
       <Modal
-        visible={open && Platform.OS !== 'web'}
+        visible={open}
         transparent
         animationType="fade"
         onRequestClose={() => setOpen(false)}
@@ -93,7 +74,6 @@ const styles = StyleSheet.create({
   wrap: {
     width: 64,
     alignItems: 'center',
-    zIndex: 30,
   },
   chip: {
     flexDirection: 'row',
@@ -120,51 +100,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: colors.primary,
-  },
-  bubble: {
-    position: 'absolute',
-    top: 28,
-    left: 0,
-    width: 260,
-    maxHeight: 420,
-    zIndex: 40,
-    backgroundColor: colors.ink,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    shadowColor: '#000',
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
-  bubbleTitle: {
-    color: colors.primarySoft,
-    fontSize: 11,
-    fontWeight: '700',
-    marginBottom: 8,
-    letterSpacing: 0.3,
-  },
-  bubbleRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: 8,
-  },
-  bubbleCode: {
-    width: 36,
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  bubbleFi: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  bubbleEn: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 11,
-    marginTop: 1,
   },
   modalBackdrop: {
     flex: 1,

@@ -138,6 +138,16 @@ export function MoreScreen() {
       <CloudSyncStatus />
 
       <Pressable
+        style={styles.valueCard}
+        onPress={() => setValueOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={t('homeInventoryValue')}
+      >
+        <Text style={styles.cardTitle}>{t('homeInventoryValue')}</Text>
+        <Text style={styles.cardSub}>{t('moreInventoryValueSub')}</Text>
+      </Pressable>
+
+      <Pressable
         style={({ pressed }) => [styles.card, pressed && styles.pressed]}
         onPress={() => openRoot('Feedback', {})}
         accessibilityRole="button"
@@ -248,16 +258,6 @@ export function MoreScreen() {
           })}
         </View>
       </View>
-
-      <Pressable
-        style={styles.valueCard}
-        onPress={() => setValueOpen(true)}
-        accessibilityRole="button"
-        accessibilityLabel={t('homeInventoryValue')}
-      >
-        <Text style={styles.cardTitle}>{t('homeInventoryValue')}</Text>
-        <Text style={styles.cardSub}>{t('moreInventoryValueSub')}</Text>
-      </Pressable>
 
       {items.map((item) => (
         <Pressable

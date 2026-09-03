@@ -358,7 +358,6 @@ export function InventaarioScreen() {
   const columnOrderCustomized = !columnOrdersEqual(columns, defaultColumns);
   const showPriceCols =
     columns.includes('price') || columns.includes('total');
-  const needsHScroll = viewProfileId === 'restolution' || columns.length > 5;
   const minTableWidth = tableMinWidth(columns, productCodeOpen);
   const colOpts = useMemo(
     () => ({ productCodeOpen }),
@@ -441,8 +440,6 @@ export function InventaarioScreen() {
     nameSort,
   ]);
 
-  const needsHScrollEffective =
-    needsHScroll || compareMonths || columns.length > 4;
   const minTableWidthEffective =
     minTableWidth + (compareMonths ? 200 : 0);
 
@@ -1392,18 +1389,21 @@ export function InventaarioScreen() {
         }}
       >
         <ScrollView
-          horizontal={needsHScrollEffective}
+          horizontal
           nestedScrollEnabled
-          showsHorizontalScrollIndicator={needsHScrollEffective}
+          scrollEnabled={draggingCol == null}
+          showsHorizontalScrollIndicator
           style={[
             styles.tableScroll,
             listHeight > 0 ? { height: listHeight } : null,
+            // Let trackpad/touch pan both axes; FlatList still owns vertical.
+            Platform.OS === 'web'
+              ? ({ touchAction: 'pan-x pan-y' } as object)
+              : null,
           ]}
           contentContainerStyle={[
             styles.tableScrollContent,
-            needsHScrollEffective
-              ? { minWidth: minTableWidthEffective }
-              : { flexGrow: 1 },
+            { minWidth: minTableWidthEffective },
             listHeight > 0 ? { height: listHeight } : null,
             Platform.OS === 'web' && listHeight <= 0
               ? ({ height: '100%' } as object)
@@ -1413,9 +1413,7 @@ export function InventaarioScreen() {
           <View
             style={[
               styles.tableInner,
-              needsHScrollEffective
-                ? { minWidth: minTableWidthEffective }
-                : { flex: 1 },
+              { minWidth: minTableWidthEffective },
               listHeight > 0 ? { height: listHeight } : null,
             ]}
           >
@@ -1423,7 +1421,17 @@ export function InventaarioScreen() {
             <FlatList
               data={visibleLines}
               keyExtractor={(item) => item.id}
-              style={styles.tableList}
+              style={[
+                styles.tableList,
+                // RN-web vertical lists set overflowX:'hidden', which eats
+                // horizontal pans. Visible lets H-scroll chain to the parent.
+                Platform.OS === 'web'
+                  ? ({
+                      overflowX: 'visible',
+                      touchAction: 'pan-x pan-y',
+                    } as object)
+                  : null,
+              ]}
               nestedScrollEnabled
               contentContainerStyle={{ paddingBottom: listPadBottom }}
               ListEmptyComponent={
@@ -1804,8 +1812,9 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.line,
     backgroundColor: colors.primarySoft,
     zIndex: 20,
-    // Keep visible — do not clip grab handles / ◂▸ nudges.
-    overflow: 'visible',
+    // Must stay clipped — overflow:'visible' breaks horizontal ScrollView
+    // pan on web after column-drag work. Handles sit inline (no clip need).
+    overflow: 'hidden',
   },
   th: {
     fontSize: 10,

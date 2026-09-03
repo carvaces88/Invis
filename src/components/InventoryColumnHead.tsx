@@ -124,6 +124,11 @@ export function InventoryColumnHead({
 
   const dropProps = isWeb
     ? ({
+        // Never let the header cell itself become a drag source — only ⠿.
+        draggable: false,
+        onDragStart: (e: { preventDefault?: () => void }) => {
+          e.preventDefault?.();
+        },
         onDragOver: (e: {
           preventDefault?: () => void;
           dataTransfer?: { dropEffect?: string };
@@ -152,48 +157,51 @@ export function InventoryColumnHead({
       } as object)
     : null;
 
-  const handleDragProps = isWeb
-    ? ({
-        draggable: true,
-        onDragStart: (e: {
-          stopPropagation?: () => void;
-          dataTransfer?: {
-            setData?: (type: string, value: string) => void;
-            effectAllowed?: string;
-            setDragImage?: (image: Element, x: number, y: number) => void;
-          };
-        }) => {
-          e.stopPropagation?.();
-          skippedPressAfterDrag.current = true;
-          setGrabbing(true);
-          e.dataTransfer?.setData?.('text/plain', col);
-          if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
-          // Prefer a short readable ghost from the header label when possible.
-          let ghostLabel: string = col;
-          try {
-            const node = wrapRef.current as unknown as {
-              textContent?: string;
-            } | null;
-            const raw = (node?.textContent ?? '')
-              .replace(/[⠿◂▸]/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim();
-            if (raw) ghostLabel = raw.length > 22 ? `${raw.slice(0, 20)}…` : raw;
-          } catch {
-            /* ignore */
-          }
-          if (e.dataTransfer) setCleanDragGhost(e.dataTransfer, ghostLabel);
-          onDragStartCol?.(col);
-        },
-        onDragEnd: () => {
-          setGrabbing(false);
-          onDragEnd?.();
-          setTimeout(() => {
-            skippedPressAfterDrag.current = false;
-          }, 0);
-        },
-      } as object)
-    : null;
+  /** HTML5 drag only on fine-pointer desktop — touch keeps pan-to-scroll. */
+  const handleDragProps =
+    isWeb && desktop
+      ? ({
+          draggable: true,
+          onDragStart: (e: {
+            stopPropagation?: () => void;
+            dataTransfer?: {
+              setData?: (type: string, value: string) => void;
+              effectAllowed?: string;
+              setDragImage?: (image: Element, x: number, y: number) => void;
+            };
+          }) => {
+            e.stopPropagation?.();
+            skippedPressAfterDrag.current = true;
+            setGrabbing(true);
+            e.dataTransfer?.setData?.('text/plain', col);
+            if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+            // Prefer a short readable ghost from the header label when possible.
+            let ghostLabel: string = col;
+            try {
+              const node = wrapRef.current as unknown as {
+                textContent?: string;
+              } | null;
+              const raw = (node?.textContent ?? '')
+                .replace(/[⠿◂▸]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+              if (raw)
+                ghostLabel = raw.length > 22 ? `${raw.slice(0, 20)}…` : raw;
+            } catch {
+              /* ignore */
+            }
+            if (e.dataTransfer) setCleanDragGhost(e.dataTransfer, ghostLabel);
+            onDragStartCol?.(col);
+          },
+          onDragEnd: () => {
+            setGrabbing(false);
+            onDragEnd?.();
+            setTimeout(() => {
+              skippedPressAfterDrag.current = false;
+            }, 0);
+          },
+        } as object)
+      : null;
 
   function toggleArm() {
     onArm?.(armed ? null : col);
@@ -260,6 +268,8 @@ export function InventoryColumnHead({
             isWeb
               ? ({
                   cursor: grabbing || dragging ? 'grabbing' : 'grab',
+                  // Desktop only: let HTML5 drag own the handle; touch keeps pan.
+                  ...(desktop ? { touchAction: 'none' } : null),
                 } as object)
               : null,
           ]}
@@ -305,6 +315,8 @@ const styles = StyleSheet.create({
           transitionProperty: 'background-color, opacity, box-shadow',
           transitionDuration: '120ms',
           userSelect: 'none',
+          // Header cell must pan with the spreadsheet, not capture drag.
+          touchAction: 'pan-x pan-y',
         } as object)
       : null),
   },
