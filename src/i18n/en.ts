@@ -583,6 +583,7 @@ export const en = {
   simpCountEmptySub: 'Dairy is seeded from the August sheet. Other categories will fill in next.',
   simpCountItemsCount: '{count} products',
   simpCountPlus: 'Add 1 to selected',
+  simpCountPlus5: 'Add 5 to selected',
   simpCountMinus: 'Subtract 1 from selected',
   simpCountReset: 'Reset draft counts',
 

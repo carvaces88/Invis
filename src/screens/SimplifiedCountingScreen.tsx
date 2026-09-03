@@ -404,11 +404,11 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         </Pressable>
         <Pressable
           style={styles.dockIcon}
-          onPress={() => setCategoryId('dairy')}
+          onPress={() => nudgeSelected(5)}
           accessibilityRole="button"
-          accessibilityLabel={t('simpCountCatDairy')}
+          accessibilityLabel={t('simpCountPlus5')}
         >
-          <Text style={styles.dockIconGlyph}>♥</Text>
+          <Text style={styles.dockPlus5}>+5</Text>
         </Pressable>
 
         <Pressable
@@ -731,6 +731,11 @@ const styles = StyleSheet.create({
   },
   dockIconGlyph: {
     fontSize: 18,
+    color: colors.ink,
+  },
+  dockPlus5: {
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.ink,
   },
   modalBackdrop: {

@@ -578,6 +578,7 @@ export const fi: Messages = {
   simpCountEmptySub: 'Maitotuotteet on esitäytetty elokuun listasta. Muut kategoriat tulevat seuraavaksi.',
   simpCountItemsCount: '{count} tuotetta',
   simpCountPlus: 'Lisää 1 valittuun',
+  simpCountPlus5: 'Lisää 5 valittuun',
   simpCountMinus: 'Vähennä 1 valitusta',
   simpCountReset: 'Nollaa luonnosmäärät',
 
