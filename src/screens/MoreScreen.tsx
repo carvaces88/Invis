@@ -91,7 +91,6 @@ export function MoreScreen() {
       title: t('simpCountOpen'),
       subtitle: t('simpCountOpenSub'),
       route: 'SimplifiedCounting' as const,
-      quirky: true,
     },
     {
       title: t('monthWrapUpOpen'),
@@ -291,29 +290,19 @@ export function MoreScreen() {
       </View>
 
       {items.map((item) => {
-        const quirky = 'quirky' in item && item.quirky;
         return (
           <Pressable
             key={item.route}
             style={({ pressed }) => [
-              quirky ? styles.simpleInvisCard : styles.card,
+              styles.card,
               pressed && styles.pressed,
             ]}
             onPress={() => navigation.navigate(item.route)}
             accessibilityRole="button"
             accessibilityLabel={item.title}
           >
-            {quirky ? (
-              <Text style={styles.simpleInvisEyebrow}>???</Text>
-            ) : null}
-            <Text
-              style={quirky ? styles.simpleInvisTitle : styles.cardTitle}
-            >
-              {item.title}
-            </Text>
-            <Text style={quirky ? styles.simpleInvisSub : styles.cardSub}>
-              {item.subtitle}
-            </Text>
+            <Text style={styles.cardTitle}>{item.title}</Text>
+            <Text style={styles.cardSub}>{item.subtitle}</Text>
           </Pressable>
         );
       })}
@@ -455,49 +444,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     padding: spacing.lg,
     marginBottom: spacing.md,
-  },
-  /** Quirky “Simple invis” entry — highlighter lime, not another sober tool card. */
-  simpleInvisCard: {
-    backgroundColor: '#D6FF3C',
-    borderRadius: 28,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    borderWidth: 3,
-    borderColor: '#FF4FD8',
-    transform: [{ rotate: '-0.8deg' }],
-    ...shadows.float,
-  },
-  simpleInvisEyebrow: {
-    alignSelf: 'flex-start',
-    marginBottom: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-    overflow: 'hidden',
-    backgroundColor: '#1A1033',
-    color: '#D6FF3C',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.4,
-  },
-  simpleInvisTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1A1033',
-    letterSpacing: -0.4,
-    fontFamily: Platform.select({
-      ios: 'AvenirNext-Heavy',
-      android: 'sans-serif-black',
-      web: 'Avenir Next, Futura, "Trebuchet MS", sans-serif',
-      default: undefined,
-    }),
-  },
-  simpleInvisSub: {
-    marginTop: 6,
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#3D2A66',
-    fontWeight: '600',
   },
   adminCard: {
     backgroundColor: colors.primarySoft,

@@ -34,7 +34,6 @@ import {
   itemMatchesQuery,
   ITEM_CATEGORY_IDS,
   lineTotal,
-  PLACEHOLDER_BY_CATEGORY,
   SIMPLIFIED_CATEGORIES,
   type SimplifiedCategoryId,
   type SimplifiedCountItem,
@@ -52,15 +51,21 @@ import {
   loadSupplierPriceHistory,
   monthKeyFromIndex,
   monthPriceRows,
-  previousMonthKey,
   type MonthPriceRow,
 } from '../lib/supplierPriceHistory';
 import {
-  ensureSeededPriorMonthStock,
-  snapshotCategoryTotal,
-  upsertMonthStockSnapshot,
-  type MonthStockStore,
-} from '../lib/simpCountMonthStock';
+  categoryTotalsForMonth,
+  inventoryForMonthIndex,
+  SIMP_COUNT_LIVE_MONTH_INDEX,
+} from '../lib/simpCountMonthInventories';
+import {
+  buildSimpCountExportHtml,
+  buildSimpExportRows,
+  exportSimpCountExcel,
+  exportSimpCountPdf,
+  type SimpExportFormat,
+  type SimpExportScope,
+} from '../lib/simpCountExport';
 import { printHtmlOrSharePdf } from '../lib/export/download';
 import { analyzePriorStockListImages } from '../lib/vision';
 import { colors, radius, spacing } from '../theme/colors';
@@ -145,11 +150,13 @@ function emptyByCategory(): Record<SimplifiedCategoryId, SimplifiedCountItem[]> 
 }
 
 function cloneSeed(
+  monthIndex: number,
   extras: ExtraProduct[] = [],
 ): Record<SimplifiedCategoryId, SimplifiedCountItem[]> {
   const out = emptyByCategory();
+  const monthInv = inventoryForMonthIndex(monthIndex);
   for (const cid of ITEM_CATEGORY_IDS) {
-    out[cid] = (PLACEHOLDER_BY_CATEGORY[cid] ?? []).map((row) => ({ ...row }));
+    out[cid] = (monthInv[cid] ?? []).map((row) => ({ ...row }));
   }
   for (const extra of extras) {
     if (!isItemCategoryId(extra.categoryId)) continue;
@@ -377,10 +384,12 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   const { t, locale } = useI18n();
   const months = locale === 'fi' ? MONTHS_FI : MONTHS_EN;
 
-  const [monthIndex, setMonthIndex] = useState(7); // August draft
+  const [monthIndex, setMonthIndex] = useState(SIMP_COUNT_LIVE_MONTH_INDEX);
   const [categoryId, setCategoryId] =
     useState<SimplifiedCategoryId>('dairy');
-  const [byCategory, setByCategory] = useState(cloneSeed);
+  const [byCategory, setByCategory] = useState(() =>
+    cloneSeed(SIMP_COUNT_LIVE_MONTH_INDEX),
+  );
   const [selectedId, setSelectedId] = useState<string | null>(
     DAIRY_FIRST_ID,
   );
@@ -419,8 +428,16 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [hiddenSheetOpen, setHiddenSheetOpen] = useState(false);
   const [hiddenHydrated, setHiddenHydrated] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [exportScope, setExportScope] = useState<SimpExportScope>('category');
+  const [exportFormat, setExportFormat] = useState<SimpExportFormat>('pdf');
+  const [exportBusy, setExportBusy] = useState(false);
 
   const isOverview = categoryId === 'stock_values';
+
+  const goToMore = useCallback(() => {
+    navigation.navigate('MainTabs', { screen: 'More' });
+  }, [navigation]);
 
   useEffect(() => {
     let alive = true;
@@ -439,18 +456,18 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
             );
           }
         }
+        let cleanedExtras: ExtraProduct[] = [];
         if (extrasRaw) {
           const parsed = JSON.parse(extrasRaw) as unknown;
           if (Array.isArray(parsed)) {
-            const cleaned = parsed.filter(
+            cleanedExtras = parsed.filter(
               (row): row is ExtraProduct =>
                 !!row &&
                 typeof row === 'object' &&
                 typeof (row as ExtraProduct).categoryId === 'string' &&
                 !!(row as ExtraProduct).item?.id,
             );
-            setExtras(cleaned);
-            setByCategory(cloneSeed(cleaned));
+            setExtras(cleanedExtras);
           }
         }
       } catch {
@@ -466,6 +483,17 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
       alive = false;
     };
   }, []);
+
+  // Swap inventory lines when the selected month changes (Jul/Aug samples vs Sept live).
+  useEffect(() => {
+    if (!extrasHydrated) return;
+    setByCategory(cloneSeed(monthIndex, extras));
+    setSelectedId(null);
+    setArmedItemId(null);
+    setGameMode(false);
+    // Intentional: don't re-run on every extras edit — only month / hydrate.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthIndex, extrasHydrated]);
 
   useEffect(() => {
     if (!hiddenHydrated) return;
@@ -775,17 +803,112 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   }, [monthIndex, months, priceHistoryMonthKey, priceHistoryRows, t]);
 
   const stockOverview = useMemo(() => {
-    return ITEM_CATEGORY_IDS.map((cid) => {
+    const priorTotals =
+      monthIndex > 0 ? categoryTotalsForMonth(monthIndex - 1) : null;
+    const rows = ITEM_CATEGORY_IDS.map((cid) => {
       const meta = SIMPLIFIED_CATEGORIES.find((c) => c.id === cid);
-      const rows = (byCategory[cid] ?? []).filter((row) => !hiddenSet.has(row.id));
+      const catRows = (byCategory[cid] ?? []).filter(
+        (row) => !hiddenSet.has(row.id),
+      );
+      const total = categoryTotal(catRows);
+      const prior = priorTotals ? priorTotals[cid] ?? 0 : null;
       return {
         id: cid,
         label: t(meta?.labelKey ?? 'simpCountCatOther'),
-        total: categoryTotal(rows),
-        count: rows.length,
+        total,
+        prior,
+        count: catRows.length,
       };
     });
-  }, [byCategory, hiddenSet, t]);
+    const foodTotal =
+      Math.round(rows.reduce((sum, r) => sum + r.total, 0) * 100) / 100;
+    return {
+      rows: rows.map((r) => ({
+        ...r,
+        pct:
+          foodTotal > 0
+            ? Math.round((r.total / foodTotal) * 100)
+            : 0,
+        delta:
+          r.prior == null ? null : Math.round((r.total - r.prior) * 100) / 100,
+      })),
+      foodTotal,
+    };
+  }, [byCategory, hiddenSet, monthIndex, t]);
+
+  const runExport = useCallback(async () => {
+    setExportBusy(true);
+    try {
+      const blank = exportScope === 'blank';
+      const nameOf = (item: SimplifiedCountItem) =>
+        locale === 'fi' ? item.nameFi || item.nameEn : item.nameEn || item.nameFi;
+      let items: SimplifiedCountItem[] = [];
+      if (exportScope === 'all') {
+        items = flattenAllItems(byCategory).filter((r) => !hiddenSet.has(r.id));
+      } else {
+        const cid: SimplifiedItemCategoryId = isItemCategoryId(categoryId)
+          ? categoryId
+          : 'dairy';
+        items = (byCategory[cid] ?? []).filter((r) => !hiddenSet.has(r.id));
+      }
+      const headers = {
+        product: t('simpCountColProduct'),
+        qty: t('simpCountColQty'),
+        unit: t('simpCountColUnit'),
+        unitPrice: t('simpCountColUnitPrice'),
+        lineTotal: t('simpCountColTotalPrice'),
+      };
+      const rows = buildSimpExportRows(items, { blank, nameOf });
+      const scopeLabel =
+        exportScope === 'all'
+          ? t('simpCountExportScopeAll')
+          : exportScope === 'blank'
+            ? t('simpCountExportScopeBlank')
+            : categoryLabel;
+      const monthLabel = months[monthIndex] ?? '';
+      const baseName = `invis-${monthLabel.toLowerCase()}-${exportScope}`;
+      if (exportFormat === 'pdf') {
+        const html = buildSimpCountExportHtml({
+          title: `${t('simpCountBrand')} · ${scopeLabel}`,
+          subtitle: `${monthLabel} · ${blank ? t('simpCountExportScopeBlankSub') : t('simpCountExportTitle')}`,
+          headers,
+          rows,
+        });
+        await exportSimpCountPdf({
+          html,
+          filename: `${baseName}.pdf`,
+        });
+      } else {
+        await exportSimpCountExcel({
+          rows,
+          sheetName: scopeLabel,
+          filename: `${baseName}.xlsx`,
+          headers,
+          dialogTitle: t('simpCountExportTitle'),
+        });
+      }
+      alertInfo(t('simpCountExportTitle'), t('simpCountExportDone'));
+      setSettingsOpen(false);
+    } catch (err) {
+      alertInfo(
+        t('simpCountExportTitle'),
+        err instanceof Error ? err.message : t('simpCountExportFailed'),
+      );
+    } finally {
+      setExportBusy(false);
+    }
+  }, [
+    byCategory,
+    categoryId,
+    categoryLabel,
+    exportFormat,
+    exportScope,
+    hiddenSet,
+    locale,
+    monthIndex,
+    months,
+    t,
+  ]);
 
   const hideItem = useCallback((id: string) => {
     setHiddenIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
@@ -962,10 +1085,10 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
     <View style={[styles.root, { paddingTop: insets.top + 8 }]}>
       <View style={styles.topBar}>
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={goToMore}
           style={styles.backBtn}
           accessibilityRole="button"
-          accessibilityLabel={t('cancel')}
+          accessibilityLabel={t('simpCountBackToMore')}
           hitSlop={8}
         >
           <Text style={styles.backGlyph}>‹</Text>
@@ -973,6 +1096,15 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         <Text style={styles.brand} numberOfLines={1}>
           {t('simpCountBrand')}
         </Text>
+        <Pressable
+          style={styles.settingsBtn}
+          onPress={() => setSettingsOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={t('simpCountExtraSettings')}
+          hitSlop={8}
+        >
+          <Text style={styles.settingsGlyph}>⚙</Text>
+        </Pressable>
         <Pressable
           style={styles.monthPill}
           onPress={() => setPicker('month')}
@@ -1111,26 +1243,89 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
           }}
           showsVerticalScrollIndicator={false}
         >
-          {stockOverview.map((row) => (
-            <Pressable
-              key={row.id}
-              style={styles.overviewCard}
-              onPress={() => setCategoryId(row.id)}
-            >
-              <View>
-                <Text style={styles.overviewTitle}>{row.label}</Text>
-                <Text style={styles.overviewSub}>
-                  {t('simpCountItemsCount').replace(
-                    '{count}',
-                    String(row.count),
-                  )}
+          <View style={styles.stockHeadRow}>
+            <Text style={[styles.stockHeadCell, { flex: 1.4 }]}>
+              {t('simpCountStockColCategory')}
+            </Text>
+            <Text style={[styles.stockHeadCell, styles.stockHeadRight]}>
+              {t('simpCountStockColTotal')}
+            </Text>
+            <Text style={[styles.stockHeadCell, styles.stockHeadPct]}>
+              {t('simpCountStockColShare')}
+            </Text>
+          </View>
+          {stockOverview.rows.map((row) => {
+            const priorLine =
+              row.prior == null
+                ? t('simpCountStockPriorNone')
+                : row.delta == null || row.delta === 0
+                  ? t('simpCountStockPriorFlat')
+                  : row.delta > 0
+                    ? t('simpCountStockPriorUp').replace(
+                        '{amount}',
+                        formatMoney(row.delta),
+                      )
+                    : t('simpCountStockPriorDown').replace(
+                        '{amount}',
+                        formatMoney(Math.abs(row.delta)),
+                      );
+            const priorAmt =
+              row.prior == null
+                ? null
+                : t('simpCountStockPrior').replace(
+                    '{amount}',
+                    formatMoney(row.prior),
+                  );
+            return (
+              <Pressable
+                key={row.id}
+                style={styles.overviewCard}
+                onPress={() => setCategoryId(row.id)}
+              >
+                <View style={{ flex: 1.4, minWidth: 0 }}>
+                  <Text style={styles.overviewTitle}>{row.label}</Text>
+                  <Text style={styles.overviewSub}>
+                    {t('simpCountItemsCount').replace(
+                      '{count}',
+                      String(row.count),
+                    )}
+                  </Text>
+                  {priorAmt ? (
+                    <Text style={styles.overviewPrior}>{priorAmt}</Text>
+                  ) : null}
+                  <Text
+                    style={[
+                      styles.overviewDelta,
+                      row.delta != null && row.delta > 0
+                        ? styles.overviewDeltaUp
+                        : row.delta != null && row.delta < 0
+                          ? styles.overviewDeltaDown
+                          : null,
+                    ]}
+                  >
+                    {priorLine}
+                  </Text>
+                </View>
+                <Text style={styles.overviewTotal}>
+                  {row.total > 0
+                    ? `${formatMoney(row.total)} €`
+                    : t('simpCountStockEmptyDash')}
                 </Text>
-              </View>
-              <Text style={styles.overviewTotal}>
-                {formatMoney(row.total)} €
-              </Text>
-            </Pressable>
-          ))}
+                <Text style={styles.overviewPct}>
+                  {t('simpCountStockSharePct').replace('{pct}', String(row.pct))}
+                </Text>
+              </Pressable>
+            );
+          })}
+          <View style={[styles.overviewCard, styles.overviewFoodTotal]}>
+            <Text style={[styles.overviewTitle, { flex: 1.4 }]}>
+              {t('simpCountStockFoodValue')}
+            </Text>
+            <Text style={styles.overviewTotal}>
+              {formatMoney(stockOverview.foodTotal)} €
+            </Text>
+            <Text style={styles.overviewPct}>100 %</Text>
+          </View>
         </ScrollView>
       ) : (
         <>
@@ -1594,6 +1789,107 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
           <ActivityIndicator size="large" color={colors.ink} />
           <Text style={styles.busyText}>{t('simpCountScanBusy')}</Text>
         </View>
+      </Modal>
+
+      <Modal
+        visible={settingsOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSettingsOpen(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setSettingsOpen(false)}
+        >
+          <Pressable
+            style={[styles.sheet, styles.hiddenSheet]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.sheetTitle}>{t('simpCountExtraSettings')}</Text>
+            <Text style={styles.sheetSub}>{t('simpCountExportSub')}</Text>
+
+            <Text style={styles.editFieldLabel}>{t('simpCountExportTitle')}</Text>
+            {(
+              [
+                {
+                  id: 'category' as const,
+                  label: t('simpCountExportScopeCategory'),
+                },
+                { id: 'all' as const, label: t('simpCountExportScopeAll') },
+                {
+                  id: 'blank' as const,
+                  label: t('simpCountExportScopeBlank'),
+                },
+              ] as const
+            ).map((opt) => (
+              <Pressable
+                key={opt.id}
+                style={[
+                  styles.sheetRow,
+                  exportScope === opt.id && styles.sheetRowOn,
+                ]}
+                onPress={() => setExportScope(opt.id)}
+              >
+                <Text
+                  style={[
+                    styles.sheetRowText,
+                    exportScope === opt.id && styles.sheetRowTextOn,
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </Pressable>
+            ))}
+            {exportScope === 'blank' ? (
+              <Text style={styles.sheetSub}>
+                {t('simpCountExportScopeBlankSub')}
+              </Text>
+            ) : null}
+
+            <View style={styles.editChipRow}>
+              {(
+                [
+                  { id: 'pdf' as const, label: t('simpCountExportPdf') },
+                  { id: 'excel' as const, label: t('simpCountExportExcel') },
+                ] as const
+              ).map((opt) => (
+                <Pressable
+                  key={opt.id}
+                  style={[
+                    styles.editChip,
+                    exportFormat === opt.id && styles.editChipOn,
+                  ]}
+                  onPress={() => setExportFormat(opt.id)}
+                >
+                  <Text
+                    style={[
+                      styles.editChipText,
+                      exportFormat === opt.id && styles.editChipTextOn,
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Pressable
+              style={[styles.editPopupSave, exportBusy && { opacity: 0.6 }]}
+              onPress={() => void runExport()}
+              disabled={exportBusy}
+            >
+              <Text style={styles.editPopupSaveText}>
+                {exportBusy ? t('simpCountExportBusy') : t('simpCountExportGo')}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.sheetRow}
+              onPress={() => setSettingsOpen(false)}
+            >
+              <Text style={styles.sheetRowMuted}>{t('simpCountAddCancel')}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       <Modal
@@ -2333,13 +2629,20 @@ const styles = StyleSheet.create({
   },
   overviewCard: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     backgroundColor: NEO_CARD,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: 10,
+    gap: 8,
     ...neoShadow,
+  },
+  overviewFoodTotal: {
+    backgroundColor: 'rgba(168,197,240,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(11,79,138,0.18)',
+    alignItems: 'center',
   },
   overviewTitle: {
     fontSize: 15,
@@ -2351,10 +2654,73 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.inkMuted,
   },
+  overviewPrior: {
+    marginTop: 4,
+    fontSize: 11,
+    color: colors.inkMuted,
+  },
+  overviewDelta: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.inkMuted,
+  },
+  overviewDeltaUp: {
+    color: '#1B7A4A',
+  },
+  overviewDeltaDown: {
+    color: '#B42318',
+  },
   overviewTotal: {
-    fontSize: 15,
+    minWidth: 78,
+    textAlign: 'right',
+    fontSize: 14,
     fontWeight: '700',
     color: colors.ink,
+  },
+  overviewPct: {
+    minWidth: 44,
+    textAlign: 'right',
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  stockHeadRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    paddingHorizontal: 4,
+    marginBottom: 8,
+  },
+  stockHeadCell: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: colors.ink,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  stockHeadRight: {
+    minWidth: 78,
+    textAlign: 'right',
+  },
+  stockHeadPct: {
+    minWidth: 44,
+    textAlign: 'right',
+  },
+  settingsBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    marginRight: 8,
+  },
+  settingsGlyph: {
+    fontSize: 16,
+    color: colors.primary,
   },
   dock: {
     position: 'absolute',
