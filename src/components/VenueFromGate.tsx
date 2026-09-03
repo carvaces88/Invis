@@ -8,13 +8,15 @@ import {
 import { useInventory } from '../data/store';
 import { isBetaTesterName, normalizeGateName } from '../lib/authAccounts';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { WORKSPACE_SYNC_AT_KEY } from '../lib/workspaceSnapshot';
 
 const WORKSPACE_OWNER_KEY = 'invis.workspaceOwner.v1';
 
 /**
  * When a named beta tester first claims this device workspace, apply their
  * venue layout (site + places) and wipe seed inventory.
- * With Supabase, cloud pull remains source of truth after the first push.
+ * With Supabase, cloud pull can refine afterward; local seed keeps UI correct
+ * if pull is slow or fails.
  */
 export function VenueFromGate() {
   const { session } = useAuth();
@@ -26,9 +28,11 @@ export function VenueFromGate() {
   useEffect(() => {
     const venue = session?.venue?.trim();
     if (!venue || venueApplied.current === venue) return;
+    // Bypass users (e.g. joonas) apply site+places together in the owner effect.
+    if (isBetaTesterName(session?.name ?? '')) return;
     venueApplied.current = venue;
     setSiteName(venue);
-  }, [session?.venue, setSiteName]);
+  }, [session?.venue, session?.name, setSiteName]);
 
   useEffect(() => {
     if (!session?.name) return;
@@ -43,18 +47,15 @@ export function VenueFromGate() {
 
         if (isBetaTesterName(session.name) && prev !== ownerKey) {
           const key = normalizeGateName(session.name).toLowerCase();
+          // New owner on this device — force a fresh cloud pull next.
+          await AsyncStorage.removeItem(WORKSPACE_SYNC_AT_KEY);
           if (key === 'joonas') {
-            // Offline / no cloud: seed Ravintola Lonkka (1 fridge + 1 freezer).
-            // With Supabase, pull the pre-seeded joonas@invis.app snapshot instead
-            // so phone/web stay in sync and Places edits are not wiped.
-            if (!isSupabaseConfigured) {
-              resetWorkspaceLayout({
-                siteName: LONKKA_SITE_NAME,
-                places: LONKKA_SEED_PLACES,
-              });
-            }
+            // Immediate Lonkka layout (1 fridge + 1 freezer). Cloud may refine.
+            resetWorkspaceLayout({
+              siteName: LONKKA_SITE_NAME,
+              places: LONKKA_SEED_PLACES,
+            });
           } else if (!isSupabaseConfigured) {
-            // Jani-style offline first claim — empty Kamppi-style layout.
             clearAllInventory();
             setSiteName('Jani · beta 1');
           }

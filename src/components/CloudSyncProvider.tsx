@@ -64,6 +64,10 @@ async function payloadWithCloudPhotos(
 /**
  * Keeps inventory workspace in Supabase so the same gate email sees identical
  * data on phone and web. Photos upload to Supabase Storage; metadata in snapshot.
+ *
+ * First pull must succeed (or confirm empty remote) before any automatic push,
+ * otherwise a fresh device can overwrite a seeded cloud workspace with local
+ * Kamppi demo stock.
  */
 export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
@@ -87,6 +91,7 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
 
   const applyingRemoteRef = useRef(false);
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pullOkRef = useRef(false);
   const email = session ? resolveSyncEmail(session) : '';
 
   const pushSnapshot = useCallback(
@@ -123,16 +128,20 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
   const pullAndMerge = useCallback(async () => {
     if (!email || !isSupabaseConfigured || !storeHydrated) return;
     setStatus('pulling');
+    pullOkRef.current = false;
     try {
       const localSyncAt = await AsyncStorage.getItem(WORKSPACE_SYNC_AT_KEY);
       const remote = await fetchRemoteWorkspaceSnapshot(email);
       const local = getWorkspaceSnapshot();
 
       if (!remote) {
+        // Empty remote: only push after an explicit meaningful local workspace.
         if (hasMeaningfulWorkspaceData(local)) {
-          await pushSnapshot({ refreshLocalPhotos: true });
+          const pushed = await pushSnapshot({ refreshLocalPhotos: true });
+          pullOkRef.current = Boolean(pushed);
         } else {
           setStatus('synced');
+          pullOkRef.current = true;
         }
         return;
       }
@@ -144,14 +153,18 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
         setLastSyncedAt(remote.updatedAt);
         applyingRemoteRef.current = false;
         setStatus('synced');
+        pullOkRef.current = true;
       } else if (localSyncAt > remote.updatedAt) {
-        await pushSnapshot({ refreshLocalPhotos: true });
+        const pushed = await pushSnapshot({ refreshLocalPhotos: true });
+        pullOkRef.current = Boolean(pushed);
       } else {
         setLastSyncedAt(localSyncAt);
         setStatus('synced');
+        pullOkRef.current = true;
       }
     } catch {
       applyingRemoteRef.current = false;
+      pullOkRef.current = false;
       setStatus('error');
     } finally {
       setSyncReady(true);
@@ -167,16 +180,18 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!email || !storeHydrated) {
       setSyncReady(false);
+      pullOkRef.current = false;
       if (!isSupabaseConfigured) setStatus('offline');
       return;
     }
     setSyncReady(false);
+    pullOkRef.current = false;
     void pullAndMerge();
   }, [email, storeHydrated, pullAndMerge]);
 
   useEffect(() => {
     if (!email || !storeHydrated || !isSupabaseConfigured) return;
-    if (!syncReady || applyingRemoteRef.current) return;
+    if (!syncReady || applyingRemoteRef.current || !pullOkRef.current) return;
 
     if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
     pushTimerRef.current = setTimeout(() => {
