@@ -44,12 +44,15 @@ export function VenueFromGate() {
         if (isBetaTesterName(session.name) && prev !== ownerKey) {
           const key = normalizeGateName(session.name).toLowerCase();
           if (key === 'joonas') {
-            // Full inventory access; start at Ravintola Lonkka with 1 fridge + 1 freezer.
-            // Places stay editable in More → Places (add / rename / remove / change type).
-            resetWorkspaceLayout({
-              siteName: LONKKA_SITE_NAME,
-              places: LONKKA_SEED_PLACES,
-            });
+            // Offline / no cloud: seed Ravintola Lonkka (1 fridge + 1 freezer).
+            // With Supabase, pull the pre-seeded joonas@invis.app snapshot instead
+            // so phone/web stay in sync and Places edits are not wiped.
+            if (!isSupabaseConfigured) {
+              resetWorkspaceLayout({
+                siteName: LONKKA_SITE_NAME,
+                places: LONKKA_SEED_PLACES,
+              });
+            }
           } else if (!isSupabaseConfigured) {
             // Jani-style offline first claim — empty Kamppi-style layout.
             clearAllInventory();
