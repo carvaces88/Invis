@@ -3,6 +3,7 @@ import type { UnitCode } from './types';
 /** Draft categories for Simplified Counting (sheet tabs). */
 export type SimplifiedCategoryId =
   | 'stock_values'
+  | 'all_items'
   | 'dairy'
   | 'vegetables'
   | 'seafood'
@@ -12,6 +13,12 @@ export type SimplifiedCategoryId =
   | 'kitchen_alcohol'
   | 'other'
   | 'waste';
+
+/** Categories that actually hold product lines (not virtual sheet tabs). */
+export type SimplifiedItemCategoryId = Exclude<
+  SimplifiedCategoryId,
+  'stock_values' | 'all_items'
+>;
 
 export type SimplifiedCountItem = {
   id: string;
@@ -29,6 +36,7 @@ export const SIMPLIFIED_CATEGORIES: {
   /** i18n MessageKey suffix mapped in screen via t() */
   labelKey:
     | 'simpCountCatStockValues'
+    | 'simpCountCatAllItems'
     | 'simpCountCatDairy'
     | 'simpCountCatVegetables'
     | 'simpCountCatSeafood'
@@ -40,6 +48,7 @@ export const SIMPLIFIED_CATEGORIES: {
     | 'simpCountCatWaste';
 }[] = [
   { id: 'stock_values', labelKey: 'simpCountCatStockValues' },
+  { id: 'all_items', labelKey: 'simpCountCatAllItems' },
   { id: 'dairy', labelKey: 'simpCountCatDairy' },
   { id: 'vegetables', labelKey: 'simpCountCatVegetables' },
   { id: 'seafood', labelKey: 'simpCountCatSeafood' },
@@ -52,7 +61,7 @@ export const SIMPLIFIED_CATEGORIES: {
 ];
 
 /** Category rows on the Stock values / food stock sheet (order matches inventaario sheet). */
-export const STOCK_VALUE_CATEGORY_IDS: SimplifiedCategoryId[] = [
+export const STOCK_VALUE_CATEGORY_IDS: SimplifiedItemCategoryId[] = [
   'dairy',
   'vegetables',
   'seafood',
@@ -64,12 +73,22 @@ export const STOCK_VALUE_CATEGORY_IDS: SimplifiedCategoryId[] = [
   'waste',
 ];
 
+export const ITEM_CATEGORY_IDS: SimplifiedItemCategoryId[] = [
+  ...STOCK_VALUE_CATEGORY_IDS,
+];
+
+export function isItemCategoryId(
+  id: SimplifiedCategoryId,
+): id is SimplifiedItemCategoryId {
+  return id !== 'stock_values' && id !== 'all_items';
+}
+
 /**
  * August sheet category totals (used when a category has no seeded lines yet).
  * Live `categoryTotal(items)` wins once products exist in that category.
  */
 export const AUGUST_SHEET_CATEGORY_TOTALS: Record<
-  Exclude<SimplifiedCategoryId, 'stock_values'>,
+  SimplifiedItemCategoryId,
   number
 > = {
   dairy: 560.29,
@@ -411,8 +430,9 @@ function withDairyAliases(
 const DAIRY_COUNT_SEEDED = withDairyAliases(DAIRY_COUNT_SEED);
 
 /** Placeholder lines for categories not yet imported from the sheet. */
-export const PLACEHOLDER_BY_CATEGORY: Partial<
-  Record<SimplifiedCategoryId, SimplifiedCountItem[]>
+export const PLACEHOLDER_BY_CATEGORY: Record<
+  SimplifiedItemCategoryId,
+  SimplifiedCountItem[]
 > = {
   dairy: DAIRY_COUNT_SEEDED,
   vegetables: [],
@@ -438,11 +458,27 @@ export function categoryTotal(items: SimplifiedCountItem[]): number {
 
 /** Live sum when seeded; otherwise August sheet total so Stock values matches the inventaario sheet. */
 export function resolveCategoryStockTotal(
-  categoryId: Exclude<SimplifiedCategoryId, 'stock_values'>,
+  categoryId: SimplifiedItemCategoryId,
   items: SimplifiedCountItem[],
 ): number {
   if (items.length > 0) return categoryTotal(items);
   return AUGUST_SHEET_CATEGORY_TOTALS[categoryId] ?? 0;
+}
+
+export function findItemCategory(
+  byCategory: Record<SimplifiedCategoryId, SimplifiedCountItem[]>,
+  itemId: string,
+): SimplifiedItemCategoryId | null {
+  for (const cid of ITEM_CATEGORY_IDS) {
+    if ((byCategory[cid] ?? []).some((row) => row.id === itemId)) return cid;
+  }
+  return null;
+}
+
+export function flattenAllItems(
+  byCategory: Record<SimplifiedCategoryId, SimplifiedCountItem[]>,
+): SimplifiedCountItem[] {
+  return ITEM_CATEGORY_IDS.flatMap((cid) => byCategory[cid] ?? []);
 }
 
 /** Other-language name + nicknames (excludes the primary display name). */

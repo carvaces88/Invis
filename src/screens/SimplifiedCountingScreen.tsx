@@ -1,6 +1,8 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
+  Easing,
   Modal,
   PanResponder,
   Platform,
@@ -12,22 +14,43 @@ import {
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GamifiedCountingView } from '../components/GamifiedCountingView';
 import { CalcIcon } from '../components/CalcIcon';
 import {
   alsoKnownAsLabel,
   categoryTotal,
+  findItemCategory,
+  flattenAllItems,
+  isItemCategoryId,
   itemMatchesQuery,
+  ITEM_CATEGORY_IDS,
   lineTotal,
   PLACEHOLDER_BY_CATEGORY,
   SIMPLIFIED_CATEGORIES,
   type SimplifiedCategoryId,
   type SimplifiedCountItem,
+  type SimplifiedItemCategoryId,
 } from '../data/simplifiedCountingSeed';
 import type { RootStackParamList, UnitCode } from '../data/types';
 import { useI18n } from '../i18n';
+import { alertInfo } from '../lib/alertAck';
+import {
+  persistPickerAsset,
+  visionPickerOptions,
+} from '../lib/persistImageUri';
+import { analyzePriorStockListImages } from '../lib/vision';
 import { colors, radius, spacing } from '../theme/colors';
+
+type ExtraProduct = {
+  categoryId: SimplifiedItemCategoryId;
+  item: SimplifiedCountItem;
+};
+
+const LIST_SCAN_MAX_PHOTOS = 8;
+const HIDDEN_STORAGE_KEY = 'invis.simpCount.hiddenIds.v1';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SimplifiedCounting'>;
 
@@ -77,17 +100,38 @@ function formatQty(n: number): string {
   return String(Math.round(n * 100) / 100).replace(/\.?0+$/, '') || '0';
 }
 
-function cloneSeed(): Record<SimplifiedCategoryId, SimplifiedCountItem[]> {
+function emptyByCategory(): Record<SimplifiedCategoryId, SimplifiedCountItem[]> {
   const out = {} as Record<SimplifiedCategoryId, SimplifiedCountItem[]>;
   for (const cat of SIMPLIFIED_CATEGORIES) {
-    if (cat.id === 'stock_values') {
-      out[cat.id] = [];
-      continue;
-    }
-    const src = PLACEHOLDER_BY_CATEGORY[cat.id] ?? [];
-    out[cat.id] = src.map((row) => ({ ...row }));
+    out[cat.id] = [];
   }
   return out;
+}
+
+function cloneSeed(
+  extras: ExtraProduct[] = [],
+): Record<SimplifiedCategoryId, SimplifiedCountItem[]> {
+  const out = emptyByCategory();
+  for (const cid of ITEM_CATEGORY_IDS) {
+    out[cid] = (PLACEHOLDER_BY_CATEGORY[cid] ?? []).map((row) => ({ ...row }));
+  }
+  for (const extra of extras) {
+    if (!isItemCategoryId(extra.categoryId)) continue;
+    const list = out[extra.categoryId] ?? [];
+    if (list.some((row) => row.id === extra.item.id)) continue;
+    out[extra.categoryId] = [...list, { ...extra.item }];
+  }
+  return out;
+}
+
+function slugId(name: string): string {
+  const base = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9äöå]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24);
+  return `custom-${base || 'item'}-${Date.now().toString(36)}`;
 }
 
 type CountRowProps = {
@@ -98,6 +142,10 @@ type CountRowProps = {
   recorded: boolean;
   recordedLabel: string;
   missingLabel: string;
+  editMode: boolean;
+  hideLabel: string;
+  onHide: () => void;
+  onLongPressEdit: () => void;
   onSelect: () => void;
   onDelta: (delta: number) => void;
 };
@@ -119,11 +167,50 @@ function CountRow({
   recorded,
   recordedLabel,
   missingLabel,
+  editMode,
+  hideLabel,
+  onHide,
+  onLongPressEdit,
   onSelect,
   onDelta,
 }: CountRowProps) {
   const pan = useRef(new Animated.Value(0)).current;
   const flash = useRef(new Animated.Value(0)).current;
+  const wobble = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!editMode) {
+      wobble.setValue(0);
+      return;
+    }
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(wobble, {
+          toValue: 1,
+          duration: 90,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+        Animated.timing(wobble, {
+          toValue: -1,
+          duration: 180,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+        Animated.timing(wobble, {
+          toValue: 0,
+          duration: 90,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+      ]),
+    );
+    anim.start();
+    return () => {
+      anim.stop();
+      wobble.setValue(0);
+    };
+  }, [editMode, wobble]);
 
   const bumpFlash = (dir: 1 | -1) => {
     flash.setValue(dir);
@@ -138,7 +225,9 @@ function CountRow({
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, g) =>
-          Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
+          !editMode &&
+          Math.abs(g.dx) > 10 &&
+          Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
         onPanResponderGrant: () => onSelect(),
         onPanResponderMove: (_, g) => {
           pan.setValue(Math.max(-90, Math.min(90, g.dx * 0.45)));
@@ -164,12 +253,17 @@ function CountRow({
           }).start();
         },
       }),
-    [onDelta, onSelect, pan, flash],
+    [editMode, onDelta, onSelect, pan],
   );
 
   const tint = flash.interpolate({
     inputRange: [-1, 0, 1],
     outputRange: ['rgba(180,35,24,0.12)', 'transparent', 'rgba(31,122,77,0.14)'],
+  });
+
+  const rotate = wobble.interpolate({
+    inputRange: [-1, 1],
+    outputRange: ['-1.8deg', '1.8deg'],
   });
 
   const total = lineTotal(item);
@@ -180,7 +274,10 @@ function CountRow({
       style={[
         styles.rowCard,
         selected && styles.rowCardSelected,
-        { transform: [{ translateX: pan }] },
+        editMode && styles.rowCardEdit,
+        {
+          transform: [{ translateX: pan }, { rotate }],
+        },
       ]}
       {...panResponder.panHandlers}
     >
@@ -188,7 +285,23 @@ function CountRow({
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, { backgroundColor: tint, borderRadius: radius.lg }]}
       />
-      <Pressable onPress={onSelect} style={styles.rowInner}>
+      {editMode ? (
+        <Pressable
+          style={styles.hideFab}
+          onPress={onHide}
+          accessibilityRole="button"
+          accessibilityLabel={hideLabel}
+          hitSlop={8}
+        >
+          <Text style={styles.hideFabGlyph}>−</Text>
+        </Pressable>
+      ) : null}
+      <Pressable
+        onPress={onSelect}
+        onLongPress={onLongPressEdit}
+        delayLongPress={420}
+        style={styles.rowInner}
+      >
         <View style={styles.colProduct}>
           <View style={styles.productNameRow}>
             <Text
@@ -266,12 +379,66 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortAlpha, setSortAlpha] = useState(false);
   const [missingOnly, setMissingOnly] = useState(false);
+  const [listScanOpen, setListScanOpen] = useState(false);
+  const [listScanBusy, setListScanBusy] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  const [hiddenSheetOpen, setHiddenSheetOpen] = useState(false);
+  const [hiddenHydrated, setHiddenHydrated] = useState(false);
 
-  const items =
-    categoryId === 'stock_values' ? [] : (byCategory[categoryId] ?? []);
+  const isOverview = categoryId === 'stock_values';
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(HIDDEN_STORAGE_KEY);
+        if (!alive || !raw) return;
+        const parsed = JSON.parse(raw) as unknown;
+        if (Array.isArray(parsed)) {
+          setHiddenIds(parsed.filter((x): x is string => typeof x === 'string'));
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        if (alive) setHiddenHydrated(true);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hiddenHydrated) return;
+    void AsyncStorage.setItem(
+      HIDDEN_STORAGE_KEY,
+      JSON.stringify(hiddenIds),
+    ).catch(() => {});
+  }, [hiddenIds, hiddenHydrated]);
+
+  const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
+
+  const items = useMemo(() => {
+    if (categoryId === 'stock_values') return [];
+    if (categoryId === 'all_items') return flattenAllItems(byCategory);
+    return byCategory[categoryId] ?? [];
+  }, [byCategory, categoryId]);
+
+  const visibleItems = useMemo(
+    () => items.filter((row) => !hiddenSet.has(row.id)),
+    [items, hiddenSet],
+  );
+
+  const allHiddenItems = useMemo(
+    () => flattenAllItems(byCategory).filter((row) => hiddenSet.has(row.id)),
+    [byCategory, hiddenSet],
+  );
 
   const filteredItems = useMemo(() => {
-    let filtered = items.filter((row) => itemMatchesQuery(row, searchQuery));
+    let filtered = visibleItems.filter((row) =>
+      itemMatchesQuery(row, searchQuery),
+    );
     if (missingOnly) {
       filtered = filtered.filter((row) => !hasRecordedValue(row));
     }
@@ -285,89 +452,81 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
       const nb = locale === 'fi' ? b.nameFi : b.nameEn;
       return collator.compare(na, nb);
     });
-  }, [items, searchQuery, sortAlpha, locale, missingOnly]);
+  }, [visibleItems, searchQuery, sortAlpha, locale, missingOnly]);
 
   const missingCount = useMemo(
-    () => items.filter((row) => !hasRecordedValue(row)).length,
-    [items],
+    () => visibleItems.filter((row) => !hasRecordedValue(row)).length,
+    [visibleItems],
   );
 
   const selectedItem = useMemo(
-    () => items.find((row) => row.id === selectedId) ?? null,
-    [items, selectedId],
+    () => visibleItems.find((row) => row.id === selectedId) ?? null,
+    [visibleItems, selectedId],
   );
 
   const total = useMemo(() => {
-    if (categoryId === 'stock_values') {
-      return SIMPLIFIED_CATEGORIES.filter((c) => c.id !== 'stock_values').reduce(
-        (sum, c) => sum + categoryTotal(byCategory[c.id] ?? []),
-        0,
+    const sumVisible = (cid: SimplifiedItemCategoryId) =>
+      categoryTotal(
+        (byCategory[cid] ?? []).filter((row) => !hiddenSet.has(row.id)),
       );
+    if (categoryId === 'stock_values' || categoryId === 'all_items') {
+      return ITEM_CATEGORY_IDS.reduce((sum, cid) => sum + sumVisible(cid), 0);
     }
-    return categoryTotal(items);
-  }, [byCategory, categoryId, items]);
+    return categoryTotal(visibleItems);
+  }, [byCategory, categoryId, hiddenSet, visibleItems]);
 
   const categoryLabel = t(
     SIMPLIFIED_CATEGORIES.find((c) => c.id === categoryId)?.labelKey ??
       'simpCountCatDairy',
   );
 
-  const applyDelta = useCallback(
-    (id: string, delta: number) => {
-      if (categoryId === 'stock_values') return;
+  const patchItem = useCallback(
+    (id: string, map: (row: SimplifiedCountItem) => SimplifiedCountItem) => {
       setByCategory((prev) => {
-        const list = prev[categoryId] ?? [];
+        const home = findItemCategory(prev, id);
+        if (!home) return prev;
         return {
           ...prev,
-          [categoryId]: list.map((row) => {
-            if (row.id !== id) return row;
-            const next = Math.max(0, Math.round((row.quantity + delta) * 100) / 100);
-            return { ...row, quantity: next };
-          }),
+          [home]: (prev[home] ?? []).map((row) =>
+            row.id === id ? map(row) : row,
+          ),
         };
       });
       setSelectedId(id);
     },
-    [categoryId],
+    [],
+  );
+
+  const applyDelta = useCallback(
+    (id: string, delta: number) => {
+      if (isOverview) return;
+      patchItem(id, (row) => {
+        const next = Math.max(0, Math.round((row.quantity + delta) * 100) / 100);
+        return { ...row, quantity: next };
+      });
+    },
+    [isOverview, patchItem],
   );
 
   const setQuantity = useCallback(
     (id: string, quantity: number) => {
-      if (categoryId === 'stock_values') return;
+      if (isOverview) return;
       const next = Math.max(0, Math.round(quantity * 100) / 100);
-      setByCategory((prev) => {
-        const list = prev[categoryId] ?? [];
-        return {
-          ...prev,
-          [categoryId]: list.map((row) =>
-            row.id === id ? { ...row, quantity: next } : row,
-          ),
-        };
-      });
-      setSelectedId(id);
+      patchItem(id, (row) => ({ ...row, quantity: next }));
     },
-    [categoryId],
+    [isOverview, patchItem],
   );
 
   const setUnit = useCallback(
     (id: string, unit: UnitCode) => {
-      if (categoryId === 'stock_values') return;
-      setByCategory((prev) => {
-        const list = prev[categoryId] ?? [];
-        return {
-          ...prev,
-          [categoryId]: list.map((row) =>
-            row.id === id ? { ...row, unit } : row,
-          ),
-        };
-      });
-      setSelectedId(id);
+      if (isOverview) return;
+      patchItem(id, (row) => ({ ...row, unit }));
     },
-    [categoryId],
+    [isOverview, patchItem],
   );
 
   const enterGameMode = () => {
-    if (filteredItems.length === 0 || categoryId === 'stock_values') return;
+    if (filteredItems.length === 0 || isOverview) return;
     const start = selectedId
       ? filteredItems.findIndex((row) => row.id === selectedId)
       : 0;
@@ -376,12 +535,12 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   };
 
   const nudgeSelected = (delta: number) => {
-    if (!selectedId || categoryId === 'stock_values') return;
+    if (!selectedId || isOverview) return;
     applyDelta(selectedId, delta);
   };
 
   const openCalculator = () => {
-    if (!selectedItem || categoryId === 'stock_values') return;
+    if (!selectedItem || isOverview) return;
     setCalcDigits(
       selectedItem.quantity > 0 ? formatQty(selectedItem.quantity) : '',
     );
@@ -411,16 +570,91 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
     setCalcOpen(false);
   };
 
+  const scanListPhotos = useCallback(
+    async (fromCamera: boolean) => {
+      setListScanOpen(false);
+      const perm = fromCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        alertInfo(t('simpCountScanList'), t('simpCountScanNeedPermission'));
+        return;
+      }
+
+      let uris: string[] = [];
+      if (fromCamera) {
+        const result = await ImagePicker.launchCameraAsync(
+          visionPickerOptions({ quality: 0.85 }),
+        );
+        if (result.canceled || !result.assets[0]) return;
+        uris = [await persistPickerAsset(result.assets[0])];
+      } else {
+        const result = await ImagePicker.launchImageLibraryAsync(
+          visionPickerOptions({
+            quality: 0.85,
+            allowsMultipleSelection: true,
+            selectionLimit: LIST_SCAN_MAX_PHOTOS,
+          }),
+        );
+        if (result.canceled || !result.assets.length) return;
+        for (const asset of result.assets) {
+          uris.push(await persistPickerAsset(asset));
+        }
+        uris = uris.slice(0, LIST_SCAN_MAX_PHOTOS);
+      }
+
+      if (!uris.length) return;
+
+      setListScanBusy(true);
+      try {
+        const document = await analyzePriorStockListImages(uris);
+        if (!document.lines.length) {
+          alertInfo(t('simpCountScanList'), t('sheetImportEmpty'));
+          return;
+        }
+        navigation.navigate('SheetImportReview', {
+          document,
+          imageUri: uris[0],
+          imageUris: uris,
+        });
+      } catch (err) {
+        alertInfo(
+          t('simpCountScanList'),
+          err instanceof Error ? err.message : t('sheetImportFailed'),
+        );
+      } finally {
+        setListScanBusy(false);
+      }
+    },
+    [navigation, t],
+  );
+
   const stockOverview = useMemo(() => {
-    return SIMPLIFIED_CATEGORIES.filter((c) => c.id !== 'stock_values').map(
-      (c) => ({
-        id: c.id,
-        label: t(c.labelKey),
-        total: categoryTotal(byCategory[c.id] ?? []),
-        count: (byCategory[c.id] ?? []).length,
-      }),
-    );
-  }, [byCategory, t]);
+    return ITEM_CATEGORY_IDS.map((cid) => {
+      const meta = SIMPLIFIED_CATEGORIES.find((c) => c.id === cid);
+      const rows = (byCategory[cid] ?? []).filter((row) => !hiddenSet.has(row.id));
+      return {
+        id: cid,
+        label: t(meta?.labelKey ?? 'simpCountCatOther'),
+        total: categoryTotal(rows),
+        count: rows.length,
+      };
+    });
+  }, [byCategory, hiddenSet, t]);
+
+  const hideItem = useCallback((id: string) => {
+    setHiddenIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    setSelectedId((cur) => (cur === id ? null : cur));
+  }, []);
+
+  const unhideItem = useCallback((id: string) => {
+    setHiddenIds((prev) => prev.filter((x) => x !== id));
+  }, []);
+
+  const toggleEditMode = () => {
+    if (isOverview) return;
+    setEditMode((v) => !v);
+  };
 
   if (gameMode) {
     return (
@@ -524,6 +758,24 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
               )}
             </Text>
           </Pressable>
+          {hiddenIds.length > 0 ? (
+            <Pressable
+              style={[styles.sortPill, styles.hiddenPill]}
+              onPress={() => setHiddenSheetOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t('simpCountShowHidden').replace(
+                '{count}',
+                String(hiddenIds.length),
+              )}
+            >
+              <Text style={[styles.sortPillText, styles.sortPillTextOn]}>
+                {t('simpCountShowHidden').replace(
+                  '{count}',
+                  String(hiddenIds.length),
+                )}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
@@ -533,7 +785,11 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         <Text style={styles.bannerTotal}>
           {t('simpCountTotal').replace('{amount}', formatMoney(total))}
         </Text>
-        <Text style={styles.bannerHint}>{t('simpCountSwipeHint')}</Text>
+        <Text style={styles.bannerHint}>
+          {editMode
+            ? t('simpCountEditHint')
+            : t('simpCountSwipeHint')}
+        </Text>
       </View>
 
       {categoryId === 'stock_values' ? (
@@ -596,10 +852,31 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
             }}
             showsVerticalScrollIndicator={false}
           >
-            {items.length === 0 ? (
+            {visibleItems.length === 0 ? (
               <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>{t('simpCountEmptyTitle')}</Text>
-                <Text style={styles.emptySub}>{t('simpCountEmptySub')}</Text>
+                <Text style={styles.emptyTitle}>
+                  {items.length > 0
+                    ? t('simpCountAllHiddenTitle')
+                    : t('simpCountEmptyTitle')}
+                </Text>
+                <Text style={styles.emptySub}>
+                  {items.length > 0
+                    ? t('simpCountAllHiddenSub')
+                    : t('simpCountEmptySub')}
+                </Text>
+                {items.length > 0 && hiddenIds.length > 0 ? (
+                  <Pressable
+                    style={styles.emptyAction}
+                    onPress={() => setHiddenSheetOpen(true)}
+                  >
+                    <Text style={styles.emptyActionText}>
+                      {t('simpCountShowHidden').replace(
+                        '{count}',
+                        String(hiddenIds.length),
+                      )}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
             ) : filteredItems.length === 0 ? (
               <View style={styles.emptyCard}>
@@ -629,6 +906,13 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
                     recorded={recorded}
                     recordedLabel={t('simpCountStatusRecorded')}
                     missingLabel={t('simpCountStatusMissing')}
+                    editMode={editMode}
+                    hideLabel={t('simpCountHideProduct')}
+                    onHide={() => hideItem(item.id)}
+                    onLongPressEdit={() => {
+                      setSelectedId(item.id);
+                      setEditMode(true);
+                    }}
                     onSelect={() => setSelectedId(item.id)}
                     onDelta={(d) => applyDelta(item.id, d)}
                   />
@@ -654,12 +938,23 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
           <Text style={styles.dockIconGlyph}>⚙</Text>
         </Pressable>
         <Pressable
-          style={styles.dockIcon}
-          onPress={() => setByCategory(cloneSeed())}
+          style={[styles.dockIcon, editMode && styles.dockIconOn]}
+          onPress={toggleEditMode}
+          disabled={isOverview}
           accessibilityRole="button"
-          accessibilityLabel={t('simpCountReset')}
+          accessibilityState={{ selected: editMode }}
+          accessibilityLabel={t('simpCountEdit')}
         >
-          <Text style={styles.dockIconGlyph}>↻</Text>
+          <Text style={styles.dockIconGlyph}>✎</Text>
+        </Pressable>
+        <Pressable
+          style={styles.dockIcon}
+          onPress={() => setListScanOpen(true)}
+          disabled={listScanBusy}
+          accessibilityRole="button"
+          accessibilityLabel={t('simpCountScanList')}
+        >
+          <Text style={styles.dockIconGlyph}>📷</Text>
         </Pressable>
         <Pressable
           style={styles.dockIcon}
@@ -673,11 +968,10 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         <Pressable
           style={[
             styles.dockCalc,
-            (!selectedItem || categoryId === 'stock_values') &&
-              styles.dockCalcDisabled,
+            (!selectedItem || isOverview || editMode) && styles.dockCalcDisabled,
           ]}
           onPress={openCalculator}
-          disabled={!selectedItem || categoryId === 'stock_values'}
+          disabled={!selectedItem || isOverview || editMode}
           accessibilityRole="button"
           accessibilityLabel={t('simpCountCalculator')}
         >
@@ -687,11 +981,11 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         <Pressable
           style={[
             styles.dockGame,
-            (filteredItems.length === 0 || categoryId === 'stock_values') &&
+            (filteredItems.length === 0 || isOverview || editMode) &&
               styles.dockCalcDisabled,
           ]}
           onPress={enterGameMode}
-          disabled={filteredItems.length === 0 || categoryId === 'stock_values'}
+          disabled={filteredItems.length === 0 || isOverview || editMode}
           accessibilityRole="button"
           accessibilityLabel={t('simpCountGameMode')}
         >
@@ -746,6 +1040,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
                       onPress={() => {
                         setCategoryId(c.id);
                         setSelectedId(null);
+                        setEditMode(false);
                         setPicker(null);
                       }}
                     >
@@ -838,6 +1133,125 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
                 </Pressable>
               </View>
             </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={listScanOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setListScanOpen(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setListScanOpen(false)}
+        >
+          <Pressable
+            style={styles.sheet}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.sheetTitle}>{t('simpCountScanList')}</Text>
+            <Text style={styles.sheetSub}>{t('simpCountScanListSub')}</Text>
+            <Pressable
+              style={styles.sheetRow}
+              onPress={() => void scanListPhotos(true)}
+            >
+              <Text style={styles.sheetRowText}>{t('simpCountScanCamera')}</Text>
+            </Pressable>
+            <Pressable
+              style={styles.sheetRow}
+              onPress={() => void scanListPhotos(false)}
+            >
+              <Text style={styles.sheetRowText}>
+                {t('simpCountScanLibrary')}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.sheetRow}
+              onPress={() => setListScanOpen(false)}
+            >
+              <Text style={styles.sheetRowMuted}>{t('simpCountAddCancel')}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={listScanBusy} transparent animationType="fade">
+        <View style={styles.busyOverlay}>
+          <ActivityIndicator size="large" color={colors.ink} />
+          <Text style={styles.busyText}>{t('simpCountScanBusy')}</Text>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={hiddenSheetOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setHiddenSheetOpen(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setHiddenSheetOpen(false)}
+        >
+          <Pressable
+            style={[styles.sheet, styles.hiddenSheet]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.sheetTitle}>
+              {t('simpCountShowHidden').replace(
+                '{count}',
+                String(allHiddenItems.length),
+              )}
+            </Text>
+            <Text style={styles.sheetSub}>{t('simpCountHideHint')}</Text>
+            <ScrollView style={{ maxHeight: 420 }}>
+              {allHiddenItems.length === 0 ? (
+                <Text style={styles.sheetRowMuted}>
+                  {t('simpCountHiddenEmpty')}
+                </Text>
+              ) : (
+                allHiddenItems.map((item) => {
+                  const name = locale === 'fi' ? item.nameFi : item.nameEn;
+                  return (
+                    <View key={item.id} style={styles.hiddenRow}>
+                      <Text style={styles.hiddenRowName} numberOfLines={2}>
+                        {name}
+                      </Text>
+                      <Pressable
+                        style={styles.unhideBtn}
+                        onPress={() => unhideItem(item.id)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('simpCountUnhideProduct')}
+                      >
+                        <Text style={styles.unhideBtnText}>
+                          {t('simpCountUnhideProduct')}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+            {allHiddenItems.length > 0 ? (
+              <Pressable
+                style={styles.sheetRow}
+                onPress={() => {
+                  setHiddenIds([]);
+                  setHiddenSheetOpen(false);
+                }}
+              >
+                <Text style={styles.sheetRowText}>
+                  {t('simpCountUnhideAll')}
+                </Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              style={styles.sheetRow}
+              onPress={() => setHiddenSheetOpen(false)}
+            >
+              <Text style={styles.sheetRowMuted}>{t('simpCountAddCancel')}</Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1101,6 +1515,30 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(11,79,138,0.28)',
   },
+  rowCardEdit: {
+    borderWidth: 1,
+    borderColor: 'rgba(180,35,24,0.22)',
+  },
+  hideFab: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    zIndex: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#C0392B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...neoShadow,
+  },
+  hideFabGlyph: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '700',
+    marginTop: -2,
+    lineHeight: 24,
+  },
   rowInner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1139,6 +1577,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.inkMuted,
     lineHeight: 18,
+  },
+  emptyAction: {
+    marginTop: 14,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(184,232,216,0.9)',
+  },
+  emptyActionText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  hiddenPill: {
+    backgroundColor: 'rgba(163,177,198,0.55)',
   },
   overviewCard: {
     flexDirection: 'row',
@@ -1187,6 +1641,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: NEO_CARD,
     ...neoShadow,
+  },
+  dockIconOn: {
+    backgroundColor: 'rgba(245,198,208,0.95)',
   },
   dockIconGlyph: {
     fontSize: 18,
@@ -1329,6 +1786,13 @@ const styles = StyleSheet.create({
     color: colors.ink,
     marginBottom: 12,
   },
+  sheetSub: {
+    marginTop: -4,
+    marginBottom: 12,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.inkMuted,
+  },
   sheetRow: {
     paddingVertical: 14,
     paddingHorizontal: 12,
@@ -1344,5 +1808,51 @@ const styles = StyleSheet.create({
   },
   sheetRowTextOn: {
     fontWeight: '700',
+  },
+  sheetRowMuted: {
+    fontSize: 14,
+    color: colors.inkMuted,
+    fontWeight: '500',
+  },
+  busyOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(11,31,51,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+  },
+  busyText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  hiddenSheet: {
+    maxHeight: '80%',
+  },
+  hiddenRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(11,31,51,0.12)',
+  },
+  hiddenRowName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.ink,
+  },
+  unhideBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(184,232,216,0.9)',
+  },
+  unhideBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.ink,
   },
 });
