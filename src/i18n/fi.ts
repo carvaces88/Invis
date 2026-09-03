@@ -603,7 +603,7 @@ export const fi: Messages = {
   simpCountGameEmpty: 'Ei tuotteita tässä kategoriassa.',
   simpCountGameProgress: '{n} / {total}',
   simpCountGameSwipeHint: 'Pyyhkäise oikealle → seuraava · vasemmalle ← edellinen',
-  simpCountGameSuccess: 'Hienoa!',
+  simpCountGameSuccess: '🔥 Tulessa!',
   simpCountSearchPlaceholder: 'Etsi tuotetta…',
   simpCountSearchEmpty: 'Ei osumia',
   simpCountSearchEmptySub: 'Kokeile toista nimeä tai “myös”-aliasta.',

@@ -313,6 +313,7 @@ export function GamifiedCountingView({
   }
 
   const name = locale === 'fi' ? item.nameFi : item.nameEn;
+  const alsoAs = alsoKnownAsLabel(item, locale, t('alsoAs'));
   const display = typing
     ? digits === ''
       ? '0'
@@ -425,6 +426,11 @@ export function GamifiedCountingView({
             <Text style={styles.heroName} numberOfLines={2}>
               {name}
             </Text>
+            {alsoAs ? (
+              <Text style={styles.alsoAs} numberOfLines={2}>
+                {alsoAs}
+              </Text>
+            ) : null}
             <Text style={styles.swipeHint}>{t('simpCountGameSwipeHint')}</Text>
           </Animated.View>
           <Pressable
@@ -693,6 +699,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '600',
     color: colors.inkMuted,
+  },
+  alsoAs: {
+    marginTop: 4,
+    fontSize: 11,
+    lineHeight: 14,
+    color: colors.inkFaint,
+    fontWeight: '500',
   },
   swipeHint: {
     marginTop: 4,
