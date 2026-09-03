@@ -16,6 +16,8 @@ export type SimplifiedCountItem = {
   quantity: number;
   unit: UnitCode;
   unitPriceAlv0: number;
+  /** Extra search nicknames (FI/EN). Other-language name is always searchable. */
+  aliases?: string[];
 };
 
 export const SIMPLIFIED_CATEGORIES: {
@@ -313,11 +315,62 @@ export const DAIRY_COUNT_SEED: SimplifiedCountItem[] = [
   },
 ];
 
+/** Extra kitchen nicknames for search / “also known as” tooltips. */
+const DAIRY_EXTRA_ALIASES: Record<string, string[]> = {
+  'dairy-milk-red': ['whole milk', 'täysmaito', 'punainen maito', 'milk'],
+  'dairy-cream-lf': ['LH cream', 'laktoositon kerma', 'cream'],
+  'dairy-butter-lf': ['LH butter', 'laktoositon voi', 'butter'],
+  'dairy-mayo': ['mayo', 'hellmanns', 'majo'],
+  'dairy-cheddar-applewood': ['applewood', 'omenapuu cheddar', 'cheddar'],
+  'dairy-mascarpone': ['maskarpone'],
+  'dairy-cream-cheese-vanilla': ['vanilla cream cheese', 'vanilja tuorejuusto'],
+  'dairy-cream-cheese': ['philadelphia', 'tuorejuusto'],
+  'dairy-halloumi': ['halloumi'],
+  'dairy-feta': ['feta'],
+  'dairy-burrata': ['burrata'],
+  'dairy-turkish-yogurt': ['turkkilainen', 'jogurtti', 'yogurt'],
+  'dairy-buffalo-mozz': ['buffalo', 'mozzarella', 'bufala'],
+  'dairy-creme-fraiche': ['crème fraiche', 'cremefraiche', 'ranskankerma'],
+  'dairy-smetana': ['sour cream', 'smétana'],
+  'dairy-parmesan': ['parmesan', 'reggiano', 'parm'],
+  'dairy-gruyere': ['gruyere', 'gryere'],
+  'dairy-viinitarhuri': ['wine cheese'],
+  'dairy-vilho': ['vilho cheese'],
+  'dairy-aura-crumb': ['aura', 'blue cheese', 'aurajuusto'],
+  'dairy-mozz-grated': ['mozzarella grated', 'raaste'],
+  'dairy-tofu': ['bean curd'],
+  'dairy-goat-fresh': ['goat cheese', 'vuohenjuusto'],
+  'dairy-oat-milk': ['oatly', 'kauramaito', 'oat drink'],
+  'dairy-gouda': ['gouda'],
+  'dairy-koskenlaskija': ['koskenlaskija'],
+  'dairy-grana-padano': ['grana padano', 'grana'],
+  'dairy-gran-castelli': ['castelli'],
+  'dairy-brie': ['brie'],
+  'dairy-roquefort': ['roquefort', 'blue'],
+  'dairy-champagne-cheddar': ['champagne'],
+  'dairy-appenzeller': ['appenzeller'],
+  'dairy-american': ['american slices', 'burger cheese'],
+  'dairy-ricotta': ['ricotta'],
+};
+
+function withDairyAliases(
+  rows: SimplifiedCountItem[],
+): SimplifiedCountItem[] {
+  return rows.map((row) => ({
+    ...row,
+    aliases: [
+      ...new Set([...(row.aliases ?? []), ...(DAIRY_EXTRA_ALIASES[row.id] ?? [])]),
+    ],
+  }));
+}
+
+const DAIRY_COUNT_SEEDED = withDairyAliases(DAIRY_COUNT_SEED);
+
 /** Placeholder lines for categories not yet imported from the sheet. */
 export const PLACEHOLDER_BY_CATEGORY: Partial<
   Record<SimplifiedCategoryId, SimplifiedCountItem[]>
 > = {
-  dairy: DAIRY_COUNT_SEED,
+  dairy: DAIRY_COUNT_SEEDED,
   vegetables: [],
   seafood: [],
   frozen: [],
@@ -333,4 +386,50 @@ export function categoryTotal(items: SimplifiedCountItem[]): number {
     Math.round(items.reduce((sum, item) => sum + lineTotal(item), 0) * 100) /
     100
   );
+}
+
+/** Other-language name + nicknames (excludes the primary display name). */
+export function itemAlsoKnownAs(
+  item: SimplifiedCountItem,
+  locale: 'en' | 'fi',
+): string[] {
+  const primary = (locale === 'fi' ? item.nameFi : item.nameEn).trim();
+  const primaryLower = primary.toLowerCase();
+  const out: string[] = [];
+  const push = (raw: string) => {
+    const v = raw.trim();
+    if (!v) return;
+    if (v.toLowerCase() === primaryLower) return;
+    if (out.some((x) => x.toLowerCase() === v.toLowerCase())) return;
+    out.push(v);
+  };
+  push(locale === 'fi' ? item.nameEn : item.nameFi);
+  for (const a of item.aliases ?? []) push(a);
+  return out;
+}
+
+export function itemMatchesQuery(
+  item: SimplifiedCountItem,
+  query: string,
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const hay = [
+    item.nameEn,
+    item.nameFi,
+    ...(item.aliases ?? []),
+  ]
+    .join(' ')
+    .toLowerCase();
+  return hay.includes(q);
+}
+
+export function alsoKnownAsLabel(
+  item: SimplifiedCountItem,
+  locale: 'en' | 'fi',
+  alsoAsPrefix: string,
+): string | null {
+  const names = itemAlsoKnownAs(item, locale);
+  if (!names.length) return null;
+  return `${alsoAsPrefix} ${names.join(', ')}`;
 }

@@ -8,9 +8,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import type { SimplifiedCountItem } from '../data/simplifiedCountingSeed';
+import {
+  alsoKnownAsLabel,
+  itemMatchesQuery,
+} from '../data/simplifiedCountingSeed';
 import type { UnitCode } from '../data/types';
 import { UNIT_CODES } from '../data/units';
 import { useI18n } from '../i18n';
@@ -174,8 +179,18 @@ export function GamifiedCountingView({
   const [typing, setTyping] = useState(false);
   const [confettiKey, setConfettiKey] = useState(0);
   const [flashOk, setFlashOk] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const namePan = useRef(new Animated.Value(0)).current;
   const successScale = useRef(new Animated.Value(1)).current;
+
+  const searchHits = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return [] as { item: SimplifiedCountItem; index: number }[];
+    return items
+      .map((item, i) => ({ item, index: i }))
+      .filter(({ item }) => itemMatchesQuery(item, q))
+      .slice(0, 6);
+  }, [items, searchQuery]);
 
   useEffect(() => {
     if (!item) return;
@@ -183,6 +198,16 @@ export function GamifiedCountingView({
     setTyping(false);
     namePan.setValue(0);
   }, [item?.id, namePan]);
+
+  const jumpTo = useCallback(
+    (nextIndex: number) => {
+      commitDigits();
+      onIndexChange(nextIndex);
+      setSearchQuery('');
+    },
+    // commitDigits defined below — wire after
+    [onIndexChange],
+  );
 
   const commitDigits = useCallback((): number | null => {
     if (!item) return null;
@@ -579,8 +604,8 @@ const styles = StyleSheet.create({
   },
   displayText: {
     fontSize: 56,
-    fontWeight: '500',
-    color: colors.inkFaint,
+    fontWeight: '700',
+    color: colors.ink,
     letterSpacing: 1,
   },
   progress: {

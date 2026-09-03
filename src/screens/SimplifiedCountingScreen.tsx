@@ -8,13 +8,16 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GamifiedCountingView } from '../components/GamifiedCountingView';
 import {
+  alsoKnownAsLabel,
   categoryTotal,
+  itemMatchesQuery,
   lineTotal,
   PLACEHOLDER_BY_CATEGORY,
   SIMPLIFIED_CATEGORIES,
@@ -89,12 +92,25 @@ function cloneSeed(): Record<SimplifiedCategoryId, SimplifiedCountItem[]> {
 type CountRowProps = {
   item: SimplifiedCountItem;
   name: string;
+  alsoAs: string | null;
   selected: boolean;
   onSelect: () => void;
   onDelta: (delta: number) => void;
 };
 
-function CountRow({ item, name, selected, onSelect, onDelta }: CountRowProps) {
+function webTitleProps(title: string | null | undefined) {
+  if (Platform.OS !== 'web' || !title) return undefined;
+  return { title } as { title: string };
+}
+
+function CountRow({
+  item,
+  name,
+  alsoAs,
+  selected,
+  onSelect,
+  onDelta,
+}: CountRowProps) {
   const pan = useRef(new Animated.Value(0)).current;
   const flash = useRef(new Animated.Value(0)).current;
 
@@ -161,7 +177,12 @@ function CountRow({ item, name, selected, onSelect, onDelta }: CountRowProps) {
         style={[StyleSheet.absoluteFill, { backgroundColor: tint, borderRadius: radius.lg }]}
       />
       <Pressable onPress={onSelect} style={styles.rowInner}>
-        <Text style={[styles.colProduct, styles.cellText]} numberOfLines={2}>
+        <Text
+          style={[styles.colProduct, styles.cellText]}
+          numberOfLines={2}
+          accessibilityLabel={alsoAs ? `${name}. ${alsoAs}` : name}
+          {...webTitleProps(alsoAs)}
+        >
           {name}
         </Text>
         <Text
@@ -202,9 +223,15 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   const [calcDigits, setCalcDigits] = useState('');
   const [gameMode, setGameMode] = useState(false);
   const [gameIndex, setGameIndex] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const items =
     categoryId === 'stock_values' ? [] : (byCategory[categoryId] ?? []);
+
+  const filteredItems = useMemo(
+    () => items.filter((row) => itemMatchesQuery(row, searchQuery)),
+    [items, searchQuery],
+  );
 
   const selectedItem = useMemo(
     () => items.find((row) => row.id === selectedId) ?? null,
@@ -398,6 +425,22 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         </Pressable>
       </View>
 
+      {categoryId !== 'stock_values' ? (
+        <View style={styles.searchRow}>
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={t('simpCountSearchPlaceholder')}
+            placeholderTextColor={colors.inkFaint}
+            style={styles.searchInput}
+            autoCorrect={false}
+            autoCapitalize="none"
+            clearButtonMode="while-editing"
+            accessibilityLabel={t('simpCountSearchPlaceholder')}
+          />
+        </View>
+      ) : null}
+
       <View style={styles.banner}>
         <View style={styles.bannerWash} />
         <Text style={styles.bannerTitle}>{categoryLabel.toUpperCase()}</Text>
@@ -471,17 +514,27 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
                 <Text style={styles.emptyTitle}>{t('simpCountEmptyTitle')}</Text>
                 <Text style={styles.emptySub}>{t('simpCountEmptySub')}</Text>
               </View>
+            ) : filteredItems.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>{t('simpCountSearchEmpty')}</Text>
+                <Text style={styles.emptySub}>{t('simpCountSearchEmptySub')}</Text>
+              </View>
             ) : (
-              items.map((item) => (
-                <CountRow
-                  key={item.id}
-                  item={item}
-                  name={locale === 'fi' ? item.nameFi : item.nameEn}
-                  selected={selectedId === item.id}
-                  onSelect={() => setSelectedId(item.id)}
-                  onDelta={(d) => applyDelta(item.id, d)}
-                />
-              ))
+              filteredItems.map((item) => {
+                const name = locale === 'fi' ? item.nameFi : item.nameEn;
+                const alsoAs = alsoKnownAsLabel(item, locale, t('alsoAs'));
+                return (
+                  <CountRow
+                    key={item.id}
+                    item={item}
+                    name={name}
+                    alsoAs={alsoAs}
+                    selected={selectedId === item.id}
+                    onSelect={() => setSelectedId(item.id)}
+                    onDelta={(d) => applyDelta(item.id, d)}
+                  />
+                );
+              })
             )}
           </ScrollView>
         </>
@@ -771,7 +824,33 @@ const styles = StyleSheet.create({
   },
   categoryRow: {
     paddingHorizontal: spacing.md,
+    marginBottom: 10,
+  },
+  searchRow: {
+    paddingHorizontal: spacing.md,
     marginBottom: 12,
+  },
+  searchInput: {
+    backgroundColor: NEO_CARD,
+    borderRadius: radius.pill,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'web' ? 12 : 10,
+    fontSize: 15,
+    color: colors.ink,
+    ...Platform.select({
+      web: {
+        boxShadow:
+          '6px 6px 14px rgba(163, 177, 198, 0.45), -5px -5px 12px rgba(255,255,255,0.85)',
+        outlineStyle: 'none',
+      } as object,
+      default: {
+        shadowColor: '#9AA8B8',
+        shadowOffset: { width: 4, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        elevation: 3,
+      },
+    }),
   },
   categoryPill: {
     flexDirection: 'row',

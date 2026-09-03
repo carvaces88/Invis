@@ -593,6 +593,9 @@ export const fi: Messages = {
   simpCountGameProgress: '{n} / {total}',
   simpCountGameSwipeHint: 'Pyyhkäise oikealle → seuraava · vasemmalle ← edellinen',
   simpCountGameSuccess: 'Hienoa!',
+  simpCountSearchPlaceholder: 'Etsi tuotetta…',
+  simpCountSearchEmpty: 'Ei osumia',
+  simpCountSearchEmptySub: 'Kokeile toista nimeä tai “myös”-aliasta.',
 
   monthWrapUpOpen: 'Päätä kuukausi',
   monthWrapUpOpenSub: 'Kuukauden lopun inventaario · yhteenveto · Restolution-raportti',

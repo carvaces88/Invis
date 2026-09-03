@@ -598,6 +598,9 @@ export const en = {
   simpCountGameProgress: '{n} / {total}',
   simpCountGameSwipeHint: 'Swipe right → next · left ← previous',
   simpCountGameSuccess: 'Nice!',
+  simpCountSearchPlaceholder: 'Find an item…',
+  simpCountSearchEmpty: 'No matching items',
+  simpCountSearchEmptySub: 'Try another name or an “also known as” nickname.',
 
   monthWrapUpOpen: 'Finalize month',
   monthWrapUpOpenSub: 'End-of-month count · summary · Restolution report',
