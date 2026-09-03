@@ -1412,6 +1412,10 @@ const styles = StyleSheet.create({
   },
   productName: {
     flexShrink: 1,
+    fontSize: 15,
+    lineHeight: 19,
+    fontWeight: '800',
+    color: '#000000',
   },
   alsoAsLine: {
     marginTop: 2,
