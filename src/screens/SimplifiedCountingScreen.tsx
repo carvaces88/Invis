@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Animated,
-  Easing,
   Modal,
   PanResponder,
   Platform,
@@ -66,7 +65,6 @@ import { printHtmlOrSharePdf } from '../lib/export/download';
 import { analyzePriorStockListImages } from '../lib/vision';
 import { colors, radius, spacing } from '../theme/colors';
 import * as Print from 'expo-print';
-import type { SimplifiedItemCategoryId } from '../data/simplifiedCountingSeed';
 
 type ExtraProduct = {
   categoryId: SimplifiedItemCategoryId;
@@ -75,6 +73,20 @@ type ExtraProduct = {
 
 const LIST_SCAN_MAX_PHOTOS = 8;
 const HIDDEN_STORAGE_KEY = 'invis.simpCount.hiddenIds.v1';
+const EXTRAS_STORAGE_KEY = 'invis.simpCount.extraProducts.v1';
+const ADD_UNIT_CHOICES: UnitCode[] = [
+  'KG',
+  'L',
+  'KPL',
+  'PSS',
+  'PKT',
+  'PRK',
+  'PL',
+];
+
+type ProductEditorState =
+  | { mode: 'add' }
+  | { mode: 'edit'; itemId: string };
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SimplifiedCounting'>;
 
@@ -166,10 +178,13 @@ type CountRowProps = {
   recorded: boolean;
   recordedLabel: string;
   missingLabel: string;
-  editMode: boolean;
+  /** Long-press armed: reddish hue + hide/edit fabs (no wiggle). */
+  armed: boolean;
   hideLabel: string;
+  editDetailsLabel: string;
   onHide: () => void;
-  onLongPressEdit: () => void;
+  onEditDetails: () => void;
+  onLongPress: () => void;
   onSelect: () => void;
   onDelta: (delta: number) => void;
 };
@@ -191,50 +206,17 @@ function CountRow({
   recorded,
   recordedLabel,
   missingLabel,
-  editMode,
+  armed,
   hideLabel,
+  editDetailsLabel,
   onHide,
-  onLongPressEdit,
+  onEditDetails,
+  onLongPress,
   onSelect,
   onDelta,
 }: CountRowProps) {
   const pan = useRef(new Animated.Value(0)).current;
   const flash = useRef(new Animated.Value(0)).current;
-  const wobble = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (!editMode) {
-      wobble.setValue(0);
-      return;
-    }
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(wobble, {
-          toValue: 1,
-          duration: 160,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: false,
-        }),
-        Animated.timing(wobble, {
-          toValue: -1,
-          duration: 320,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: false,
-        }),
-        Animated.timing(wobble, {
-          toValue: 0,
-          duration: 160,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: false,
-        }),
-      ]),
-    );
-    anim.start();
-    return () => {
-      anim.stop();
-      wobble.setValue(0);
-    };
-  }, [editMode, wobble]);
 
   const bumpFlash = (dir: 1 | -1) => {
     flash.setValue(dir);
@@ -249,7 +231,7 @@ function CountRow({
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, g) =>
-          !editMode &&
+          !armed &&
           Math.abs(g.dx) > 10 &&
           Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
         onPanResponderGrant: () => onSelect(),
@@ -277,17 +259,12 @@ function CountRow({
           }).start();
         },
       }),
-    [editMode, onDelta, onSelect, pan],
+    [armed, onDelta, onSelect, pan],
   );
 
   const tint = flash.interpolate({
     inputRange: [-1, 0, 1],
     outputRange: ['rgba(180,35,24,0.12)', 'transparent', 'rgba(31,122,77,0.14)'],
-  });
-
-  const rotate = wobble.interpolate({
-    inputRange: [-1, 1],
-    outputRange: ['-0.55deg', '0.55deg'],
   });
 
   const total = lineTotal(item);
@@ -298,31 +275,43 @@ function CountRow({
       style={[
         styles.rowCard,
         selected && styles.rowCardSelected,
-        editMode && styles.rowCardEdit,
-        {
-          transform: [{ translateX: pan }, { rotate }],
-        },
+        armed && styles.rowCardEdit,
+        { transform: [{ translateX: pan }] },
       ]}
       {...panResponder.panHandlers}
     >
       <Animated.View
         pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { backgroundColor: tint, borderRadius: radius.lg }]}
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: tint, borderRadius: radius.lg },
+        ]}
       />
-      {editMode ? (
-        <Pressable
-          style={styles.hideFab}
-          onPress={onHide}
-          accessibilityRole="button"
-          accessibilityLabel={hideLabel}
-          hitSlop={8}
-        >
-          <Text style={styles.hideFabGlyph}>−</Text>
-        </Pressable>
+      {armed ? (
+        <View style={styles.rowActionFabs} pointerEvents="box-none">
+          <Pressable
+            style={styles.hideFab}
+            onPress={onHide}
+            accessibilityRole="button"
+            accessibilityLabel={hideLabel}
+            hitSlop={8}
+          >
+            <Text style={styles.hideFabGlyph}>−</Text>
+          </Pressable>
+          <Pressable
+            style={styles.editFab}
+            onPress={onEditDetails}
+            accessibilityRole="button"
+            accessibilityLabel={editDetailsLabel}
+            hitSlop={8}
+          >
+            <Text style={styles.editFabGlyph}>✎</Text>
+          </Pressable>
+        </View>
       ) : null}
       <Pressable
         onPress={onSelect}
-        onLongPress={onLongPressEdit}
+        onLongPress={onLongPress}
         delayLongPress={420}
         style={styles.rowInner}
       >
@@ -414,6 +403,19 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   );
   const [priceHistoryMonthKey, setPriceHistoryMonthKey] = useState('');
   const [editMode, setEditMode] = useState(false);
+  const [armedItemId, setArmedItemId] = useState<string | null>(null);
+  const [productEditor, setProductEditor] = useState<ProductEditorState | null>(
+    null,
+  );
+  const [editNameEn, setEditNameEn] = useState('');
+  const [editNameFi, setEditNameFi] = useState('');
+  const [editUnit, setEditUnit] = useState<UnitCode>('KPL');
+  const [editPrice, setEditPrice] = useState('');
+  const [editCategoryId, setEditCategoryId] =
+    useState<SimplifiedItemCategoryId>('dairy');
+  const [editAliases, setEditAliases] = useState('');
+  const [extras, setExtras] = useState<ExtraProduct[]>([]);
+  const [extrasHydrated, setExtrasHydrated] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [hiddenSheetOpen, setHiddenSheetOpen] = useState(false);
   const [hiddenHydrated, setHiddenHydrated] = useState(false);
@@ -424,16 +426,40 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
     let alive = true;
     void (async () => {
       try {
-        const raw = await AsyncStorage.getItem(HIDDEN_STORAGE_KEY);
-        if (!alive || !raw) return;
-        const parsed = JSON.parse(raw) as unknown;
-        if (Array.isArray(parsed)) {
-          setHiddenIds(parsed.filter((x): x is string => typeof x === 'string'));
+        const [hiddenRaw, extrasRaw] = await Promise.all([
+          AsyncStorage.getItem(HIDDEN_STORAGE_KEY),
+          AsyncStorage.getItem(EXTRAS_STORAGE_KEY),
+        ]);
+        if (!alive) return;
+        if (hiddenRaw) {
+          const parsed = JSON.parse(hiddenRaw) as unknown;
+          if (Array.isArray(parsed)) {
+            setHiddenIds(
+              parsed.filter((x): x is string => typeof x === 'string'),
+            );
+          }
+        }
+        if (extrasRaw) {
+          const parsed = JSON.parse(extrasRaw) as unknown;
+          if (Array.isArray(parsed)) {
+            const cleaned = parsed.filter(
+              (row): row is ExtraProduct =>
+                !!row &&
+                typeof row === 'object' &&
+                typeof (row as ExtraProduct).categoryId === 'string' &&
+                !!(row as ExtraProduct).item?.id,
+            );
+            setExtras(cleaned);
+            setByCategory(cloneSeed(cleaned));
+          }
         }
       } catch {
         /* ignore */
       } finally {
-        if (alive) setHiddenHydrated(true);
+        if (alive) {
+          setHiddenHydrated(true);
+          setExtrasHydrated(true);
+        }
       }
     })();
     return () => {
@@ -448,6 +474,14 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
       JSON.stringify(hiddenIds),
     ).catch(() => {});
   }, [hiddenIds, hiddenHydrated]);
+
+  useEffect(() => {
+    if (!extrasHydrated) return;
+    void AsyncStorage.setItem(
+      EXTRAS_STORAGE_KEY,
+      JSON.stringify(extras),
+    ).catch(() => {});
+  }, [extras, extrasHydrated]);
 
   const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
 
@@ -755,15 +789,153 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   const hideItem = useCallback((id: string) => {
     setHiddenIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
     setSelectedId((cur) => (cur === id ? null : cur));
+    setArmedItemId((cur) => (cur === id ? null : cur));
   }, []);
 
   const unhideItem = useCallback((id: string) => {
     setHiddenIds((prev) => prev.filter((x) => x !== id));
   }, []);
 
+  const openProductEditor = useCallback(
+    (state: ProductEditorState) => {
+      if (state.mode === 'add') {
+        const fallbackCat: SimplifiedItemCategoryId =
+          isItemCategoryId(categoryId) ? categoryId : 'other';
+        setEditCategoryId(fallbackCat);
+        setEditNameEn('');
+        setEditNameFi('');
+        setEditUnit('KPL');
+        setEditPrice('');
+        setEditAliases('');
+        setProductEditor(state);
+        setEditMode(true);
+        setArmedItemId(null);
+        return;
+      }
+      const home = findItemCategory(byCategory, state.itemId);
+      const item =
+        flattenAllItems(byCategory).find((r) => r.id === state.itemId) ?? null;
+      if (!item || !home) return;
+      setEditCategoryId(home);
+      setEditNameEn(item.nameEn);
+      setEditNameFi(item.nameFi);
+      setEditUnit(item.unit);
+      setEditPrice(
+        item.unitPriceAlv0 > 0 ? formatMoney(item.unitPriceAlv0) : '',
+      );
+      setEditAliases((item.aliases ?? []).join(', '));
+      setSelectedId(item.id);
+      setProductEditor(state);
+      setEditMode(true);
+      setArmedItemId(null);
+    },
+    [byCategory, categoryId],
+  );
+
+  const saveProductEditor = useCallback(() => {
+    if (!productEditor) return;
+    const nameEn = editNameEn.trim();
+    const nameFi = editNameFi.trim() || nameEn;
+    if (!nameEn && !nameFi) {
+      alertInfo(t('simpCountAddProduct'), t('simpCountAddNeedName'));
+      return;
+    }
+    const priceRaw = editPrice.trim().replace(',', '.');
+    const price =
+      priceRaw === '' ? 0 : Math.max(0, Math.round(Number(priceRaw) * 100) / 100);
+    if (!Number.isFinite(price)) {
+      alertInfo(t('simpCountAddProduct'), t('simpCountAddNeedPrice'));
+      return;
+    }
+    const aliases = editAliases
+      .split(',')
+      .map((a) => a.trim())
+      .filter(Boolean);
+
+    if (productEditor.mode === 'add') {
+      const item: SimplifiedCountItem = {
+        id: slugId(nameEn || nameFi),
+        nameEn: nameEn || nameFi,
+        nameFi: nameFi || nameEn,
+        quantity: 0,
+        unit: editUnit,
+        unitPriceAlv0: price,
+        aliases: aliases.length ? aliases : undefined,
+      };
+      const extra: ExtraProduct = {
+        categoryId: editCategoryId,
+        item,
+      };
+      setExtras((prev) => [...prev, extra]);
+      setByCategory((prev) => ({
+        ...prev,
+        [editCategoryId]: [...(prev[editCategoryId] ?? []), item],
+      }));
+      setSelectedId(item.id);
+      setCategoryId(editCategoryId);
+      setProductEditor(null);
+      return;
+    }
+
+    const id = productEditor.itemId;
+    const home = findItemCategory(byCategory, id);
+    if (!home) return;
+    const updated: SimplifiedCountItem = {
+      id,
+      nameEn: nameEn || nameFi,
+      nameFi: nameFi || nameEn,
+      quantity:
+        flattenAllItems(byCategory).find((r) => r.id === id)?.quantity ?? 0,
+      unit: editUnit,
+      unitPriceAlv0: price,
+      aliases: aliases.length ? aliases : undefined,
+    };
+
+    if (home === editCategoryId) {
+      setByCategory((prev) => ({
+        ...prev,
+        [home]: (prev[home] ?? []).map((row) =>
+          row.id === id ? updated : row,
+        ),
+      }));
+    } else {
+      setByCategory((prev) => ({
+        ...prev,
+        [home]: (prev[home] ?? []).filter((row) => row.id !== id),
+        [editCategoryId]: [...(prev[editCategoryId] ?? []), updated],
+      }));
+    }
+
+    setExtras((prev) => {
+      const without = prev.filter((e) => e.item.id !== id);
+      if (id.startsWith('custom-') || prev.some((e) => e.item.id === id)) {
+        return [...without, { categoryId: editCategoryId, item: updated }];
+      }
+      return without;
+    });
+    setSelectedId(id);
+    setProductEditor(null);
+  }, [
+    byCategory,
+    editAliases,
+    editCategoryId,
+    editNameEn,
+    editNameFi,
+    editPrice,
+    editUnit,
+    productEditor,
+    t,
+  ]);
+
   const toggleEditMode = () => {
     if (isOverview) return;
-    setEditMode((v) => !v);
+    setEditMode((v) => {
+      if (v) {
+        setProductEditor(null);
+        setArmedItemId(null);
+      }
+      return !v;
+    });
   };
 
   if (gameMode) {
@@ -902,6 +1074,33 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         </Text>
       </View>
 
+      {editMode && !isOverview ? (
+        <View style={styles.editBar}>
+          <Pressable
+            style={styles.editBarBtn}
+            onPress={() => openProductEditor({ mode: 'add' })}
+            accessibilityRole="button"
+          >
+            <Text style={styles.editBarBtnText}>
+              {t('simpCountAddProduct')}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={styles.editBarBtnDone}
+            onPress={() => {
+              setEditMode(false);
+              setProductEditor(null);
+              setArmedItemId(null);
+            }}
+            accessibilityRole="button"
+          >
+            <Text style={styles.editBarBtnDoneText}>
+              {t('simpCountEditDone')}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       {categoryId === 'stock_values' ? (
         <ScrollView
           style={styles.list}
@@ -1018,10 +1217,13 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
                     missingLabel={t('simpCountStatusMissing')}
                     editMode={editMode}
                     hideLabel={t('simpCountHideProduct')}
+                    editDetailsLabel={t('simpCountEditDetails')}
                     onHide={() => hideItem(item.id)}
+                    onEditDetails={() =>
+                      openProductEditor({ mode: 'edit', itemId: item.id })
+                    }
                     onLongPressEdit={() => {
-                      setSelectedId(item.id);
-                      setEditMode(true);
+                      openProductEditor({ mode: 'edit', itemId: item.id });
                     }}
                     onSelect={() => setSelectedId(item.id)}
                     onDelta={(d) => applyDelta(item.id, d)}
@@ -1512,6 +1714,144 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
             >
               <Text style={styles.sheetRowMuted}>{t('simpCountAddCancel')}</Text>
             </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal
+        visible={productEditor !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setProductEditor(null)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setProductEditor(null)}
+        >
+          <Pressable
+            style={[styles.sheet, styles.productEditorSheet]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.sheetTitle}>
+              {productEditor?.mode === 'edit'
+                ? t('simpCountEditDetails')
+                : t('simpCountAddProduct')}
+            </Text>
+            <Text style={styles.sheetSub}>{t('simpCountEditPopupSub')}</Text>
+            <ScrollView
+              style={{ maxHeight: 420 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.editFieldLabel}>{t('simpCountAddName')}</Text>
+              <TextInput
+                value={editNameEn}
+                onChangeText={setEditNameEn}
+                style={styles.editFieldInput}
+                placeholder={t('simpCountAddName')}
+                placeholderTextColor={colors.inkFaint}
+              />
+              <Text style={styles.editFieldLabel}>
+                {t('simpCountAddNameFi')}
+              </Text>
+              <TextInput
+                value={editNameFi}
+                onChangeText={setEditNameFi}
+                style={styles.editFieldInput}
+                placeholder={t('simpCountAddNameFi')}
+                placeholderTextColor={colors.inkFaint}
+              />
+              <Text style={styles.editFieldLabel}>
+                {t('simpCountAddCategory')}
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.editChipRow}
+              >
+                {ITEM_CATEGORY_IDS.map((cid) => {
+                  const meta = SIMPLIFIED_CATEGORIES.find((c) => c.id === cid);
+                  const on = editCategoryId === cid;
+                  return (
+                    <Pressable
+                      key={cid}
+                      style={[styles.editChip, on && styles.editChipOn]}
+                      onPress={() => setEditCategoryId(cid)}
+                    >
+                      <Text
+                        style={[
+                          styles.editChipText,
+                          on && styles.editChipTextOn,
+                        ]}
+                      >
+                        {t(meta?.labelKey ?? 'simpCountCatOther')}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+              <Text style={styles.editFieldLabel}>{t('simpCountAddUnit')}</Text>
+              <View style={styles.editChipRow}>
+                {ADD_UNIT_CHOICES.map((u) => {
+                  const on = editUnit === u;
+                  return (
+                    <Pressable
+                      key={u}
+                      style={[styles.editChip, on && styles.editChipOn]}
+                      onPress={() => setEditUnit(u)}
+                    >
+                      <Text
+                        style={[
+                          styles.editChipText,
+                          on && styles.editChipTextOn,
+                        ]}
+                      >
+                        {u}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.editFieldLabel}>
+                {t('simpCountAddPrice')}
+              </Text>
+              <TextInput
+                value={editPrice}
+                onChangeText={setEditPrice}
+                style={styles.editFieldInput}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor={colors.inkFaint}
+              />
+              <Text style={styles.editFieldLabel}>
+                {t('simpCountAddAliases')}
+              </Text>
+              <TextInput
+                value={editAliases}
+                onChangeText={setEditAliases}
+                style={styles.editFieldInput}
+                placeholder={t('simpCountAddAliasesPh')}
+                placeholderTextColor={colors.inkFaint}
+              />
+            </ScrollView>
+            <View style={styles.editPopupActions}>
+              <Pressable
+                style={styles.editPopupCancel}
+                onPress={() => setProductEditor(null)}
+              >
+                <Text style={styles.sheetRowMuted}>
+                  {t('simpCountAddCancel')}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={styles.editPopupSave}
+                onPress={saveProductEditor}
+              >
+                <Text style={styles.editPopupSaveText}>
+                  {productEditor?.mode === 'edit'
+                    ? t('simpCountEditSave')
+                    : t('simpCountAddSave')}
+                </Text>
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>

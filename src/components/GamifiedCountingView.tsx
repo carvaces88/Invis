@@ -450,9 +450,6 @@ export function GamifiedCountingView({
             </Text>
             <Text style={styles.displayText}>{display}</Text>
           </View>
-          {flashOk ? (
-            <Text style={styles.successLabel}>{t('simpCountGameSuccess')}</Text>
-          ) : null}
         </Animated.View>
 
         <View style={styles.pad}>
