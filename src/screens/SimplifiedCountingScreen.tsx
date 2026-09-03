@@ -197,9 +197,16 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
     DAIRY_FIRST_ID,
   );
   const [picker, setPicker] = useState<'month' | 'category' | null>(null);
+  const [calcOpen, setCalcOpen] = useState(false);
+  const [calcDigits, setCalcDigits] = useState('');
 
   const items =
     categoryId === 'stock_values' ? [] : (byCategory[categoryId] ?? []);
+
+  const selectedItem = useMemo(
+    () => items.find((row) => row.id === selectedId) ?? null,
+    [items, selectedId],
+  );
 
   const total = useMemo(() => {
     if (categoryId === 'stock_values') {
@@ -235,9 +242,58 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
     [categoryId],
   );
 
+  const setQuantity = useCallback(
+    (id: string, quantity: number) => {
+      if (categoryId === 'stock_values') return;
+      const next = Math.max(0, Math.round(quantity * 100) / 100);
+      setByCategory((prev) => {
+        const list = prev[categoryId] ?? [];
+        return {
+          ...prev,
+          [categoryId]: list.map((row) =>
+            row.id === id ? { ...row, quantity: next } : row,
+          ),
+        };
+      });
+      setSelectedId(id);
+    },
+    [categoryId],
+  );
+
   const nudgeSelected = (delta: number) => {
     if (!selectedId || categoryId === 'stock_values') return;
     applyDelta(selectedId, delta);
+  };
+
+  const openCalculator = () => {
+    if (!selectedItem || categoryId === 'stock_values') return;
+    setCalcDigits(
+      selectedItem.quantity > 0 ? formatQty(selectedItem.quantity) : '',
+    );
+    setCalcOpen(true);
+  };
+
+  const pushCalcKey = (key: string) => {
+    setCalcDigits((prev) => {
+      if (key === 'C') return '';
+      if (key === '⌫') return prev.slice(0, -1);
+      if (key === '.') {
+        if (prev.includes('.')) return prev;
+        return prev === '' ? '0.' : `${prev}.`;
+      }
+      if (prev === '0' && key !== '.') return key;
+      if (prev.replace('.', '').length >= 8) return prev;
+      return `${prev}${key}`;
+    });
+  };
+
+  const applyCalculator = () => {
+    if (!selectedId) return;
+    const raw = calcDigits.trim().replace(',', '.');
+    const n = raw === '' || raw === '.' ? 0 : Number(raw);
+    if (!Number.isFinite(n) || n < 0) return;
+    setQuantity(selectedId, n);
+    setCalcOpen(false);
   };
 
   const stockOverview = useMemo(() => {
@@ -387,15 +443,6 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         ]}
       >
         <Pressable
-          style={styles.dockAccent}
-          onPress={() => nudgeSelected(1)}
-          accessibilityRole="button"
-          accessibilityLabel={t('simpCountPlus')}
-        >
-          <Text style={styles.dockAccentGlyph}>+</Text>
-        </Pressable>
-
-        <Pressable
           style={styles.dockIcon}
           onPress={() => setPicker('category')}
           accessibilityRole="button"
@@ -421,12 +468,18 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         </Pressable>
 
         <Pressable
-          style={styles.dockAccent}
-          onPress={() => nudgeSelected(-1)}
+          style={[
+            styles.dockCalc,
+            (!selectedItem || categoryId === 'stock_values') &&
+              styles.dockCalcDisabled,
+          ]}
+          onPress={openCalculator}
+          disabled={!selectedItem || categoryId === 'stock_values'}
           accessibilityRole="button"
-          accessibilityLabel={t('simpCountMinus')}
+          accessibilityLabel={t('simpCountCalculator')}
         >
-          <Text style={styles.dockAccentGlyph}>−</Text>
+          <Text style={styles.dockCalcGlyph}>123</Text>
+          <Text style={styles.dockCalcLabel}>{t('simpCountCalculator')}</Text>
         </Pressable>
       </View>
 
@@ -491,6 +544,84 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
                     </Pressable>
                   ))}
             </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={calcOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCalcOpen(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setCalcOpen(false)}
+        >
+          <Pressable
+            style={styles.calcSheet}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.sheetTitle}>{t('simpCountCalculator')}</Text>
+            <Text style={styles.calcProduct} numberOfLines={2}>
+              {selectedItem
+                ? locale === 'fi'
+                  ? selectedItem.nameFi
+                  : selectedItem.nameEn
+                : '—'}
+            </Text>
+            <View style={styles.calcDisplay}>
+              <Text style={styles.calcDisplayText}>
+                {calcDigits === '' ? '0' : calcDigits}
+              </Text>
+              <Text style={styles.calcUnit}>
+                {selectedItem?.unit ?? ''}
+              </Text>
+            </View>
+            <View style={styles.calcPad}>
+              {(
+                [
+                  ['7', '8', '9'],
+                  ['4', '5', '6'],
+                  ['1', '2', '3'],
+                  ['C', '0', '.'],
+                ] as const
+              ).map((row) => (
+                <View key={row.join('-')} style={styles.calcPadRow}>
+                  {row.map((key) => (
+                    <Pressable
+                      key={key}
+                      style={styles.calcKey}
+                      onPress={() => pushCalcKey(key)}
+                      accessibilityRole="button"
+                      accessibilityLabel={key}
+                    >
+                      <Text style={styles.calcKeyText}>{key}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ))}
+              <View style={styles.calcPadRow}>
+                <Pressable
+                  style={styles.calcKey}
+                  onPress={() => pushCalcKey('⌫')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('simpCountCalcBackspace')}
+                >
+                  <Text style={styles.calcKeyText}>⌫</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.calcKey, styles.calcApply]}
+                  onPress={applyCalculator}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('simpCountCalcApply')}
+                >
+                  <Text style={styles.calcApplyText}>
+                    {t('simpCountCalcApply')}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -729,27 +860,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: spacing.md,
     paddingTop: 12,
     backgroundColor: NEO_BG,
-    gap: 10,
-  },
-  dockAccent: {
-    width: 64,
-    height: 56,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: GRADIENT_TEAL,
-    overflow: 'hidden',
-    ...neoShadow,
-  },
-  dockAccentGlyph: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: colors.ink,
-    marginTop: -2,
+    gap: 12,
   },
   dockIcon: {
     width: 44,
@@ -767,6 +882,97 @@ const styles = StyleSheet.create({
   dockPlus5: {
     fontSize: 15,
     fontWeight: '700',
+    color: colors.ink,
+  },
+  dockCalc: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 132,
+    height: 52,
+    paddingHorizontal: 16,
+    borderRadius: radius.lg,
+    backgroundColor: GRADIENT_TEAL,
+    ...neoShadow,
+  },
+  dockCalcDisabled: {
+    opacity: 0.45,
+  },
+  dockCalcGlyph: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.ink,
+    letterSpacing: 0.4,
+  },
+  dockCalcLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  calcSheet: {
+    backgroundColor: NEO_CARD,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  calcProduct: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.inkMuted,
+    marginBottom: 10,
+  },
+  calcDisplay: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'flex-end',
+    gap: 8,
+    backgroundColor: NEO_BG,
+    borderRadius: radius.lg,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 14,
+    ...neoShadow,
+  },
+  calcDisplayText: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: colors.ink,
+    letterSpacing: 0.5,
+  },
+  calcUnit: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.inkMuted,
+  },
+  calcPad: {
+    gap: 10,
+  },
+  calcPadRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  calcKey: {
+    flex: 1,
+    height: 52,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: NEO_BG,
+    ...neoShadow,
+  },
+  calcKeyText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  calcApply: {
+    flex: 2,
+    backgroundColor: GRADIENT_TEAL,
+  },
+  calcApplyText: {
+    fontSize: 16,
+    fontWeight: '800',
     color: colors.ink,
   },
   modalBackdrop: {

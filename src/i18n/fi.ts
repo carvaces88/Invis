@@ -577,9 +577,10 @@ export const fi: Messages = {
   simpCountEmptyTitle: 'Ei tuotteita tässä kategoriassa vielä',
   simpCountEmptySub: 'Maitotuotteet on esitäytetty elokuun listasta. Muut kategoriat tulevat seuraavaksi.',
   simpCountItemsCount: '{count} tuotetta',
-  simpCountPlus: 'Lisää 1 valittuun',
   simpCountPlus5: 'Lisää 5 valittuun',
-  simpCountMinus: 'Vähennä 1 valitusta',
+  simpCountCalculator: 'Laskin',
+  simpCountCalcApply: 'Aseta määrä',
+  simpCountCalcBackspace: 'Poista merkki',
   simpCountReset: 'Nollaa luonnosmäärät',
 
   monthWrapUpOpen: 'Päätä kuukausi',
