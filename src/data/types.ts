@@ -427,6 +427,8 @@ export type RootStackParamList = {
   ProductDetail: { productId: string };
   /** Compare inventory 0% ALV vs competitor / distributor shelf prices */
   PriceComparison: undefined;
+  /** Draft: minimal swipe ±1 counting by category sheet */
+  SimplifiedCounting: undefined;
   /** Swipe-verify counted amounts (boxes vs pieces, etc.) */
   VerifyAmounts:
     | {

@@ -42,6 +42,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
       UnitsGuide: 'units',
       ProductDetail: 'catalog/:productId',
       PriceComparison: 'prices',
+      SimplifiedCounting: 'simplified-counting',
       Places: 'places',
       Feedback: 'feedback',
       AdminDeck: 'admin',

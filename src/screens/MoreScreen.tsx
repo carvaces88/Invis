@@ -86,6 +86,11 @@ export function MoreScreen() {
       route: 'InventoryPhotos' as const,
     },
     {
+      title: t('simpCountOpen'),
+      subtitle: t('simpCountOpenSub'),
+      route: 'SimplifiedCounting' as const,
+    },
+    {
       title: t('monthWrapUpOpen'),
       subtitle: t('monthWrapUpOpenSub'),
       route: 'MonthWrapUp' as const,
@@ -146,6 +151,7 @@ export function MoreScreen() {
         <Text style={styles.cardTitle}>{t('homeInventoryValue')}</Text>
         <Text style={styles.cardSub}>{t('moreInventoryValueSub')}</Text>
       </Pressable>
+
 
       <Pressable
         style={({ pressed }) => [styles.card, pressed && styles.pressed]}

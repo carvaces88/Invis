@@ -46,6 +46,7 @@ import { ReportsChatScreen } from './src/screens/ReportsChatScreen';
 import { ScanScreen } from './src/screens/ScanScreen';
 import { SheetImportReviewScreen } from './src/screens/SheetImportReviewScreen';
 import { SheetImportScanScreen } from './src/screens/SheetImportScanScreen';
+import { SimplifiedCountingScreen } from './src/screens/SimplifiedCountingScreen';
 import { InventoryPhotosScreen } from './src/screens/InventoryPhotosScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { UnitsGuideScreen } from './src/screens/UnitsGuideScreen';
@@ -443,6 +444,14 @@ function RootNavigator() {
             title: t('priceCompareTitle'),
             headerTintColor: colors.primary,
             headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="SimplifiedCounting"
+          component={SimplifiedCountingScreen}
+          options={{
+            title: t('simpCountOpen'),
+            headerShown: false,
           }}
         />
         <Stack.Screen
