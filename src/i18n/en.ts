@@ -614,6 +614,12 @@ export const en = {
   simpCountSearchEmptySub: 'Try another name or an “also known as” nickname.',
   simpCountSortAlpha: 'Sort A–Z',
   simpCountSortSheet: 'Sheet order',
+  simpCountStatusRecorded: 'Value recorded',
+  simpCountStatusMissing: 'Missing value',
+  simpCountMissingOnly: 'Show only missing values',
+  simpCountMissingToggle: '! {count}',
+  simpCountMissingEmptyTitle: 'All items have a value',
+  simpCountMissingEmptySub: 'Turn off the missing filter to see the full list again.',
 
   monthWrapUpOpen: 'Finalize month',
   monthWrapUpOpenSub: 'End-of-month count · summary · Restolution report',

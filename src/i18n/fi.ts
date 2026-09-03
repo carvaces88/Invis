@@ -609,6 +609,12 @@ export const fi: Messages = {
   simpCountSearchEmptySub: 'Kokeile toista nimeä tai “myös”-aliasta.',
   simpCountSortAlpha: 'Järjestä A–Ö',
   simpCountSortSheet: 'Listan järjestys',
+  simpCountStatusRecorded: 'Arvo kirjattu',
+  simpCountStatusMissing: 'Arvo puuttuu',
+  simpCountMissingOnly: 'Näytä vain puuttuvat',
+  simpCountMissingToggle: '! {count}',
+  simpCountMissingEmptyTitle: 'Kaikilla on arvo',
+  simpCountMissingEmptySub: 'Poista puuttuvat-suodatin nähdäksesi koko listan.',
 
   monthWrapUpOpen: 'Päätä kuukausi',
   monthWrapUpOpenSub: 'Kuukauden lopun inventaario · yhteenveto · Restolution-raportti',

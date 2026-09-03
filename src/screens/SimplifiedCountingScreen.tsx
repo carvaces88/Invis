@@ -95,9 +95,16 @@ type CountRowProps = {
   name: string;
   alsoAs: string | null;
   selected: boolean;
+  recorded: boolean;
+  recordedLabel: string;
+  missingLabel: string;
   onSelect: () => void;
   onDelta: (delta: number) => void;
 };
+
+function hasRecordedValue(item: SimplifiedCountItem): boolean {
+  return item.quantity > 0;
+}
 
 function webTitleProps(title: string | null | undefined) {
   if (Platform.OS !== 'web' || !title) return undefined;
@@ -109,6 +116,9 @@ function CountRow({
   name,
   alsoAs,
   selected,
+  recorded,
+  recordedLabel,
+  missingLabel,
   onSelect,
   onDelta,
 }: CountRowProps) {
@@ -163,6 +173,7 @@ function CountRow({
   });
 
   const total = lineTotal(item);
+  const statusLabel = recorded ? recordedLabel : missingLabel;
 
   return (
     <Animated.View
@@ -178,19 +189,36 @@ function CountRow({
         style={[StyleSheet.absoluteFill, { backgroundColor: tint, borderRadius: radius.lg }]}
       />
       <Pressable onPress={onSelect} style={styles.rowInner}>
-        <Text
-          style={[styles.colProduct, styles.cellText]}
-          numberOfLines={2}
-          accessibilityLabel={alsoAs ? `${name}. ${alsoAs}` : name}
-          {...webTitleProps(alsoAs)}
-        >
-          {name}
-        </Text>
+        <View style={styles.colProduct}>
+          <View style={styles.productNameRow}>
+            <Text
+              style={[
+                styles.statusMark,
+                recorded ? styles.statusMarkOk : styles.statusMarkMissing,
+              ]}
+              accessibilityLabel={statusLabel}
+            >
+              {recorded ? '✓' : '!'}
+            </Text>
+            <Text
+              style={[styles.cellText, styles.productName]}
+              numberOfLines={2}
+              accessibilityLabel={
+                alsoAs
+                  ? `${name}. ${alsoAs}. ${statusLabel}`
+                  : `${name}. ${statusLabel}`
+              }
+              {...webTitleProps(alsoAs)}
+            >
+              {name}
+            </Text>
+          </View>
+        </View>
         <Text
           style={[
             styles.colQty,
             styles.cellText,
-            item.quantity === 0 && styles.colQtyZero,
+            !recorded && styles.colQtyZero,
           ]}
         >
           {formatQty(item.quantity)}
@@ -226,12 +254,16 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   const [gameIndex, setGameIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortAlpha, setSortAlpha] = useState(false);
+  const [missingOnly, setMissingOnly] = useState(false);
 
   const items =
     categoryId === 'stock_values' ? [] : (byCategory[categoryId] ?? []);
 
   const filteredItems = useMemo(() => {
-    const filtered = items.filter((row) => itemMatchesQuery(row, searchQuery));
+    let filtered = items.filter((row) => itemMatchesQuery(row, searchQuery));
+    if (missingOnly) {
+      filtered = filtered.filter((row) => !hasRecordedValue(row));
+    }
     if (!sortAlpha) return filtered;
     const collator = new Intl.Collator(locale === 'fi' ? 'fi' : 'en', {
       sensitivity: 'base',
@@ -242,7 +274,12 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
       const nb = locale === 'fi' ? b.nameFi : b.nameEn;
       return collator.compare(na, nb);
     });
-  }, [items, searchQuery, sortAlpha, locale]);
+  }, [items, searchQuery, sortAlpha, locale, missingOnly]);
+
+  const missingCount = useMemo(
+    () => items.filter((row) => !hasRecordedValue(row)).length,
+    [items],
+  );
 
   const selectedItem = useMemo(
     () => items.find((row) => row.id === selectedId) ?? null,
@@ -457,6 +494,25 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
               A–Z
             </Text>
           </Pressable>
+          <Pressable
+            style={[styles.sortPill, missingOnly && styles.missingPillOn]}
+            onPress={() => setMissingOnly((v) => !v)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: missingOnly }}
+            accessibilityLabel={t('simpCountMissingOnly')}
+          >
+            <Text
+              style={[
+                styles.sortPillText,
+                missingOnly && styles.sortPillTextOn,
+              ]}
+            >
+              {t('simpCountMissingToggle').replace(
+                '{count}',
+                String(missingCount),
+              )}
+            </Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -536,13 +592,22 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
               </View>
             ) : filteredItems.length === 0 ? (
               <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>{t('simpCountSearchEmpty')}</Text>
-                <Text style={styles.emptySub}>{t('simpCountSearchEmptySub')}</Text>
+                <Text style={styles.emptyTitle}>
+                  {missingOnly
+                    ? t('simpCountMissingEmptyTitle')
+                    : t('simpCountSearchEmpty')}
+                </Text>
+                <Text style={styles.emptySub}>
+                  {missingOnly
+                    ? t('simpCountMissingEmptySub')
+                    : t('simpCountSearchEmptySub')}
+                </Text>
               </View>
             ) : (
               filteredItems.map((item) => {
                 const name = locale === 'fi' ? item.nameFi : item.nameEn;
                 const alsoAs = alsoKnownAsLabel(item, locale, t('alsoAs'));
+                const recorded = hasRecordedValue(item);
                 return (
                   <CountRow
                     key={item.id}
@@ -550,6 +615,9 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
                     name={name}
                     alsoAs={alsoAs}
                     selected={selectedId === item.id}
+                    recorded={recorded}
+                    recordedLabel={t('simpCountStatusRecorded')}
+                    missingLabel={t('simpCountStatusMissing')}
                     onSelect={() => setSelectedId(item.id)}
                     onDelta={(d) => applyDelta(item.id, d)}
                   />
@@ -896,6 +964,9 @@ const styles = StyleSheet.create({
   sortPillOn: {
     backgroundColor: 'rgba(184,232,216,0.85)',
   },
+  missingPillOn: {
+    backgroundColor: 'rgba(245,198,208,0.9)',
+  },
   sortPillText: {
     fontSize: 13,
     fontWeight: '800',
@@ -904,6 +975,28 @@ const styles = StyleSheet.create({
   },
   sortPillTextOn: {
     color: colors.ink,
+  },
+  productNameRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  productName: {
+    flex: 1,
+    minWidth: 0,
+  },
+  statusMark: {
+    marginTop: 1,
+    width: 16,
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  statusMarkOk: {
+    color: colors.success,
+  },
+  statusMarkMissing: {
+    color: colors.warning,
   },
   categoryPill: {
     flexDirection: 'row',
