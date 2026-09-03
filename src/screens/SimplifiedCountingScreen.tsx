@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GamifiedCountingView } from '../components/GamifiedCountingView';
 import {
   categoryTotal,
   lineTotal,
@@ -20,7 +21,7 @@ import {
   type SimplifiedCategoryId,
   type SimplifiedCountItem,
 } from '../data/simplifiedCountingSeed';
-import type { RootStackParamList } from '../data/types';
+import type { RootStackParamList, UnitCode } from '../data/types';
 import { useI18n } from '../i18n';
 import { colors, radius, spacing } from '../theme/colors';
 
@@ -199,6 +200,8 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   const [picker, setPicker] = useState<'month' | 'category' | null>(null);
   const [calcOpen, setCalcOpen] = useState(false);
   const [calcDigits, setCalcDigits] = useState('');
+  const [gameMode, setGameMode] = useState(false);
+  const [gameIndex, setGameIndex] = useState(0);
 
   const items =
     categoryId === 'stock_values' ? [] : (byCategory[categoryId] ?? []);
@@ -260,6 +263,35 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
     [categoryId],
   );
 
+  const setUnit = useCallback(
+    (id: string, unit: UnitCode) => {
+      if (categoryId === 'stock_values') return;
+      setByCategory((prev) => {
+        const list = prev[categoryId] ?? [];
+        return {
+          ...prev,
+          [categoryId]: list.map((row) =>
+            row.id === id ? { ...row, unit } : row,
+          ),
+        };
+      });
+      setSelectedId(id);
+    },
+    [categoryId],
+  );
+
+  const enterGameMode = () => {
+    if (items.length === 0 || categoryId === 'stock_values') return;
+    const start = selectedId
+      ? Math.max(
+          0,
+          items.findIndex((row) => row.id === selectedId),
+        )
+      : 0;
+    setGameIndex(start === -1 ? 0 : start);
+    setGameMode(true);
+  };
+
   const nudgeSelected = (delta: number) => {
     if (!selectedId || categoryId === 'stock_values') return;
     applyDelta(selectedId, delta);
@@ -306,6 +338,25 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
       }),
     );
   }, [byCategory, t]);
+
+  if (gameMode) {
+    return (
+      <GamifiedCountingView
+        items={items}
+        index={gameIndex}
+        topInset={insets.top}
+        bottomInset={insets.bottom}
+        onIndexChange={setGameIndex}
+        onSetQuantity={setQuantity}
+        onSetUnit={setUnit}
+        onExit={() => {
+          const current = items[gameIndex];
+          if (current) setSelectedId(current.id);
+          setGameMode(false);
+        }}
+      />
+    );
+  }
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + 8 }]}>
@@ -480,6 +531,21 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         >
           <Text style={styles.dockCalcGlyph}>123</Text>
           <Text style={styles.dockCalcLabel}>{t('simpCountCalculator')}</Text>
+        </Pressable>
+
+        <Pressable
+          style={[
+            styles.dockGame,
+            (items.length === 0 || categoryId === 'stock_values') &&
+              styles.dockCalcDisabled,
+          ]}
+          onPress={enterGameMode}
+          disabled={items.length === 0 || categoryId === 'stock_values'}
+          accessibilityRole="button"
+          accessibilityLabel={t('simpCountGameMode')}
+        >
+          <Text style={styles.dockGameGlyph}>▶</Text>
+          <Text style={styles.dockGameLabel}>{t('simpCountGameMode')}</Text>
         </Pressable>
       </View>
 
@@ -859,12 +925,13 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
     paddingTop: 12,
     backgroundColor: NEO_BG,
-    gap: 12,
+    gap: 10,
   },
   dockIcon: {
     width: 44,
@@ -906,6 +973,39 @@ const styles = StyleSheet.create({
   },
   dockCalcLabel: {
     fontSize: 13,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  dockGame: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 118,
+    height: 52,
+    paddingHorizontal: 14,
+    borderRadius: radius.lg,
+    backgroundColor: GRADIENT_PINK,
+    ...Platform.select({
+      web: {
+        boxShadow:
+          '6px 6px 14px rgba(163, 177, 198, 0.45), -5px -5px 12px rgba(255,255,255,0.85)',
+      } as object,
+      default: {
+        shadowColor: '#9AA8B8',
+        shadowOffset: { width: 4, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        elevation: 3,
+      },
+    }),
+  },
+  dockGameGlyph: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.ink,
+  },
+  dockGameLabel: {
+    fontSize: 12,
     fontWeight: '700',
     color: colors.ink,
   },
