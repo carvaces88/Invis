@@ -612,6 +612,8 @@ export const en = {
   simpCountSearchPlaceholder: 'Find an item…',
   simpCountSearchEmpty: 'No matching items',
   simpCountSearchEmptySub: 'Try another name or an “also known as” nickname.',
+  simpCountSortAlpha: 'Sort A–Z',
+  simpCountSortSheet: 'Sheet order',
 
   monthWrapUpOpen: 'Finalize month',
   monthWrapUpOpenSub: 'End-of-month count · summary · Restolution report',

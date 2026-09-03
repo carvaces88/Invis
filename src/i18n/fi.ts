@@ -607,6 +607,8 @@ export const fi: Messages = {
   simpCountSearchPlaceholder: 'Etsi tuotetta…',
   simpCountSearchEmpty: 'Ei osumia',
   simpCountSearchEmptySub: 'Kokeile toista nimeä tai “myös”-aliasta.',
+  simpCountSortAlpha: 'Järjestä A–Ö',
+  simpCountSortSheet: 'Listan järjestys',
 
   monthWrapUpOpen: 'Päätä kuukausi',
   monthWrapUpOpenSub: 'Kuukauden lopun inventaario · yhteenveto · Restolution-raportti',

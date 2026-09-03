@@ -225,14 +225,24 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   const [gameMode, setGameMode] = useState(false);
   const [gameIndex, setGameIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortAlpha, setSortAlpha] = useState(false);
 
   const items =
     categoryId === 'stock_values' ? [] : (byCategory[categoryId] ?? []);
 
-  const filteredItems = useMemo(
-    () => items.filter((row) => itemMatchesQuery(row, searchQuery)),
-    [items, searchQuery],
-  );
+  const filteredItems = useMemo(() => {
+    const filtered = items.filter((row) => itemMatchesQuery(row, searchQuery));
+    if (!sortAlpha) return filtered;
+    const collator = new Intl.Collator(locale === 'fi' ? 'fi' : 'en', {
+      sensitivity: 'base',
+      numeric: true,
+    });
+    return [...filtered].sort((a, b) => {
+      const na = locale === 'fi' ? a.nameFi : a.nameEn;
+      const nb = locale === 'fi' ? b.nameFi : b.nameEn;
+      return collator.compare(na, nb);
+    });
+  }, [items, searchQuery, sortAlpha, locale]);
 
   const selectedItem = useMemo(
     () => items.find((row) => row.id === selectedId) ?? null,
@@ -309,14 +319,11 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   );
 
   const enterGameMode = () => {
-    if (items.length === 0 || categoryId === 'stock_values') return;
+    if (filteredItems.length === 0 || categoryId === 'stock_values') return;
     const start = selectedId
-      ? Math.max(
-          0,
-          items.findIndex((row) => row.id === selectedId),
-        )
+      ? filteredItems.findIndex((row) => row.id === selectedId)
       : 0;
-    setGameIndex(start === -1 ? 0 : start);
+    setGameIndex(start < 0 ? 0 : start);
     setGameMode(true);
   };
 
@@ -370,7 +377,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   if (gameMode) {
     return (
       <GamifiedCountingView
-        items={items}
+        items={filteredItems}
         index={gameIndex}
         topInset={insets.top}
         bottomInset={insets.bottom}
@@ -378,7 +385,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         onSetQuantity={setQuantity}
         onSetUnit={setUnit}
         onExit={() => {
-          const current = items[gameIndex];
+          const current = filteredItems[gameIndex];
           if (current) setSelectedId(current.id);
           setGameMode(false);
         }}
@@ -439,6 +446,17 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
             clearButtonMode="while-editing"
             accessibilityLabel={t('simpCountSearchPlaceholder')}
           />
+          <Pressable
+            style={[styles.sortPill, sortAlpha && styles.sortPillOn]}
+            onPress={() => setSortAlpha((v) => !v)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: sortAlpha }}
+            accessibilityLabel={t('simpCountSortAlpha')}
+          >
+            <Text style={[styles.sortPillText, sortAlpha && styles.sortPillTextOn]}>
+              A–Z
+            </Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -486,6 +504,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
           <View style={styles.colHead}>
             <Text style={[styles.headCell, styles.colProduct]}>
               {t('simpCountColProduct')}
+              {` (${filteredItems.length})`}
             </Text>
             <Text style={[styles.headCell, styles.colQty]}>
               {t('simpCountColQty')}
@@ -589,11 +608,11 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         <Pressable
           style={[
             styles.dockGame,
-            (items.length === 0 || categoryId === 'stock_values') &&
+            (filteredItems.length === 0 || categoryId === 'stock_values') &&
               styles.dockCalcDisabled,
           ]}
           onPress={enterGameMode}
-          disabled={items.length === 0 || categoryId === 'stock_values'}
+          disabled={filteredItems.length === 0 || categoryId === 'stock_values'}
           accessibilityRole="button"
           accessibilityLabel={t('simpCountGameMode')}
         >
@@ -826,10 +845,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     paddingHorizontal: spacing.md,
     marginBottom: 12,
   },
   searchInput: {
+    flex: 1,
     backgroundColor: NEO_CARD,
     borderRadius: radius.pill,
     paddingHorizontal: 16,
@@ -850,6 +873,37 @@ const styles = StyleSheet.create({
         elevation: 3,
       },
     }),
+  },
+  sortPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: radius.pill,
+    backgroundColor: NEO_CARD,
+    ...Platform.select({
+      web: {
+        boxShadow:
+          '6px 6px 14px rgba(163, 177, 198, 0.45), -5px -5px 12px rgba(255,255,255,0.85)',
+      } as object,
+      default: {
+        shadowColor: '#9AA8B8',
+        shadowOffset: { width: 4, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        elevation: 3,
+      },
+    }),
+  },
+  sortPillOn: {
+    backgroundColor: 'rgba(184,232,216,0.85)',
+  },
+  sortPillText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.inkMuted,
+    letterSpacing: 0.3,
+  },
+  sortPillTextOn: {
+    color: colors.ink,
   },
   categoryPill: {
     flexDirection: 'row',
