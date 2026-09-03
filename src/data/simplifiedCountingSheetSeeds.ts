@@ -1495,3 +1495,25 @@ export const DRY_GOODS_COUNT_SEED: SheetSeedItem[] = [
     unitPriceAlv0: 0.25,
   },
 ];
+
+/** KEITTIÖALKOHOLI · inventaario sheet */
+export const KITCHEN_ALCOHOL_COUNT_SEED: SheetSeedItem[] = [
+  {
+    id: 'alcohol-punkku',
+    nameEn: 'Red wine (kitchen)',
+    nameFi: 'Punkku',
+    quantity: 15,
+    unit: 'L',
+    unitPriceAlv0: 3.14,
+    aliases: ['red wine', 'punaviini', 'punkku'],
+  },
+  {
+    id: 'alcohol-valkkari',
+    nameEn: 'White wine (kitchen)',
+    nameFi: 'Valkkari',
+    quantity: 30,
+    unit: 'L',
+    unitPriceAlv0: 5.36,
+    aliases: ['white wine', 'valkoviini', 'valkkari'],
+  },
+];

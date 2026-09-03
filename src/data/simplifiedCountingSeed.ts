@@ -2,6 +2,7 @@ import type { UnitCode } from './types';
 import {
   DRY_GOODS_COUNT_SEED,
   FROZEN_COUNT_SEED,
+  KITCHEN_ALCOHOL_COUNT_SEED,
   MEAT_COUNT_SEED,
   SEAFOOD_COUNT_SEED,
   VEGETABLES_COUNT_SEED,
@@ -447,7 +448,7 @@ export const PLACEHOLDER_BY_CATEGORY: Record<
   meat: MEAT_COUNT_SEED,
   frozen: FROZEN_COUNT_SEED,
   dry_goods: DRY_GOODS_COUNT_SEED,
-  kitchen_alcohol: [],
+  kitchen_alcohol: KITCHEN_ALCOHOL_COUNT_SEED,
   other: [],
   waste: [],
 };
