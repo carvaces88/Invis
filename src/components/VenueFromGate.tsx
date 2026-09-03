@@ -1,20 +1,25 @@
 import { useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../auth/AuthContext';
+import {
+  LONKKA_SEED_PLACES,
+  LONKKA_SITE_NAME,
+} from '../data/seedPlaces';
 import { useInventory } from '../data/store';
-import { isBetaTesterName } from '../lib/authAccounts';
+import { isBetaTesterName, normalizeGateName } from '../lib/authAccounts';
 import { isSupabaseConfigured } from '../lib/supabase';
 
 const WORKSPACE_OWNER_KEY = 'invis.workspaceOwner.v1';
 
 /**
- * When a named beta tester (e.g. Jani) first claims this device workspace,
- * wipe seed inventory so they start empty — only when cloud sync is off.
- * With Supabase, cloud pull is the source of truth across devices.
+ * When a named beta tester first claims this device workspace, apply their
+ * venue layout (site + places) and wipe seed inventory.
+ * With Supabase, cloud pull remains source of truth after the first push.
  */
 export function VenueFromGate() {
   const { session } = useAuth();
-  const { setSiteName, clearAllInventory } = useInventory();
+  const { setSiteName, clearAllInventory, resetWorkspaceLayout } =
+    useInventory();
   const venueApplied = useRef<string | null>(null);
   const ownerApplied = useRef<string | null>(null);
 
@@ -36,13 +41,20 @@ export function VenueFromGate() {
         const prev = await AsyncStorage.getItem(WORKSPACE_OWNER_KEY);
         if (cancelled) return;
 
-        if (
-          isBetaTesterName(session.name) &&
-          prev !== ownerKey &&
-          !isSupabaseConfigured
-        ) {
-          clearAllInventory();
-          setSiteName('Jani · beta 1');
+        if (isBetaTesterName(session.name) && prev !== ownerKey) {
+          const key = normalizeGateName(session.name).toLowerCase();
+          if (key === 'joonas') {
+            // Full inventory access; start at Ravintola Lonkka with 1 fridge + 1 freezer.
+            // Places stay editable in More → Places (add / rename / remove / change type).
+            resetWorkspaceLayout({
+              siteName: LONKKA_SITE_NAME,
+              places: LONKKA_SEED_PLACES,
+            });
+          } else if (!isSupabaseConfigured) {
+            // Jani-style offline first claim — empty Kamppi-style layout.
+            clearAllInventory();
+            setSiteName('Jani · beta 1');
+          }
         }
 
         if (prev !== ownerKey) {
@@ -57,7 +69,12 @@ export function VenueFromGate() {
     return () => {
       cancelled = true;
     };
-  }, [session?.name, clearAllInventory, setSiteName]);
+  }, [
+    session?.name,
+    clearAllInventory,
+    resetWorkspaceLayout,
+    setSiteName,
+  ]);
 
   return null;
 }

@@ -55,3 +55,23 @@ export const SEED_PLACES: Place[] = [
 ];
 
 export const DEFAULT_PLACE_ID = SEED_PLACES[0]!.id;
+
+/** Ravintola Lonkka (Joonas) — start with one fridge + one freezer; editable in Places */
+export const LONKKA_SITE_NAME = 'Ravintola Lonkka';
+
+export const LONKKA_SEED_PLACES: Place[] = [
+  {
+    id: 'place-lonkka-fridge',
+    name: 'Fridge',
+    kind: 'kitchen',
+    storageType: 'prep_fridge',
+    sortOrder: 0,
+  },
+  {
+    id: 'place-lonkka-freezer',
+    name: 'Freezer',
+    kind: 'freezer',
+    storageType: 'freezer',
+    sortOrder: 1,
+  },
+];

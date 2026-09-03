@@ -8,6 +8,7 @@ export const AUTH_ACCOUNTS: Record<
   ivan: { email: 'ivan@invis.app', displayName: 'Ivan', role: 'admin' },
   guest: { email: 'guest@invis.app', displayName: 'Guest', role: 'guest' },
   jani: { email: 'jani@invis.app', displayName: 'Jani', role: 'guest' },
+  joonas: { email: 'joonas@invis.app', displayName: 'Joonas', role: 'guest' },
   investor: {
     email: 'investor@invis.app',
     displayName: 'Investor',
@@ -18,7 +19,7 @@ export const AUTH_ACCOUNTS: Record<
 export const KITCHEN_NAMES = ['cesar', 'elena', 'ivan', 'guest'] as const;
 
 /** Named beta testers — cloud sync via canonical account email (e.g. jani@invis.app) */
-export const BETA_TESTER_NAMES = ['jani'] as const;
+export const BETA_TESTER_NAMES = ['jani', 'joonas'] as const;
 
 /** Investor walkthrough — full app + Pro unlock + pitch deck */
 export const INVESTOR_NAMES = ['investor'] as const;

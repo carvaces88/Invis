@@ -296,6 +296,14 @@ type Store = {
   ) => RecentAddWarning | null;
   /** Erase all counted stock across places; keeps catalog + places */
   clearAllInventory: () => void;
+  /**
+   * Replace site label + places and rebuild empty count lines on the first place.
+   * Used when provisioning a restaurant workspace (e.g. Joonas / Ravintola Lonkka).
+   */
+  resetWorkspaceLayout: (args: {
+    siteName: string;
+    places: Place[];
+  }) => void;
   /** Signed delta — kuorma_in (+), havikki_out (-), adjustment */
   applyStockDelta: (args: {
     productId: string;
@@ -1569,6 +1577,49 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     void AsyncStorage.removeItem(ACTIVITY_KEY).catch(() => {});
   }, []);
 
+  const resetWorkspaceLayout = useCallback(
+    (args: { siteName: string; places: Place[] }) => {
+      const nextPlaces =
+        args.places.length > 0
+          ? args.places.map(migratePlace)
+          : SEED_PLACES.map(migratePlace);
+      const defaultPlaceId = nextPlaces[0]?.id ?? DEFAULT_PLACE_ID;
+      const site = args.siteName.trim() || SEED_SITE_NAME;
+      const nowDate = todayIsoDate();
+      const nextSession: InventorySession = {
+        id: `session-${Date.now()}`,
+        title: 'Inventory sheet RR',
+        date: nowDate,
+        status: 'in_progress',
+        lines: createInitialSessionLines(products, defaultPlaceId, {
+          seeded: false,
+        }),
+      };
+
+      setPlaces(nextPlaces);
+      setSiteNameState(site);
+      setActivePlaceIdState(defaultPlaceId);
+      setInventoryCleared(true);
+      setSession(nextSession);
+      setMovements((m) => m.filter((x) => x.type !== 'inventory_count'));
+      setRecentActivity([]);
+      setPeriodSnapshot(null);
+
+      void AsyncStorage.multiSet([
+        [PLACES_KEY, JSON.stringify(nextPlaces)],
+        [SITE_NAME_KEY, site],
+        [ACTIVE_PLACE_KEY, defaultPlaceId],
+        [SESSION_KEY, JSON.stringify(nextSession)],
+        [INVENTORY_CLEARED_KEY, '1'],
+      ]).catch(() => {});
+      void AsyncStorage.multiRemove([
+        ACTIVITY_KEY,
+        PERIOD_SNAPSHOT_KEY,
+      ]).catch(() => {});
+    },
+    [products],
+  );
+
   const applyStockDelta = useCallback(
     (args: {
       productId: string;
@@ -1857,6 +1908,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       addQuantity,
       getRecentAddWarning,
       clearAllInventory,
+      resetWorkspaceLayout,
       applyStockDelta,
       recordHavikki,
       replaceProducts,
@@ -1904,6 +1956,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       addQuantity,
       getRecentAddWarning,
       clearAllInventory,
+      resetWorkspaceLayout,
       applyStockDelta,
       recordHavikki,
       replaceProducts,

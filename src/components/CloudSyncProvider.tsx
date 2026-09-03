@@ -76,6 +76,7 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
     priorStockList,
     inventoryPhotos,
     siteName,
+    places,
   } = useInventory();
 
   const [status, setStatus] = useState<CloudSyncStatus>(
@@ -195,6 +196,7 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
     priorStockList,
     inventoryPhotos,
     siteName,
+    places,
   ]);
 
   const syncNow = useCallback(async () => {

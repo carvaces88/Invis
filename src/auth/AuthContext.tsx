@@ -159,10 +159,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ? (account?.email?.trim().toLowerCase() ?? null)
       : email;
 
+    const defaultVenue =
+      beta && normalizeGateName(name).toLowerCase() === 'joonas'
+        ? 'Ravintola Lonkka'
+        : null;
+
     const next: GateSession = {
       name:
         kitchen || beta || investor ? displayKitchenName(name) : name,
-      venue: bypass ? null : venue,
+      venue: bypass ? defaultVenue : venue,
       email: syncEmail,
       kind: kitchen ? 'kitchen' : investor ? 'investor' : 'tester',
       enteredAt: new Date().toISOString(),
