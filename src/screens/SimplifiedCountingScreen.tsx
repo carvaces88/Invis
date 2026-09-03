@@ -20,6 +20,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GamifiedCountingView } from '../components/GamifiedCountingView';
 import { CalcIcon } from '../components/CalcIcon';
 import {
+  CameraIcon,
+  EditIcon,
+  FlameIcon,
+  GearIcon,
+  PlusFiveBadge,
+} from '../components/SimpCountDockIcons';
+import {
   alsoKnownAsLabel,
   categoryTotal,
   findItemCategory,
@@ -187,20 +194,20 @@ function CountRow({
       Animated.sequence([
         Animated.timing(wobble, {
           toValue: 1,
-          duration: 90,
-          easing: Easing.inOut(Easing.ease),
+          duration: 160,
+          easing: Easing.inOut(Easing.sin),
           useNativeDriver: false,
         }),
         Animated.timing(wobble, {
           toValue: -1,
-          duration: 180,
-          easing: Easing.inOut(Easing.ease),
+          duration: 320,
+          easing: Easing.inOut(Easing.sin),
           useNativeDriver: false,
         }),
         Animated.timing(wobble, {
           toValue: 0,
-          duration: 90,
-          easing: Easing.inOut(Easing.ease),
+          duration: 160,
+          easing: Easing.inOut(Easing.sin),
           useNativeDriver: false,
         }),
       ]),
@@ -263,7 +270,7 @@ function CountRow({
 
   const rotate = wobble.interpolate({
     inputRange: [-1, 1],
-    outputRange: ['-1.8deg', '1.8deg'],
+    outputRange: ['-0.55deg', '0.55deg'],
   });
 
   const total = lineTotal(item);
@@ -930,66 +937,71 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         ]}
       >
         <Pressable
-          style={styles.dockIcon}
+          style={styles.dockBtn}
           onPress={() => setPicker('category')}
           accessibilityRole="button"
           accessibilityLabel={t('simpCountPickCategory')}
         >
-          <Text style={styles.dockIconGlyph}>⚙</Text>
+          <GearIcon size={22} color={colors.primary} />
         </Pressable>
         <Pressable
-          style={[styles.dockIcon, editMode && styles.dockIconOn]}
+          style={[styles.dockBtn, editMode && styles.dockBtnOn]}
           onPress={toggleEditMode}
           disabled={isOverview}
           accessibilityRole="button"
           accessibilityState={{ selected: editMode }}
           accessibilityLabel={t('simpCountEdit')}
         >
-          <Text style={styles.dockIconGlyph}>✎</Text>
+          <EditIcon
+            size={22}
+            color={editMode ? colors.primaryMid : colors.primary}
+          />
         </Pressable>
         <Pressable
-          style={styles.dockIcon}
+          style={styles.dockBtn}
           onPress={() => setListScanOpen(true)}
           disabled={listScanBusy}
           accessibilityRole="button"
           accessibilityLabel={t('simpCountScanList')}
         >
-          <Text style={styles.dockIconGlyph}>📷</Text>
+          <CameraIcon size={22} color={colors.primary} />
         </Pressable>
         <Pressable
-          style={styles.dockIcon}
+          style={styles.dockBtn}
           onPress={() => nudgeSelected(5)}
           accessibilityRole="button"
           accessibilityLabel={t('simpCountPlus5')}
         >
-          <Text style={styles.dockPlus5}>+5</Text>
+          <PlusFiveBadge size={22} color={colors.primary} />
         </Pressable>
 
         <Pressable
           style={[
-            styles.dockCalc,
-            (!selectedItem || isOverview || editMode) && styles.dockCalcDisabled,
+            styles.dockBtn,
+            styles.dockBtnAccent,
+            (!selectedItem || isOverview || editMode) && styles.dockBtnDisabled,
           ]}
           onPress={openCalculator}
           disabled={!selectedItem || isOverview || editMode}
           accessibilityRole="button"
           accessibilityLabel={t('simpCountCalculator')}
         >
-          <CalcIcon size={24} color={colors.ink} />
+          <CalcIcon size={22} color={colors.primary} />
         </Pressable>
 
         <Pressable
           style={[
-            styles.dockGame,
+            styles.dockBtn,
+            styles.dockBtnAccent,
             (filteredItems.length === 0 || isOverview || editMode) &&
-              styles.dockCalcDisabled,
+              styles.dockBtnDisabled,
           ]}
           onPress={enterGameMode}
           disabled={filteredItems.length === 0 || isOverview || editMode}
           accessibilityRole="button"
           accessibilityLabel={t('simpCountGameMode')}
         >
-          <Text style={styles.dockGameGlyph}>🔥</Text>
+          <FlameIcon size={22} color={colors.primary} />
         </Pressable>
       </View>
 
@@ -1637,74 +1649,27 @@ const styles = StyleSheet.create({
     backgroundColor: NEO_BG,
     gap: 10,
   },
-  dockIcon: {
-    width: 44,
-    height: 44,
+  dockBtn: {
+    width: 48,
+    height: 48,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: NEO_CARD,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
     ...neoShadow,
   },
-  dockIconOn: {
-    backgroundColor: 'rgba(245,198,208,0.95)',
+  dockBtnAccent: {
+    backgroundColor: colors.primarySoft,
+    borderColor: 'rgba(11,79,138,0.18)',
   },
-  dockIconGlyph: {
-    fontSize: 18,
-    color: colors.ink,
+  dockBtnOn: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
   },
-  dockPlus5: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.ink,
-  },
-  dockCalc: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: GRADIENT_TEAL,
-    ...Platform.select({
-      web: {
-        boxShadow:
-          '6px 6px 14px rgba(163, 177, 198, 0.45), -5px -5px 12px rgba(255,255,255,0.85)',
-      } as object,
-      default: {
-        shadowColor: '#9AA8B8',
-        shadowOffset: { width: 4, height: 4 },
-        shadowOpacity: 0.35,
-        shadowRadius: 8,
-        elevation: 3,
-      },
-    }),
-  },
-  dockCalcDisabled: {
-    opacity: 0.45,
-  },
-  dockGame: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: GRADIENT_PINK,
-    ...Platform.select({
-      web: {
-        boxShadow:
-          '6px 6px 14px rgba(163, 177, 198, 0.45), -5px -5px 12px rgba(255,255,255,0.85)',
-      } as object,
-      default: {
-        shadowColor: '#9AA8B8',
-        shadowOffset: { width: 4, height: 4 },
-        shadowOpacity: 0.35,
-        shadowRadius: 8,
-        elevation: 3,
-      },
-    }),
-  },
-  dockGameGlyph: {
-    fontSize: 22,
+  dockBtnDisabled: {
+    opacity: 0.4,
   },
   calcSheet: {
     backgroundColor: NEO_CARD,
