@@ -254,13 +254,16 @@ export function GamifiedCountingView({
     if (index > 0) onIndexChange(index - 1);
   }, [commitDigits, index, onIndexChange]);
 
-  const nameResponder = useMemo(
+  const swipeResponder = useMemo(
     () =>
       PanResponder.create({
+        // Horizontal swipe anywhere on the hero card (name + qty display).
         onMoveShouldSetPanResponder: (_, g) =>
-          Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.3,
+          Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.15,
+        onMoveShouldSetPanResponderCapture: (_, g) =>
+          Math.abs(g.dx) > 18 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
         onPanResponderMove: (_, g) => {
-          namePan.setValue(Math.max(-80, Math.min(80, g.dx * 0.4)));
+          namePan.setValue(Math.max(-90, Math.min(90, g.dx * 0.4)));
         },
         onPanResponderRelease: (_, g) => {
           if (g.dx > SWIPE_X) {
@@ -412,18 +415,13 @@ export function GamifiedCountingView({
           style={[
             styles.heroCard,
             flashOk && styles.heroCardSuccess,
-            { transform: [{ scale: successScale }] },
+            { transform: [{ translateX: namePan }, { scale: successScale }] },
           ]}
+          {...swipeResponder.panHandlers}
         >
           <FireBurst burstKey={fireKey} />
           <View style={styles.heroTop}>
-            <Animated.View
-              style={[
-                styles.nameSwipeZone,
-                { transform: [{ translateX: namePan }] },
-              ]}
-              {...nameResponder.panHandlers}
-            >
+            <View style={styles.nameSwipeZone}>
               <Text style={styles.heroName} numberOfLines={2}>
                 {name}
               </Text>
@@ -433,7 +431,7 @@ export function GamifiedCountingView({
                 </Text>
               ) : null}
               <Text style={styles.swipeHint}>{t('simpCountGameSwipeHint')}</Text>
-            </Animated.View>
+            </View>
             <Pressable
               style={styles.unitPill}
               onPress={() => setUnitOpen(true)}
@@ -534,7 +532,7 @@ export function GamifiedCountingView({
           accessibilityLabel={t('simpCountGameNextCelebrate')}
         >
           <View style={styles.dockNextWash} />
-          <Text style={styles.dockNextGlyph}>+</Text>
+          <Text style={styles.dockNextGlyph}>✓</Text>
         </Pressable>
       </View>
 
