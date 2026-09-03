@@ -15,22 +15,50 @@ const strokeProps = {
   fill: 'none' as const,
 };
 
-/** Category / settings gear — matches CalcIcon stroke language. */
-export function GearIcon({ size = 22, color = colors.primary }: IconProps) {
+/** Category picker — stacked section rows (not a sun/gear). */
+export function CategoryIcon({ size = 22, color = colors.primary }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityRole="image">
-      <Path
-        d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6z"
+      <Rect
+        x="3.5"
+        y="4"
+        width="17"
+        height="4.2"
+        rx="1.2"
+        stroke={color}
+        {...strokeProps}
+      />
+      <Rect
+        x="3.5"
+        y="10"
+        width="17"
+        height="4.2"
+        rx="1.2"
+        stroke={color}
+        {...strokeProps}
+      />
+      <Rect
+        x="3.5"
+        y="16"
+        width="17"
+        height="4.2"
+        rx="1.2"
         stroke={color}
         {...strokeProps}
       />
       <Path
-        d="M12 3.2v1.8M12 19v1.8M4.9 6.1l1.3 1.3M17.8 16.6l1.3 1.3M3.2 12h1.8M19 12h1.8M4.9 17.9l1.3-1.3M17.8 7.4l1.3-1.3"
+        d="M6.2 6.1h3.2M6.2 12.1h3.2M6.2 18.1h3.2"
         stroke={color}
-        {...strokeProps}
+        strokeWidth={1.75}
+        strokeLinecap="round"
       />
     </Svg>
   );
+}
+
+/** @deprecated Use CategoryIcon — kept so old imports don’t break builds. */
+export function GearIcon(props: IconProps) {
+  return <CategoryIcon {...props} />;
 }
 
 /** Edit / hide mode — pencil. */

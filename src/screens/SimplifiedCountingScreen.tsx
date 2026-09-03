@@ -21,9 +21,9 @@ import { GamifiedCountingView } from '../components/GamifiedCountingView';
 import { CalcIcon } from '../components/CalcIcon';
 import {
   CameraIcon,
+  CategoryIcon,
   EditIcon,
   FlameIcon,
-  GearIcon,
   PlusFiveBadge,
 } from '../components/SimpCountDockIcons';
 import {
@@ -48,8 +48,25 @@ import {
   persistPickerAsset,
   visionPickerOptions,
 } from '../lib/persistImageUri';
+import {
+  buildPriceHistoryExportHtml,
+  loadSupplierPriceHistory,
+  monthKeyFromIndex,
+  monthPriceRows,
+  previousMonthKey,
+  type MonthPriceRow,
+} from '../lib/supplierPriceHistory';
+import {
+  ensureSeededPriorMonthStock,
+  snapshotCategoryTotal,
+  upsertMonthStockSnapshot,
+  type MonthStockStore,
+} from '../lib/simpCountMonthStock';
+import { printHtmlOrSharePdf } from '../lib/export/download';
 import { analyzePriorStockListImages } from '../lib/vision';
 import { colors, radius, spacing } from '../theme/colors';
+import * as Print from 'expo-print';
+import type { SimplifiedItemCategoryId } from '../data/simplifiedCountingSeed';
 
 type ExtraProduct = {
   categoryId: SimplifiedItemCategoryId;
@@ -388,6 +405,14 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   const [missingOnly, setMissingOnly] = useState(false);
   const [listScanOpen, setListScanOpen] = useState(false);
   const [listScanBusy, setListScanBusy] = useState(false);
+  const [listScanKind, setListScanKind] = useState<
+    null | 'count' | 'supplier'
+  >(null);
+  const [priceHistoryOpen, setPriceHistoryOpen] = useState(false);
+  const [priceHistoryRows, setPriceHistoryRows] = useState<MonthPriceRow[]>(
+    [],
+  );
+  const [priceHistoryMonthKey, setPriceHistoryMonthKey] = useState('');
   const [editMode, setEditMode] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [hiddenSheetOpen, setHiddenSheetOpen] = useState(false);
@@ -578,8 +603,9 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   };
 
   const scanListPhotos = useCallback(
-    async (fromCamera: boolean) => {
+    async (fromCamera: boolean, kind: 'count' | 'supplier') => {
       setListScanOpen(false);
+      setListScanKind(null);
       const perm = fromCamera
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -619,11 +645,20 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
           alertInfo(t('simpCountScanList'), t('sheetImportEmpty'));
           return;
         }
-        navigation.navigate('SheetImportReview', {
-          document,
-          imageUri: uris[0],
-          imageUris: uris,
-        });
+        if (kind === 'supplier') {
+          navigation.navigate('SupplierOrderReview', {
+            document,
+            imageUri: uris[0],
+            imageUris: uris,
+            monthIndex,
+          });
+        } else {
+          navigation.navigate('SheetImportReview', {
+            document,
+            imageUri: uris[0],
+            imageUris: uris,
+          });
+        }
       } catch (err) {
         alertInfo(
           t('simpCountScanList'),
@@ -633,8 +668,43 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         setListScanBusy(false);
       }
     },
-    [navigation, t],
+    [monthIndex, navigation, t],
   );
+
+  const openPriceHistory = useCallback(async () => {
+    setListScanOpen(false);
+    setListScanKind(null);
+    const key = monthKeyFromIndex(monthIndex);
+    const all = await loadSupplierPriceHistory();
+    // Selected month only — prior months stay stored for export, not mixed in.
+    setPriceHistoryMonthKey(key);
+    setPriceHistoryRows(monthPriceRows(all, key));
+    setPriceHistoryOpen(true);
+  }, [monthIndex]);
+
+  const exportPriceHistoryMonth = useCallback(async () => {
+    const html = buildPriceHistoryExportHtml({
+      title: t('simpCountPriceHistory'),
+      monthLabel: months[monthIndex] ?? priceHistoryMonthKey,
+      monthKey: priceHistoryMonthKey || monthKeyFromIndex(monthIndex),
+      rows: priceHistoryRows,
+      emptyNote: t('simpCountPriceHistoryEmptyMonth').replace(
+        '{month}',
+        months[monthIndex] ?? '',
+      ),
+    });
+    try {
+      await printHtmlOrSharePdf({
+        html,
+        filename: `invis-prices-${priceHistoryMonthKey || monthKeyFromIndex(monthIndex)}.pdf`,
+      });
+    } catch (err) {
+      alertInfo(
+        t('simpCountPriceHistory'),
+        err instanceof Error ? err.message : t('supplierOrderFailed'),
+      );
+    }
+  }, [monthIndex, months, priceHistoryMonthKey, priceHistoryRows, t]);
 
   const stockOverview = useMemo(() => {
     return ITEM_CATEGORY_IDS.map((cid) => {
@@ -942,7 +1012,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
           accessibilityRole="button"
           accessibilityLabel={t('simpCountPickCategory')}
         >
-          <GearIcon size={22} color={colors.primary} />
+          <CategoryIcon size={22} color={colors.primary} />
         </Pressable>
         <Pressable
           style={[styles.dockBtn, editMode && styles.dockBtnOn]}
@@ -959,7 +1029,10 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         </Pressable>
         <Pressable
           style={styles.dockBtn}
-          onPress={() => setListScanOpen(true)}
+          onPress={() => {
+            setListScanKind(null);
+            setListScanOpen(true);
+          }}
           disabled={listScanBusy}
           accessibilityRole="button"
           accessibilityLabel={t('simpCountScanList')}
@@ -1153,38 +1226,108 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         visible={listScanOpen}
         transparent
         animationType="fade"
-        onRequestClose={() => setListScanOpen(false)}
+        onRequestClose={() => {
+          setListScanOpen(false);
+          setListScanKind(null);
+        }}
       >
         <Pressable
           style={styles.modalBackdrop}
-          onPress={() => setListScanOpen(false)}
+          onPress={() => {
+            setListScanOpen(false);
+            setListScanKind(null);
+          }}
         >
           <Pressable
             style={styles.sheet}
             onPress={(e) => e.stopPropagation()}
           >
-            <Text style={styles.sheetTitle}>{t('simpCountScanList')}</Text>
-            <Text style={styles.sheetSub}>{t('simpCountScanListSub')}</Text>
-            <Pressable
-              style={styles.sheetRow}
-              onPress={() => void scanListPhotos(true)}
-            >
-              <Text style={styles.sheetRowText}>{t('simpCountScanCamera')}</Text>
-            </Pressable>
-            <Pressable
-              style={styles.sheetRow}
-              onPress={() => void scanListPhotos(false)}
-            >
-              <Text style={styles.sheetRowText}>
-                {t('simpCountScanLibrary')}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={styles.sheetRow}
-              onPress={() => setListScanOpen(false)}
-            >
-              <Text style={styles.sheetRowMuted}>{t('simpCountAddCancel')}</Text>
-            </Pressable>
+            {listScanKind == null ? (
+              <>
+                <Text style={styles.sheetTitle}>
+                  {t('simpCountScanKindTitle')}
+                </Text>
+                <Text style={styles.sheetSub}>{t('simpCountScanListSub')}</Text>
+                <Pressable
+                  style={styles.sheetRow}
+                  onPress={() => setListScanKind('count')}
+                >
+                  <Text style={styles.sheetRowText}>
+                    {t('simpCountScanKindCount')}
+                  </Text>
+                  <Text style={styles.sheetRowMuted}>
+                    {t('simpCountScanKindCountSub')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.sheetRow}
+                  onPress={() => setListScanKind('supplier')}
+                >
+                  <Text style={styles.sheetRowText}>
+                    {t('simpCountScanKindSupplier')}
+                  </Text>
+                  <Text style={styles.sheetRowMuted}>
+                    {t('simpCountScanKindSupplierSub')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.sheetRow}
+                  onPress={() => void openPriceHistory()}
+                >
+                  <Text style={styles.sheetRowText}>
+                    {t('simpCountPriceHistory')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.sheetRow}
+                  onPress={() => {
+                    setListScanOpen(false);
+                    setListScanKind(null);
+                  }}
+                >
+                  <Text style={styles.sheetRowMuted}>
+                    {t('simpCountAddCancel')}
+                  </Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.sheetTitle}>
+                  {listScanKind === 'supplier'
+                    ? t('simpCountScanKindSupplier')
+                    : t('simpCountScanKindCount')}
+                </Text>
+                <Text style={styles.sheetSub}>
+                  {listScanKind === 'supplier'
+                    ? t('simpCountScanKindSupplierSub')
+                    : t('simpCountScanKindCountSub')}
+                </Text>
+                <Pressable
+                  style={styles.sheetRow}
+                  onPress={() => void scanListPhotos(true, listScanKind)}
+                >
+                  <Text style={styles.sheetRowText}>
+                    {t('simpCountScanCamera')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.sheetRow}
+                  onPress={() => void scanListPhotos(false, listScanKind)}
+                >
+                  <Text style={styles.sheetRowText}>
+                    {t('simpCountScanLibrary')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.sheetRow}
+                  onPress={() => setListScanKind(null)}
+                >
+                  <Text style={styles.sheetRowMuted}>
+                    {t('simpCountAddCancel')}
+                  </Text>
+                </Pressable>
+              </>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -1194,6 +1337,64 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
           <ActivityIndicator size="large" color={colors.ink} />
           <Text style={styles.busyText}>{t('simpCountScanBusy')}</Text>
         </View>
+      </Modal>
+
+      <Modal
+        visible={priceHistoryOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPriceHistoryOpen(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setPriceHistoryOpen(false)}
+        >
+          <Pressable
+            style={[styles.sheet, styles.hiddenSheet]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.sheetTitle}>{t('simpCountPriceHistory')}</Text>
+            <ScrollView style={{ maxHeight: 420 }}>
+              {priceHistoryRows.length === 0 ? (
+                <Text style={styles.sheetRowMuted}>
+                  {t('simpCountPriceHistoryEmpty')}
+                </Text>
+              ) : (
+                priceHistoryRows.map((group) => {
+                  const prev = group.history[1];
+                  const delta =
+                    prev &&
+                    t('simpCountPriceHistoryDelta')
+                      .replace('{from}', prev.unitPriceAlv0.toFixed(2))
+                      .replace('{to}', group.latest.unitPriceAlv0.toFixed(2));
+                  return (
+                    <View key={group.productKey} style={styles.hiddenRow}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.hiddenRowName} numberOfLines={2}>
+                          {group.name}
+                        </Text>
+                        <Text style={styles.sheetRowMuted}>
+                          {group.latest.monthKey} ·{' '}
+                          {group.latest.unitPriceAlv0.toFixed(2)} €
+                          {delta ? ` · ${delta}` : ''}
+                          {group.latest.appliedToInventory
+                            ? ` · ✓`
+                            : ''}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+            <Pressable
+              style={styles.sheetRow}
+              onPress={() => setPriceHistoryOpen(false)}
+            >
+              <Text style={styles.sheetRowMuted}>{t('simpCountAddCancel')}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       <Modal
@@ -1766,6 +1967,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 12,
     borderRadius: radius.md,
+    gap: 4,
   },
   sheetRowOn: {
     backgroundColor: 'rgba(184,232,216,0.55)',
