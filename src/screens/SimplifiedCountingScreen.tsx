@@ -200,18 +200,29 @@ function CountRow({
             >
               {recorded ? '✓' : '!'}
             </Text>
-            <Text
-              style={[styles.cellText, styles.productName]}
-              numberOfLines={2}
-              accessibilityLabel={
-                alsoAs
-                  ? `${name}. ${alsoAs}. ${statusLabel}`
-                  : `${name}. ${statusLabel}`
-              }
-              {...webTitleProps(alsoAs)}
-            >
-              {name}
-            </Text>
+            <View style={styles.productTextCol}>
+              <Text
+                style={[styles.cellText, styles.productName]}
+                numberOfLines={2}
+                accessibilityLabel={
+                  alsoAs
+                    ? `${name}. ${alsoAs}. ${statusLabel}`
+                    : `${name}. ${statusLabel}`
+                }
+                {...webTitleProps(alsoAs)}
+              >
+                {name}
+              </Text>
+              {alsoAs ? (
+                <Text
+                  style={styles.alsoAsLine}
+                  numberOfLines={2}
+                  {...webTitleProps(alsoAs)}
+                >
+                  {alsoAs}
+                </Text>
+              ) : null}
+            </View>
           </View>
         </View>
         <Text
@@ -981,9 +992,19 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 6,
   },
-  productName: {
+  productTextCol: {
     flex: 1,
     minWidth: 0,
+  },
+  productName: {
+    flexShrink: 1,
+  },
+  alsoAsLine: {
+    marginTop: 2,
+    fontSize: 10,
+    lineHeight: 13,
+    color: colors.inkFaint,
+    fontWeight: '500',
   },
   statusMark: {
     marginTop: 1,
