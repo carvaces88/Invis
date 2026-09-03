@@ -574,31 +574,64 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   const openCalculator = () => {
     if (!selectedItem || isOverview) return;
     setCalcDigits(
-      selectedItem.quantity > 0 ? formatQty(selectedItem.quantity) : '',
+      selectedItem.quantity > 0 ? formatQty(selectedItem.quantity) : '0',
     );
     setCalcOpen(true);
   };
 
+  const evalCalcExpr = (raw: string): number | null => {
+    const cleaned = raw
+      .replace(/×/g, '*')
+      .replace(/÷/g, '/')
+      .replace(/−/g, '-')
+      .replace(/,/g, '.')
+      .trim();
+    if (!cleaned || cleaned === '.') return 0;
+    if (!/^[\d.\s+\-*/()]+$/.test(cleaned)) return null;
+    try {
+      // eslint-disable-next-line no-new-func -- tiny local calculator, input sanitized above
+      const n = Function(`"use strict"; return (${cleaned})`)() as unknown;
+      return typeof n === 'number' && Number.isFinite(n) ? n : null;
+    } catch {
+      return null;
+    }
+  };
+
   const pushCalcKey = (key: string) => {
     setCalcDigits((prev) => {
-      if (key === 'C') return '';
-      if (key === '⌫') return prev.slice(0, -1);
-      if (key === '.') {
-        if (prev.includes('.')) return prev;
-        return prev === '' ? '0.' : `${prev}.`;
+      const cur = prev === '' ? '0' : prev;
+      if (key === 'C') return '0';
+      if (key === '⌫') {
+        const next = cur.slice(0, -1);
+        return next === '' ? '0' : next;
       }
-      if (prev === '0' && key !== '.') return key;
-      if (prev.replace('.', '').length >= 8) return prev;
-      return `${prev}${key}`;
+      if (key === '=') {
+        const n = evalCalcExpr(cur);
+        if (n == null) return cur;
+        return formatQty(Math.round(n * 1000) / 1000);
+      }
+      if (key === '.') {
+        // Allow decimal on the current number segment only
+        const parts = cur.split(/[+\-×÷]/);
+        const last = parts[parts.length - 1] ?? '';
+        if (last.includes('.')) return cur;
+        return cur === '0' ? '0.' : `${cur}.`;
+      }
+      if (/[+\-×÷]/.test(key)) {
+        if (/[+\-×÷]$/.test(cur)) return `${cur.slice(0, -1)}${key}`;
+        return `${cur}${key}`;
+      }
+      if (cur === '0' && /[0-9]/.test(key)) return key;
+      if (cur.replace(/[^0-9]/g, '').length >= 12) return cur;
+      return `${cur}${key}`;
     });
   };
 
   const applyCalculator = () => {
     if (!selectedId) return;
-    const raw = calcDigits.trim().replace(',', '.');
-    const n = raw === '' || raw === '.' ? 0 : Number(raw);
-    if (!Number.isFinite(n) || n < 0) return;
-    setQuantity(selectedId, n);
+    const n = evalCalcExpr(calcDigits.trim() || '0');
+    if (n == null || n < 0) return;
+    setQuantity(selectedId, Math.round(n * 100) / 100);
     setCalcOpen(false);
   };
 
@@ -1167,7 +1200,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
                 : '—'}
             </Text>
             <View style={styles.calcDisplay}>
-              <Text style={styles.calcDisplayText}>
+              <Text style={styles.calcDisplayText} numberOfLines={1}>
                 {calcDigits === '' ? '0' : calcDigits}
               </Text>
               <Text style={styles.calcUnit}>
@@ -1177,18 +1210,24 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
             <View style={styles.calcPad}>
               {(
                 [
-                  ['7', '8', '9'],
-                  ['4', '5', '6'],
-                  ['1', '2', '3'],
-                  ['C', '0', '.'],
+                  ['7', '8', '9', '÷'],
+                  ['4', '5', '6', '×'],
+                  ['1', '2', '3', '−'],
+                  ['C', '0', '.', '+'],
                 ] as const
               ).map((row) => (
                 <View key={row.join('-')} style={styles.calcPadRow}>
                   {row.map((key) => (
                     <Pressable
                       key={key}
-                      style={styles.calcKey}
-                      onPress={() => pushCalcKey(key)}
+                      style={[
+                        styles.calcKey,
+                        /[+\−×÷]/.test(key) && styles.calcKeyOp,
+                        key === 'C' && styles.calcKeyClear,
+                      ]}
+                      onPress={() =>
+                        pushCalcKey(key === '−' ? '-' : key)
+                      }
                       accessibilityRole="button"
                       accessibilityLabel={key}
                     >
@@ -1205,6 +1244,14 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
                   accessibilityLabel={t('simpCountCalcBackspace')}
                 >
                   <Text style={styles.calcKeyText}>⌫</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.calcKey, styles.calcKeyEq]}
+                  onPress={() => pushCalcKey('=')}
+                  accessibilityRole="button"
+                  accessibilityLabel="="
+                >
+                  <Text style={styles.calcKeyText}>=</Text>
                 </Pressable>
                 <Pressable
                   style={[styles.calcKey, styles.calcApply]}
@@ -1923,6 +1970,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: NEO_BG,
     ...neoShadow,
+  },
+  calcKeyOp: {
+    backgroundColor: 'rgba(184,232,216,0.55)',
+  },
+  calcKeyClear: {
+    backgroundColor: 'rgba(245,198,208,0.55)',
+  },
+  calcKeyEq: {
+    backgroundColor: 'rgba(168,197,240,0.55)',
   },
   calcKeyText: {
     fontSize: 20,
