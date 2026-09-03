@@ -20,6 +20,7 @@ import { useInventory } from '../data/store';
 import type { MainTabParamList, RootStackParamList } from '../data/types';
 import { useI18n, type Locale } from '../i18n';
 import { alertAck, alertConfirm } from '../lib/alertAck';
+import { hardReloadApp } from '../lib/hardReloadApp';
 import { useUnitSystem, type UnitSystem } from '../lib/unitSystem';
 import { colors, radius, shadows, spacing, surfaces } from '../theme/colors';
 
@@ -38,6 +39,7 @@ export function MoreScreen() {
   const { clearAllInventory } = useInventory();
   const { profile, isMaster, isInvestor, isPro, signOut } = useAuth();
   const [valueOpen, setValueOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const openRoot = (
     route: keyof RootStackParamList,
@@ -152,6 +154,28 @@ export function MoreScreen() {
         <Text style={styles.cardSub}>{t('moreInventoryValueSub')}</Text>
       </Pressable>
 
+      {Platform.OS === 'web' ? (
+        <Pressable
+          style={({ pressed }) => [
+            styles.refreshCard,
+            pressed && styles.pressed,
+            refreshing && { opacity: 0.7 },
+          ]}
+          disabled={refreshing}
+          onPress={() => {
+            setRefreshing(true);
+            void hardReloadApp();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t('refreshApp')}
+          accessibilityHint={t('refreshAppSub')}
+        >
+          <Text style={styles.cardTitle}>
+            {refreshing ? t('refreshAppBusy') : t('refreshApp')}
+          </Text>
+          <Text style={styles.cardSub}>{t('refreshAppSub')}</Text>
+        </Pressable>
+      ) : null}
 
       <Pressable
         style={({ pressed }) => [styles.card, pressed && styles.pressed]}
@@ -399,7 +423,14 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     padding: spacing.lg,
     marginBottom: spacing.md,
-    ...shadows.soft,
+  },
+  refreshCard: {
+    ...surfaces.card,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
   },
   card: {
     ...surfaces.card,

@@ -6,8 +6,12 @@ export type SimplifiedCategoryId =
   | 'dairy'
   | 'vegetables'
   | 'seafood'
+  | 'meat'
   | 'frozen'
-  | 'dry_goods';
+  | 'dry_goods'
+  | 'kitchen_alcohol'
+  | 'other'
+  | 'waste';
 
 export type SimplifiedCountItem = {
   id: string;
@@ -28,16 +32,56 @@ export const SIMPLIFIED_CATEGORIES: {
     | 'simpCountCatDairy'
     | 'simpCountCatVegetables'
     | 'simpCountCatSeafood'
+    | 'simpCountCatMeat'
     | 'simpCountCatFrozen'
-    | 'simpCountCatDryGoods';
+    | 'simpCountCatDryGoods'
+    | 'simpCountCatKitchenAlcohol'
+    | 'simpCountCatOther'
+    | 'simpCountCatWaste';
 }[] = [
   { id: 'stock_values', labelKey: 'simpCountCatStockValues' },
   { id: 'dairy', labelKey: 'simpCountCatDairy' },
   { id: 'vegetables', labelKey: 'simpCountCatVegetables' },
   { id: 'seafood', labelKey: 'simpCountCatSeafood' },
+  { id: 'meat', labelKey: 'simpCountCatMeat' },
   { id: 'frozen', labelKey: 'simpCountCatFrozen' },
   { id: 'dry_goods', labelKey: 'simpCountCatDryGoods' },
+  { id: 'kitchen_alcohol', labelKey: 'simpCountCatKitchenAlcohol' },
+  { id: 'other', labelKey: 'simpCountCatOther' },
+  { id: 'waste', labelKey: 'simpCountCatWaste' },
 ];
+
+/** Category rows on the Stock values / food stock sheet (order matches inventaario sheet). */
+export const STOCK_VALUE_CATEGORY_IDS: SimplifiedCategoryId[] = [
+  'dairy',
+  'vegetables',
+  'seafood',
+  'meat',
+  'frozen',
+  'dry_goods',
+  'kitchen_alcohol',
+  'other',
+  'waste',
+];
+
+/**
+ * August sheet category totals (used when a category has no seeded lines yet).
+ * Live `categoryTotal(items)` wins once products exist in that category.
+ */
+export const AUGUST_SHEET_CATEGORY_TOTALS: Record<
+  Exclude<SimplifiedCategoryId, 'stock_values'>,
+  number
+> = {
+  dairy: 560.29,
+  vegetables: 527.29,
+  seafood: 558.81,
+  meat: 5995.61,
+  frozen: 886.69,
+  dry_goods: 3441.1,
+  kitchen_alcohol: 207.9,
+  other: 0,
+  waste: 0,
+};
 
 /** Lönkka Bull & Bottle · August dairy sheet (draft seed). */
 export const DAIRY_COUNT_SEED: SimplifiedCountItem[] = [
@@ -373,8 +417,12 @@ export const PLACEHOLDER_BY_CATEGORY: Partial<
   dairy: DAIRY_COUNT_SEEDED,
   vegetables: [],
   seafood: [],
+  meat: [],
   frozen: [],
   dry_goods: [],
+  kitchen_alcohol: [],
+  other: [],
+  waste: [],
 };
 
 export function lineTotal(item: SimplifiedCountItem): number {
@@ -386,6 +434,15 @@ export function categoryTotal(items: SimplifiedCountItem[]): number {
     Math.round(items.reduce((sum, item) => sum + lineTotal(item), 0) * 100) /
     100
   );
+}
+
+/** Live sum when seeded; otherwise August sheet total so Stock values matches the inventaario sheet. */
+export function resolveCategoryStockTotal(
+  categoryId: Exclude<SimplifiedCategoryId, 'stock_values'>,
+  items: SimplifiedCountItem[],
+): number {
+  if (items.length > 0) return categoryTotal(items);
+  return AUGUST_SHEET_CATEGORY_TOTALS[categoryId] ?? 0;
 }
 
 /** Other-language name + nicknames (excludes the primary display name). */

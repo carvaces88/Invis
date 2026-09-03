@@ -307,6 +307,10 @@ export function CatalogScreen() {
           style={[
             styles.tableScroll,
             listHeight > 0 ? { height: listHeight } : null,
+            // Let trackpad/touch pan both axes; FlatList still owns vertical.
+            Platform.OS === 'web'
+              ? ({ touchAction: 'pan-x pan-y' } as object)
+              : null,
           ]}
           contentContainerStyle={[
             styles.tableScrollContent,
@@ -330,7 +334,19 @@ export function CatalogScreen() {
             <FlatList
               data={filtered}
               keyExtractor={(item) => item.id}
-              style={styles.list}
+              style={[
+                styles.list,
+                // RN-web vertical lists set overflowX:'hidden', which eats
+                // pans inside a nested H-ScrollView — keep Y scrollable.
+                Platform.OS === 'web'
+                  ? ({
+                      overflowX: 'visible',
+                      overflowY: 'auto',
+                      touchAction: 'pan-x pan-y',
+                      WebkitOverflowScrolling: 'touch',
+                    } as object)
+                  : null,
+              ]}
               nestedScrollEnabled
               contentContainerStyle={{
                 paddingHorizontal: spacing.lg,
@@ -473,8 +489,10 @@ const styles = StyleSheet.create({
   tableInner: {
     flex: 1,
     minHeight: 0,
+    // Column layout so FlatList gets remaining height under price headers.
+    flexDirection: 'column',
   },
-  list: { flex: 1, minHeight: 0 },
+  list: { flex: 1, minHeight: 0, flexShrink: 1 },
   card: {
     ...surfaces.cardTight,
     paddingVertical: spacing.sm,

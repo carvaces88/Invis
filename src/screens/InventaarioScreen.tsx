@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -100,11 +101,11 @@ function withViewStorageColumn(columns: ExportColumnId[]): ExportColumnId[] {
 
 function colStyle(
   col: ExportColumnId,
-  opts?: { productCodeOpen?: boolean },
+  opts?: { productCodeOpen?: boolean; compactName?: boolean },
 ) {
   switch (col) {
     case 'name':
-      return styles.colName;
+      return opts?.compactName ? styles.colNameCompact : styles.colName;
     case 'unit':
       return styles.colUnit;
     case 'storage':
@@ -155,11 +156,12 @@ function colHeadAlign(col: ExportColumnId) {
 function tableMinWidth(
   columns: ExportColumnId[],
   productCodeOpen = false,
+  compactName = false,
 ): number {
   return columns.reduce((sum, col) => {
     switch (col) {
       case 'name':
-        return sum + 200;
+        return sum + (compactName ? 104 : 148);
       case 'unit':
         return sum + 64;
       case 'storage':
@@ -193,6 +195,9 @@ function tableMinWidth(
 
 export function InventaarioScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  /** Phone / narrow web — keep Name tight and chrome shorter. */
+  const isCompact = windowWidth < 700;
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const {
@@ -358,10 +363,14 @@ export function InventaarioScreen() {
   const columnOrderCustomized = !columnOrdersEqual(columns, defaultColumns);
   const showPriceCols =
     columns.includes('price') || columns.includes('total');
-  const minTableWidth = tableMinWidth(columns, productCodeOpen);
+  const minTableWidth = tableMinWidth(columns, productCodeOpen, isCompact);
+  const nameColStyle = isCompact ? styles.colNameCompact : styles.colName;
+  const footerNameStyle = isCompact
+    ? styles.footerLabelCompact
+    : styles.footerLabel;
   const colOpts = useMemo(
-    () => ({ productCodeOpen }),
-    [productCodeOpen],
+    () => ({ productCodeOpen, compactName: isCompact }),
+    [productCodeOpen, isCompact],
   );
 
   const alvFactor = showWithAlv && showPriceCols ? 1 + FOOD_ALV_RATE : 1;
@@ -600,7 +609,7 @@ export function InventaarioScreen() {
             ? placeById.get(item.placeId)?.name
             : undefined;
         return (
-          <View key={col} style={styles.colName}>
+          <View key={col} style={nameColStyle}>
             <Text
               style={styles.td}
               numberOfLines={2}
@@ -929,15 +938,29 @@ export function InventaarioScreen() {
   );
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + spacing.xs }]}>
+    <View
+      style={[
+        styles.root,
+        {
+          // Android installed web apps often report insets.top = 0 — keep a floor.
+          paddingTop: Math.max(insets.top, isCompact ? 12 : 0) + spacing.md,
+        },
+      ]}
+    >
       <View style={styles.chrome}>
-        <View style={styles.titleRow}>
+        <View style={[styles.titleRow, isCompact && styles.titleRowCompact]}>
           <View style={styles.titleBlock}>
             <Text style={styles.kicker}>{t('appBrand')}</Text>
-            <Text style={styles.title} numberOfLines={1}>
+            <Text
+              style={[styles.title, isCompact && styles.titleCompact]}
+              numberOfLines={1}
+            >
               {t('currentInventory')}
             </Text>
-            <Text style={styles.meta} numberOfLines={1}>
+            <Text
+              style={[styles.meta, isCompact && styles.metaCompact]}
+              numberOfLines={2}
+            >
               {t('currentInventorySub').replace(
                 '{count}',
                 String(recordedCount),
@@ -1467,7 +1490,7 @@ export function InventaarioScreen() {
                       switch (col) {
                         case 'name':
                           return (
-                            <Text key={col} style={styles.footerLabel}>
+                            <Text key={col} style={footerNameStyle}>
                               {t('foodTotal')}
                             </Text>
                           );
@@ -1536,6 +1559,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
+    marginTop: spacing.sm,
     marginBottom: spacing.xs,
   },
   filterSelectHalf: {
@@ -1547,7 +1571,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xs,
+    paddingBottom: spacing.sm,
+  },
+  titleRowCompact: {
+    paddingBottom: spacing.md,
   },
   titleBlock: { flex: 1, minWidth: 0 },
   kicker: {
@@ -1556,14 +1583,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+    marginBottom: 4,
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.ink,
-    marginTop: 1,
+    marginTop: 2,
   },
-  meta: { color: colors.inkMuted, marginTop: 2, fontSize: 12 },
+  titleCompact: {
+    marginTop: 6,
+  },
+  meta: { color: colors.inkMuted, marginTop: 4, fontSize: 12, lineHeight: 16 },
+  metaCompact: { marginTop: 6, marginBottom: 2 },
   toolsToggle: {
     width: 36,
     height: 36,
@@ -1870,15 +1902,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  // Cap name growth so Storage (and following cols) sit beside content
-  // instead of after a wide empty flex void on wide screens.
+  // Keep name compact so qty / price / Restolution cols stay on-screen.
   colName: {
     flexGrow: 1,
     flexShrink: 1,
-    flexBasis: 180,
-    minWidth: 160,
-    maxWidth: 340,
+    flexBasis: 132,
+    minWidth: 112,
+    maxWidth: 200,
     paddingRight: spacing.sm,
+  },
+  /** Phone: fixed width so Storage / Unit / Qty sit in the first viewport. */
+  colNameCompact: {
+    width: 108,
+    flexGrow: 0,
+    flexShrink: 0,
+    maxWidth: 108,
+    minWidth: 108,
+    paddingRight: spacing.xs,
   },
   colUnit: { width: 64, textAlign: 'center', paddingTop: 1 },
   colStorage: {
@@ -1971,9 +2011,17 @@ const styles = StyleSheet.create({
   footerLabel: {
     flexGrow: 1,
     flexShrink: 1,
-    flexBasis: 180,
-    minWidth: 160,
-    maxWidth: 340,
+    flexBasis: 132,
+    minWidth: 112,
+    maxWidth: 200,
+    fontWeight: '700',
+    color: colors.ink,
+    fontSize: 13,
+  },
+  footerLabelCompact: {
+    width: 108,
+    flexGrow: 0,
+    flexShrink: 0,
     fontWeight: '700',
     color: colors.ink,
     fontSize: 13,
