@@ -180,6 +180,8 @@ export function GamifiedCountingView({
   const [confettiKey, setConfettiKey] = useState(0);
   const [flashOk, setFlashOk] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [fxOpen, setFxOpen] = useState(false);
+  const [fxExpr, setFxExpr] = useState('0');
   const namePan = useRef(new Animated.Value(0)).current;
   const successScale = useRef(new Animated.Value(1)).current;
 
@@ -349,10 +351,61 @@ export function GamifiedCountingView({
     setDigits(formatQty(next));
   };
 
-  const clearQty = () => {
-    onSetQuantity(item.id, 0);
-    setDigits('');
+  const openFx = () => {
+    const seed = typing
+      ? digits === '' || digits === '.'
+        ? '0'
+        : digits
+      : formatQty(item.quantity);
+    setFxExpr(seed === '0' ? '0' : seed);
+    setFxOpen(true);
+  };
+
+  const evalFx = (raw: string): number | null => {
+    const cleaned = raw
+      .replace(/×/g, '*')
+      .replace(/÷/g, '/')
+      .replace(/−/g, '-')
+      .replace(/,/g, '.');
+    if (!/^[\d.\s+\-*/()]+$/.test(cleaned)) return null;
+    try {
+      // eslint-disable-next-line no-new-func -- tiny local calculator, input sanitized above
+      const n = Function(`"use strict"; return (${cleaned})`)() as unknown;
+      return typeof n === 'number' && Number.isFinite(n) ? n : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const pushFxKey = (key: string) => {
+    setFxExpr((prev) => {
+      if (key === 'C') return '0';
+      if (key === '⌫') {
+        const next = prev.slice(0, -1);
+        return next === '' ? '0' : next;
+      }
+      if (key === '=') {
+        const n = evalFx(prev);
+        if (n == null) return prev;
+        return formatQty(Math.round(n * 1000) / 1000);
+      }
+      if (prev === '0' && /[0-9]/.test(key)) return key;
+      if (prev === '0' && key === '.') return '0.';
+      if (/[+\-×÷]/.test(key) && /[+\-×÷]$/.test(prev)) {
+        return `${prev.slice(0, -1)}${key}`;
+      }
+      return `${prev}${key}`;
+    });
+  };
+
+  const applyFx = () => {
+    const n = evalFx(fxExpr);
+    if (n == null) return;
+    const qty = Math.max(0, Math.round(n * 100) / 100);
+    onSetQuantity(item.id, qty);
     setTyping(false);
+    setDigits(formatQty(qty));
+    setFxOpen(false);
   };
 
   return (
@@ -373,16 +426,9 @@ export function GamifiedCountingView({
             ]}
             {...nameResponder.panHandlers}
           >
-            <View style={styles.titleRow}>
-              <Text style={styles.heroName} numberOfLines={2}>
-                {name}
-              </Text>
-              <Text style={styles.titleCount}>
-                {t('simpCountGameProgress')
-                  .replace('{n}', String(index + 1))
-                  .replace('{total}', String(items.length))}
-              </Text>
-            </View>
+            <Text style={styles.heroName} numberOfLines={2}>
+              {name}
+            </Text>
             <Text style={styles.swipeHint}>{t('simpCountGameSwipeHint')}</Text>
           </Animated.View>
           <Pressable
@@ -398,6 +444,11 @@ export function GamifiedCountingView({
         <View style={styles.displayWell}>
           <Text style={styles.displayText}>{display}</Text>
         </View>
+        <Text style={styles.progress}>
+          {t('simpCountGameProgress')
+            .replace('{n}', String(index + 1))
+            .replace('{total}', String(items.length))}
+        </Text>
         {flashOk ? (
           <Text style={styles.successLabel}>{t('simpCountGameSuccess')}</Text>
         ) : null}
@@ -447,9 +498,9 @@ export function GamifiedCountingView({
 
         <Pressable
           style={styles.dockBtn}
-          onPress={clearQty}
+          onPress={openFx}
           accessibilityRole="button"
-          accessibilityLabel={t('simpCountGameClear')}
+          accessibilityLabel={t('simpCountCalculator')}
         >
           <Text style={styles.dockFx}>ƒx</Text>
         </Pressable>
@@ -482,6 +533,78 @@ export function GamifiedCountingView({
           <Text style={styles.dockNextGlyph}>+</Text>
         </Pressable>
       </View>
+
+      <Modal
+        visible={fxOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFxOpen(false)}
+      >
+        <Pressable style={styles.fxBackdrop} onPress={() => setFxOpen(false)}>
+          <Pressable style={styles.fxCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.sheetTitle}>{t('simpCountCalculator')}</Text>
+            <View style={styles.fxDisplay}>
+              <Text style={styles.fxDisplayText} numberOfLines={1}>
+                {fxExpr}
+              </Text>
+            </View>
+            <View style={styles.fxPad}>
+              {(
+                [
+                  ['7', '8', '9', '÷'],
+                  ['4', '5', '6', '×'],
+                  ['1', '2', '3', '−'],
+                  ['C', '0', '.', '+'],
+                ] as const
+              ).map((row) => (
+                <View key={row.join('-')} style={styles.fxPadRow}>
+                  {row.map((key) => (
+                    <Pressable
+                      key={key}
+                      style={[
+                        styles.fxKey,
+                        /[+\−×÷]/.test(key) && styles.fxKeyOp,
+                        key === 'C' && styles.fxKeyClear,
+                      ]}
+                      onPress={() => pushFxKey(key === '−' ? '-' : key)}
+                      accessibilityRole="button"
+                      accessibilityLabel={key}
+                    >
+                      <Text style={styles.fxKeyText}>{key}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ))}
+              <View style={styles.fxPadRow}>
+                <Pressable
+                  style={styles.fxKey}
+                  onPress={() => pushFxKey('⌫')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('simpCountCalcBackspace')}
+                >
+                  <Text style={styles.fxKeyText}>⌫</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.fxKey, styles.fxKeyEq]}
+                  onPress={() => pushFxKey('=')}
+                  accessibilityRole="button"
+                  accessibilityLabel="="
+                >
+                  <Text style={styles.fxKeyText}>=</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.fxKey, styles.fxKeyApply]}
+                  onPress={applyFx}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('simpCountCalcApply')}
+                >
+                  <Text style={styles.fxApplyText}>{t('simpCountCalcApply')}</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={unitOpen}
@@ -570,23 +693,10 @@ const styles = StyleSheet.create({
     minHeight: 56,
     justifyContent: 'center',
   },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
   heroName: {
-    flex: 1,
     fontSize: 22,
     fontWeight: '600',
     color: colors.inkMuted,
-  },
-  titleCount: {
-    marginTop: 4,
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.ink,
-    letterSpacing: 0.2,
   },
   swipeHint: {
     marginTop: 4,
@@ -622,6 +732,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.ink,
     letterSpacing: 1,
+  },
+  progress: {
+    marginTop: 10,
+    fontSize: 12,
+    color: colors.inkFaint,
+    textAlign: 'center',
   },
   successLabel: {
     marginTop: 6,
@@ -700,6 +816,74 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontStyle: 'italic',
     color: colors.inkMuted,
+  },
+  fxBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(11,31,51,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  fxCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: NEO_CARD,
+    borderRadius: 24,
+    padding: spacing.md,
+    ...neoShadow,
+  },
+  fxDisplay: {
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+    backgroundColor: NEO_BG,
+    ...neoInset,
+  },
+  fxDisplayText: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: colors.ink,
+    textAlign: 'right',
+  },
+  fxPad: {
+    gap: 8,
+  },
+  fxPadRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  fxKey: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: NEO_BG,
+    ...neoShadow,
+  },
+  fxKeyOp: {
+    backgroundColor: 'rgba(184,232,216,0.55)',
+  },
+  fxKeyClear: {
+    backgroundColor: 'rgba(245,198,208,0.55)',
+  },
+  fxKeyEq: {
+    backgroundColor: 'rgba(168,197,240,0.55)',
+  },
+  fxKeyApply: {
+    flex: 2,
+    backgroundColor: GRADIENT_TEAL,
+  },
+  fxKeyText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  fxApplyText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.ink,
   },
   dockNav: {
     fontSize: 28,
