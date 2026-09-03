@@ -764,6 +764,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
       await printHtmlOrSharePdf({
         html,
         filename: `invis-prices-${priceHistoryMonthKey || monthKeyFromIndex(monthIndex)}.pdf`,
+        nativePrint: () => Print.printToFileAsync({ html }),
       });
     } catch (err) {
       alertInfo(
@@ -1215,17 +1216,24 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
                     recorded={recorded}
                     recordedLabel={t('simpCountStatusRecorded')}
                     missingLabel={t('simpCountStatusMissing')}
-                    editMode={editMode}
+                    armed={armedItemId === item.id}
                     hideLabel={t('simpCountHideProduct')}
                     editDetailsLabel={t('simpCountEditDetails')}
                     onHide={() => hideItem(item.id)}
                     onEditDetails={() =>
                       openProductEditor({ mode: 'edit', itemId: item.id })
                     }
-                    onLongPressEdit={() => {
-                      openProductEditor({ mode: 'edit', itemId: item.id });
+                    onLongPress={() => {
+                      setSelectedId(item.id);
+                      setArmedItemId(item.id);
+                      setEditMode(true);
                     }}
-                    onSelect={() => setSelectedId(item.id)}
+                    onSelect={() => {
+                      setSelectedId(item.id);
+                      if (armedItemId && armedItemId !== item.id) {
+                        setArmedItemId(null);
+                      }
+                    }}
                     onDelta={(d) => applyDelta(item.id, d)}
                   />
                 );
@@ -1606,16 +1614,19 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
             <ScrollView style={{ maxHeight: 420 }}>
               {priceHistoryRows.length === 0 ? (
                 <Text style={styles.sheetRowMuted}>
-                  {t('simpCountPriceHistoryEmpty')}
+                  {t('simpCountPriceHistoryEmptyMonth').replace(
+                    '{month}',
+                    months[monthIndex] ?? priceHistoryMonthKey,
+                  )}
                 </Text>
               ) : (
                 priceHistoryRows.map((group) => {
-                  const prev = group.history[1];
+                  const prev = group.previous;
                   const delta =
                     prev &&
                     t('simpCountPriceHistoryDelta')
                       .replace('{from}', prev.unitPriceAlv0.toFixed(2))
-                      .replace('{to}', group.latest.unitPriceAlv0.toFixed(2));
+                      .replace('{to}', group.current.unitPriceAlv0.toFixed(2));
                   return (
                     <View key={group.productKey} style={styles.hiddenRow}>
                       <View style={{ flex: 1, minWidth: 0 }}>
@@ -1623,12 +1634,10 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
                           {group.name}
                         </Text>
                         <Text style={styles.sheetRowMuted}>
-                          {group.latest.monthKey} ·{' '}
-                          {group.latest.unitPriceAlv0.toFixed(2)} €
+                          {group.current.monthKey} ·{' '}
+                          {group.current.unitPriceAlv0.toFixed(2)} €
                           {delta ? ` · ${delta}` : ''}
-                          {group.latest.appliedToInventory
-                            ? ` · ✓`
-                            : ''}
+                          {group.current.appliedToInventory ? ` · ✓` : ''}
                         </Text>
                       </View>
                     </View>
@@ -1636,6 +1645,11 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
                 })
               )}
             </ScrollView>
+            <Pressable style={styles.sheetRow} onPress={exportPriceHistoryMonth}>
+              <Text style={styles.sheetRowText}>
+                {t('simpCountPriceHistoryExport')}
+              </Text>
+            </Pressable>
             <Pressable
               style={styles.sheetRow}
               onPress={() => setPriceHistoryOpen(false)}
@@ -2120,14 +2134,19 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(11,79,138,0.28)',
   },
   rowCardEdit: {
-    borderWidth: 1,
-    borderColor: 'rgba(180,35,24,0.22)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(180,35,24,0.35)',
+    backgroundColor: 'rgba(253,236,236,0.95)',
+  },
+  rowActionFabs: {
+    position: 'absolute',
+    top: -10,
+    left: -8,
+    zIndex: 5,
+    flexDirection: 'row',
+    gap: 6,
   },
   hideFab: {
-    position: 'absolute',
-    top: -8,
-    left: -8,
-    zIndex: 4,
     width: 28,
     height: 28,
     borderRadius: 14,
@@ -2142,6 +2161,120 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: -2,
     lineHeight: 24,
+  },
+  editFab: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...neoShadow,
+  },
+  editFabGlyph: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  editBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: spacing.md,
+    marginBottom: 10,
+  },
+  editBarBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: 'rgba(11,79,138,0.18)',
+  },
+  editBarBtnDisabled: { opacity: 0.45 },
+  editBarBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  editBarBtnDone: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+  },
+  editBarBtnDoneText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  productEditorSheet: {
+    maxHeight: '88%',
+  },
+  editFieldLabel: {
+    marginTop: 8,
+    marginBottom: 4,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.inkMuted,
+  },
+  editFieldInput: {
+    backgroundColor: NEO_BG,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: colors.ink,
+    marginBottom: 4,
+  },
+  editChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  editChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: NEO_BG,
+  },
+  editChipOn: {
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  editChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.inkMuted,
+  },
+  editChipTextOn: {
+    color: colors.primary,
+    fontWeight: '800',
+  },
+  editPopupActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    gap: 12,
+  },
+  editPopupCancel: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  editPopupSave: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  editPopupSaveText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 15,
   },
   rowInner: {
     flexDirection: 'row',

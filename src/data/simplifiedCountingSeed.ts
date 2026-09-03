@@ -1,4 +1,11 @@
 import type { UnitCode } from './types';
+import {
+  DRY_GOODS_COUNT_SEED,
+  FROZEN_COUNT_SEED,
+  MEAT_COUNT_SEED,
+  SEAFOOD_COUNT_SEED,
+  VEGETABLES_COUNT_SEED,
+} from './simplifiedCountingSheetSeeds';
 
 /** Draft categories for Simplified Counting (sheet tabs). */
 export type SimplifiedCategoryId =
@@ -429,17 +436,17 @@ function withDairyAliases(
 
 const DAIRY_COUNT_SEEDED = withDairyAliases(DAIRY_COUNT_SEED);
 
-/** Placeholder lines for categories not yet imported from the sheet. */
+/** Seeded lines from the August inventaario sheet (by category tab). */
 export const PLACEHOLDER_BY_CATEGORY: Record<
   SimplifiedItemCategoryId,
   SimplifiedCountItem[]
 > = {
   dairy: DAIRY_COUNT_SEEDED,
-  vegetables: [],
-  seafood: [],
-  meat: [],
-  frozen: [],
-  dry_goods: [],
+  vegetables: VEGETABLES_COUNT_SEED,
+  seafood: SEAFOOD_COUNT_SEED,
+  meat: MEAT_COUNT_SEED,
+  frozen: FROZEN_COUNT_SEED,
+  dry_goods: DRY_GOODS_COUNT_SEED,
   kitchen_alcohol: [],
   other: [],
   waste: [],

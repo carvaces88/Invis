@@ -47,6 +47,7 @@ import { ScanScreen } from './src/screens/ScanScreen';
 import { SheetImportReviewScreen } from './src/screens/SheetImportReviewScreen';
 import { SheetImportScanScreen } from './src/screens/SheetImportScanScreen';
 import { SimplifiedCountingScreen } from './src/screens/SimplifiedCountingScreen';
+import { SupplierOrderReviewScreen } from './src/screens/SupplierOrderReviewScreen';
 import { InventoryPhotosScreen } from './src/screens/InventoryPhotosScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { UnitsGuideScreen } from './src/screens/UnitsGuideScreen';
@@ -397,6 +398,15 @@ function RootNavigator() {
           component={SheetImportReviewScreen}
           options={{
             title: t('sheetImportReviewTitle'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+        />
+        <Stack.Screen
+          name="SupplierOrderReview"
+          component={SupplierOrderReviewScreen}
+          options={{
+            title: t('supplierOrderTitle'),
             headerTintColor: colors.primary,
             headerStyle: { backgroundColor: colors.bg },
           }}

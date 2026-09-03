@@ -37,6 +37,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
       MonthWrapUp: 'month-wrap-up',
       SheetImport: 'import-sheet',
       SheetImportReview: 'import-sheet-review',
+      SupplierOrderReview: 'supplier-order-review',
       InventoryPhotos: 'inventory-photos',
       VideoDemo: 'video-demo',
       UnitsGuide: 'units',

@@ -415,6 +415,17 @@ export type RootStackParamList = {
     /** All source photos (multi-page import) */
     imageUris?: string[];
   };
+  /**
+   * Supplier order / price list photo → match catalog →
+   * add to inventory OR save price records only.
+   */
+  SupplierOrderReview: {
+    document: DocumentExtract;
+    imageUri?: string;
+    imageUris?: string[];
+    /** Counting month index 0–11 for history bucketing */
+    monthIndex?: number;
+  };
   /** Browse inventory session photos by place / date */
   InventoryPhotos: undefined;
   /** Optional feedback / comments (strongly nudged after sign-in) */
