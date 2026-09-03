@@ -373,9 +373,16 @@ export function GamifiedCountingView({
             ]}
             {...nameResponder.panHandlers}
           >
-            <Text style={styles.heroName} numberOfLines={2}>
-              {name}
-            </Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.heroName} numberOfLines={2}>
+                {name}
+              </Text>
+              <Text style={styles.titleCount}>
+                {t('simpCountGameProgress')
+                  .replace('{n}', String(index + 1))
+                  .replace('{total}', String(items.length))}
+              </Text>
+            </View>
             <Text style={styles.swipeHint}>{t('simpCountGameSwipeHint')}</Text>
           </Animated.View>
           <Pressable
@@ -391,11 +398,6 @@ export function GamifiedCountingView({
         <View style={styles.displayWell}>
           <Text style={styles.displayText}>{display}</Text>
         </View>
-        <Text style={styles.progress}>
-          {t('simpCountGameProgress')
-            .replace('{n}', String(index + 1))
-            .replace('{total}', String(items.length))}
-        </Text>
         {flashOk ? (
           <Text style={styles.successLabel}>{t('simpCountGameSuccess')}</Text>
         ) : null}
@@ -568,10 +570,23 @@ const styles = StyleSheet.create({
     minHeight: 56,
     justifyContent: 'center',
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
   heroName: {
+    flex: 1,
     fontSize: 22,
     fontWeight: '600',
     color: colors.inkMuted,
+  },
+  titleCount: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.ink,
+    letterSpacing: 0.2,
   },
   swipeHint: {
     marginTop: 4,
@@ -607,12 +622,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.ink,
     letterSpacing: 1,
-  },
-  progress: {
-    marginTop: 10,
-    fontSize: 12,
-    color: colors.inkFaint,
-    textAlign: 'center',
   },
   successLabel: {
     marginTop: 6,
