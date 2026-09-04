@@ -1,0 +1,19 @@
+---
+description: Simple invis new-item suggest — category, AKAs, prefill, destination
+globs: src/screens/SimplifiedCountingScreen.tsx,src/lib/simpCount*.ts,src/data/simplifiedCounting*.ts
+alwaysApply: false
+---
+
+# Simple invis — new product suggestions
+
+When staff **enter a new product** in Simple invis (type name, scan list, or add from photo), if it is **not already** on the month list:
+
+1. **Suggest a destination category** (dairy / vegetables / seafood / meat / frozen / dry_goods / kitchen_alcohol / other / waste) from name + aliases + catalog/ingredient cues — e.g. milk → dairy, T-bone → meat, punkku → kitchen_alcohol.
+2. **Suggest storage place** when the main inventory place list is available (e.g. cooler vs dry store) — user can confirm; do not silently invent places.
+3. **Build AKA / also-known-as** nicknames (FI + EN + kitchen slang) via `generateProductAliases` / seed aliases — prefill the aliases field.
+4. **Prefill the add form** with best-guess EN name, FI name, unit, unit price (from similar list/catalog rows when confident), and the suggested category selected.
+5. **Save into the destined category** on confirm (switch category chip + list), not only the currently open tab — unless the user overrides the category.
+
+If a close match already exists on the Simple invis list, prefer **select existing / merge** over inserting a duplicate.
+
+Do not drop this when refining export, stock values, or dock UI.

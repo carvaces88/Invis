@@ -22,9 +22,15 @@ import { useI18n, type Locale } from '../i18n';
 import { alertAck, alertConfirm } from '../lib/alertAck';
 import { hardReloadApp } from '../lib/hardReloadApp';
 import { useUnitSystem, type UnitSystem } from '../lib/unitSystem';
+import { SimpleInvisIcon } from '../components/SimpCountDockIcons';
 import { colors, radius, shadows, spacing, surfaces } from '../theme/colors';
 
 const brandWordmark = require('../../assets/invis-wordmark.png');
+
+/** Cyan → blue → magenta — matches the Generate-style pill reference. */
+const SIMP_GRAD =
+  'linear-gradient(90deg, #22D3EE 0%, #3B82F6 48%, #A855F7 100%)';
+const SIMP_ICON = '#22D3EE';
 
 type MoreNav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'More'>,
@@ -86,11 +92,6 @@ export function MoreScreen() {
       title: t('inventoryPhotosOpen'),
       subtitle: t('inventoryPhotosOpenSub'),
       route: 'InventoryPhotos' as const,
-    },
-    {
-      title: t('simpCountOpen'),
-      subtitle: t('simpCountOpenSub'),
-      route: 'SimplifiedCounting' as const,
     },
     {
       title: t('monthWrapUpOpen'),
@@ -289,10 +290,9 @@ export function MoreScreen() {
         </View>
       </View>
 
-      {items.map((item) => {
-        return (
+      {items.map((item) => (
+        <React.Fragment key={item.route}>
           <Pressable
-            key={item.route}
             style={({ pressed }) => [
               styles.card,
               pressed && styles.pressed,
@@ -304,8 +304,52 @@ export function MoreScreen() {
             <Text style={styles.cardTitle}>{item.title}</Text>
             <Text style={styles.cardSub}>{item.subtitle}</Text>
           </Pressable>
-        );
-      })}
+          {item.route === 'InventoryPhotos' ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.simpleInvisOuter,
+                pressed && styles.pressed,
+                Platform.OS === 'web'
+                  ? ({
+                      backgroundImage: `linear-gradient(#FFFFFF,#FFFFFF), ${SIMP_GRAD}`,
+                      backgroundOrigin: 'border-box',
+                      backgroundClip: 'padding-box, border-box',
+                      borderWidth: 2,
+                      borderColor: 'transparent',
+                    } as object)
+                  : null,
+              ]}
+              onPress={() => navigation.navigate('SimplifiedCounting')}
+              accessibilityRole="button"
+              accessibilityLabel={t('simpCountOpen')}
+            >
+              <View style={styles.simpleInvisInner}>
+                <SimpleInvisIcon size={22} color={SIMP_ICON} />
+                <View style={styles.simpleInvisTextCol}>
+                  <Text
+                    style={[
+                      styles.simpleInvisTitle,
+                      Platform.OS === 'web'
+                        ? ({
+                            backgroundImage: SIMP_GRAD,
+                            backgroundClip: 'text',
+                            WebkitBackgroundClip: 'text',
+                            color: 'transparent',
+                          } as Record<string, string>)
+                        : null,
+                    ]}
+                  >
+                    {t('simpCountOpen')}
+                  </Text>
+                  <Text style={styles.simpleInvisSub}>
+                    {t('simpCountOpenSub')}
+                  </Text>
+                </View>
+              </View>
+            </Pressable>
+          ) : null}
+        </React.Fragment>
+      ))}
 
       <Pressable
         style={({ pressed }) => [styles.dangerCard, pressed && styles.pressed]}
@@ -444,6 +488,45 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     padding: spacing.lg,
     marginBottom: spacing.md,
+  },
+  simpleInvisOuter: {
+    borderRadius: 999,
+    marginBottom: spacing.md,
+    padding: 2,
+    backgroundColor: Platform.OS === 'web' ? undefined : '#FFFFFF',
+    borderWidth: Platform.OS === 'web' ? 0 : 2,
+    borderColor: Platform.OS === 'web' ? 'transparent' : '#3B82F6',
+    ...shadows.float,
+    ...(Platform.OS === 'web'
+      ? ({
+          boxShadow: '0 8px 24px rgba(59, 130, 246, 0.18)',
+        } as object)
+      : null),
+  },
+  simpleInvisInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+  },
+  simpleInvisTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  simpleInvisTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#6366F1',
+    letterSpacing: -0.2,
+  },
+  simpleInvisSub: {
+    marginTop: 2,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.inkMuted,
   },
   adminCard: {
     backgroundColor: colors.primarySoft,

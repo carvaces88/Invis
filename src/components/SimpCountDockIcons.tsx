@@ -126,6 +126,40 @@ export function PlusFiveBadge({
   );
 }
 
+/** Simple invis — compact count checklist (More entry glyph). */
+export function SimpleInvisIcon({
+  size = 22,
+  color = colors.primary,
+}: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityRole="image">
+      <Rect
+        x="4"
+        y="3.5"
+        width="16"
+        height="17"
+        rx="3"
+        stroke={color}
+        {...strokeProps}
+      />
+      <Path
+        d="M8 8.2h8M8 12h8M8 15.8h5.2"
+        stroke={color}
+        strokeWidth={1.75}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M15.2 14.6l1.5 1.5 2.8-3"
+        stroke={color}
+        strokeWidth={1.85}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
+  );
+}
+
 /** Tiny spacer so unused Rect import stays available for future glyphs. */
 export function DockIconFrame({
   size = 22,

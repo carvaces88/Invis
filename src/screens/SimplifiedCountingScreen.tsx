@@ -66,8 +66,13 @@ import {
   type SimpExportFormat,
   type SimpExportScope,
 } from '../lib/simpCountExport';
+import {
+  suggestSimpCountProduct,
+  type SimpProductSuggestion,
+} from '../lib/simpCountProductSuggest';
 import { printHtmlOrSharePdf } from '../lib/export/download';
 import { analyzePriorStockListImages } from '../lib/vision';
+import { useInventory } from '../data/store';
 import { colors, radius, spacing } from '../theme/colors';
 import * as Print from 'expo-print';
 
@@ -382,6 +387,7 @@ function CountRow({
 export function SimplifiedCountingScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { t, locale } = useI18n();
+  const { products, places } = useInventory();
   const months = locale === 'fi' ? MONTHS_FI : MONTHS_EN;
 
   const [monthIndex, setMonthIndex] = useState(SIMP_COUNT_LIVE_MONTH_INDEX);
@@ -432,6 +438,9 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   const [exportScope, setExportScope] = useState<SimpExportScope>('category');
   const [exportFormat, setExportFormat] = useState<SimpExportFormat>('pdf');
   const [exportBusy, setExportBusy] = useState(false);
+  const [addSuggestion, setAddSuggestion] =
+    useState<SimpProductSuggestion | null>(null);
+  const [suggestApplied, setSuggestApplied] = useState(false);
 
   const isOverview = categoryId === 'stock_values';
 
@@ -922,6 +931,8 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
 
   const openProductEditor = useCallback(
     (state: ProductEditorState) => {
+      setAddSuggestion(null);
+      setSuggestApplied(false);
       if (state.mode === 'add') {
         const fallbackCat: SimplifiedItemCategoryId =
           isItemCategoryId(categoryId) ? categoryId : 'other';
@@ -955,6 +966,73 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
     },
     [byCategory, categoryId],
   );
+
+  // While adding: suggest category, place, AKAs, and bilingual names from typed text.
+  useEffect(() => {
+    if (productEditor?.mode !== 'add' || suggestApplied) return;
+    const q = (editNameEn || editNameFi).trim();
+    if (q.length < 2) {
+      setAddSuggestion(null);
+      return;
+    }
+    const handle = setTimeout(() => {
+      const fallback: SimplifiedItemCategoryId | undefined = isItemCategoryId(
+        categoryId,
+      )
+        ? categoryId
+        : undefined;
+      const suggestion = suggestSimpCountProduct({
+        query: q,
+        existingItems: flattenAllItems(byCategory),
+        byCategory,
+        catalog: products,
+        places,
+        fallbackCategory: fallback,
+      });
+      setAddSuggestion(suggestion);
+    }, 280);
+    return () => clearTimeout(handle);
+  }, [
+    productEditor?.mode,
+    editNameEn,
+    editNameFi,
+    byCategory,
+    products,
+    places,
+    categoryId,
+    suggestApplied,
+  ]);
+
+  const applyAddSuggestion = useCallback(() => {
+    if (!addSuggestion) return;
+    setEditNameEn(addSuggestion.nameEn);
+    setEditNameFi(addSuggestion.nameFi);
+    setEditCategoryId(addSuggestion.categoryId);
+    setEditUnit(addSuggestion.unit);
+    if (
+      addSuggestion.unitPriceAlv0 != null &&
+      addSuggestion.unitPriceAlv0 > 0
+    ) {
+      setEditPrice(formatMoney(addSuggestion.unitPriceAlv0));
+    }
+    if (addSuggestion.aliases.length) {
+      setEditAliases(addSuggestion.aliases.join(', '));
+    }
+    setSuggestApplied(true);
+  }, [addSuggestion]);
+
+  const openSuggestedExisting = useCallback(() => {
+    if (!addSuggestion?.existingItemId) return;
+    const id = addSuggestion.existingItemId;
+    const home =
+      addSuggestion.existingCategoryId ??
+      findItemCategory(byCategory, id);
+    if (home) setCategoryId(home);
+    setSelectedId(id);
+    setProductEditor(null);
+    setAddSuggestion(null);
+    setEditMode(false);
+  }, [addSuggestion, byCategory]);
 
   const saveProductEditor = useCallback(() => {
     if (!productEditor) return;
@@ -2054,21 +2132,93 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
               <Text style={styles.editFieldLabel}>{t('simpCountAddName')}</Text>
               <TextInput
                 value={editNameEn}
-                onChangeText={setEditNameEn}
+                onChangeText={(v) => {
+                  setEditNameEn(v);
+                  setSuggestApplied(false);
+                }}
                 style={styles.editFieldInput}
                 placeholder={t('simpCountAddName')}
                 placeholderTextColor={colors.inkFaint}
+                autoFocus={productEditor?.mode === 'add'}
               />
               <Text style={styles.editFieldLabel}>
                 {t('simpCountAddNameFi')}
               </Text>
               <TextInput
                 value={editNameFi}
-                onChangeText={setEditNameFi}
+                onChangeText={(v) => {
+                  setEditNameFi(v);
+                  setSuggestApplied(false);
+                }}
                 style={styles.editFieldInput}
                 placeholder={t('simpCountAddNameFi')}
                 placeholderTextColor={colors.inkFaint}
               />
+              {productEditor?.mode === 'add' && addSuggestion ? (
+                <View style={styles.suggestCard}>
+                  <Text style={styles.suggestTitle}>
+                    {t('simpCountSuggestTitle')}
+                  </Text>
+                  {addSuggestion.existingItemId ? (
+                    <Text style={styles.suggestDup}>
+                      {t('simpCountSuggestDup')}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.suggestBody}>
+                    {(addSuggestion.placeLabel
+                      ? t('simpCountSuggestLine')
+                      : t('simpCountSuggestLineNoPlace')
+                    )
+                      .replace(
+                        '{category}',
+                        t(
+                          SIMPLIFIED_CATEGORIES.find(
+                            (c) => c.id === addSuggestion.categoryId,
+                          )?.labelKey ?? 'simpCountCatOther',
+                        ),
+                      )
+                      .replace(
+                        '{place}',
+                        addSuggestion.placeLabel ?? '',
+                      )
+                      .replace(
+                        '{aliases}',
+                        addSuggestion.aliases.slice(0, 4).join(', ') || '—',
+                      )}
+                  </Text>
+                  <Text style={styles.suggestNames} numberOfLines={2}>
+                    {addSuggestion.nameEn}
+                    {addSuggestion.nameFi !== addSuggestion.nameEn
+                      ? ` · ${addSuggestion.nameFi}`
+                      : ''}
+                    {` · ${addSuggestion.unit}`}
+                    {addSuggestion.unitPriceAlv0
+                      ? ` · ${formatMoney(addSuggestion.unitPriceAlv0)} €`
+                      : ''}
+                  </Text>
+                  <View style={styles.suggestActions}>
+                    {addSuggestion.existingItemId ? (
+                      <Pressable
+                        style={styles.suggestBtn}
+                        onPress={openSuggestedExisting}
+                      >
+                        <Text style={styles.suggestBtnText}>
+                          {t('simpCountSuggestOpenExisting')}
+                        </Text>
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        style={styles.suggestBtn}
+                        onPress={applyAddSuggestion}
+                      >
+                        <Text style={styles.suggestBtnText}>
+                          {t('simpCountSuggestApply')}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                </View>
+              ) : null}
               <Text style={styles.editFieldLabel}>
                 {t('simpCountAddCategory')}
               </Text>
@@ -2522,6 +2672,55 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.ink,
     marginBottom: 4,
+  },
+  suggestCard: {
+    marginTop: 8,
+    marginBottom: 10,
+    padding: 12,
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(184,232,216,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(11,79,138,0.14)',
+  },
+  suggestTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  suggestDup: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B42318',
+    marginBottom: 4,
+  },
+  suggestBody: {
+    fontSize: 13,
+    color: colors.ink,
+    lineHeight: 18,
+  },
+  suggestNames: {
+    marginTop: 4,
+    fontSize: 12,
+    color: colors.inkMuted,
+  },
+  suggestActions: {
+    marginTop: 10,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  suggestBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+  },
+  suggestBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 13,
   },
   editChipRow: {
     flexDirection: 'row',

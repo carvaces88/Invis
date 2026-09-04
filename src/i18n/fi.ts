@@ -591,6 +591,13 @@ export const fi: Messages = {
   simpCountEditDone: 'Valmis',
   simpCountEditSave: 'Tallenna',
   simpCountEditPopupSub: 'Päivitä nimi, yksikkö, hinta, kategoria ja aliakset.',
+  simpCountSuggestTitle: 'Ehdotus',
+  simpCountSuggestApply: 'Käytä ehdotusta',
+  simpCountSuggestOpenExisting: 'Avaa olemassa oleva',
+  simpCountSuggestLine:
+    '{category} · {place} · aka {aliases}',
+  simpCountSuggestLineNoPlace: '{category} · aka {aliases}',
+  simpCountSuggestDup: 'On jo listalla — avaa se sen sijaan, että lisäät uudestaan.',
   simpCountAddNeedName: 'Anna tuotteen nimi.',
   simpCountAddNeedPrice: 'Anna kelvollinen yksikköhinta (tai jätä tyhjäksi = 0).',
   simpCountAddAliases: 'Myös nimellä',

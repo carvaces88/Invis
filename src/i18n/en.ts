@@ -596,6 +596,13 @@ export const en = {
   simpCountEditDone: 'Done',
   simpCountEditSave: 'Save changes',
   simpCountEditPopupSub: 'Update name, unit, price, category, and nicknames.',
+  simpCountSuggestTitle: 'Suggestion',
+  simpCountSuggestApply: 'Use suggestion',
+  simpCountSuggestOpenExisting: 'Open existing',
+  simpCountSuggestLine:
+    '{category} · {place} · aka {aliases}',
+  simpCountSuggestLineNoPlace: '{category} · aka {aliases}',
+  simpCountSuggestDup: 'Already on the list — open it instead of adding again.',
   simpCountAddNeedName: 'Enter a product name.',
   simpCountAddNeedPrice: 'Enter a valid unit price (or leave blank for 0).',
   simpCountAddAliases: 'Also known as',
