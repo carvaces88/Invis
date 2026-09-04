@@ -490,27 +490,33 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   simpleInvisOuter: {
-    borderRadius: 999,
+    borderRadius: radius.xl,
     marginBottom: spacing.md,
     padding: 2,
     backgroundColor: Platform.OS === 'web' ? undefined : '#FFFFFF',
     borderWidth: Platform.OS === 'web' ? 0 : 2,
     borderColor: Platform.OS === 'web' ? 'transparent' : '#3B82F6',
-    ...shadows.float,
     ...(Platform.OS === 'web'
       ? ({
-          boxShadow: '0 8px 24px rgba(59, 130, 246, 0.18)',
+          boxShadow:
+            '0 0 0 1px rgba(168, 85, 247, 0.18), 0 10px 28px rgba(34, 211, 238, 0.35), 0 16px 40px rgba(168, 85, 247, 0.28)',
         } as object)
-      : null),
+      : {
+          shadowColor: '#A855F7',
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.35,
+          shadowRadius: 18,
+          elevation: 10,
+        }),
   },
   simpleInvisInner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     backgroundColor: '#FFFFFF',
-    borderRadius: 999,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    borderRadius: radius.xl - 2,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
   },
   simpleInvisTextCol: {
     flex: 1,
