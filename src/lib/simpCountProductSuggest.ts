@@ -17,7 +17,7 @@ export type SimpProductSuggestion = {
   unit: UnitCode;
   unitPriceAlv0: number | null;
   aliases: string[];
-  /** Existing Simple invis row if this looks like a duplicate */
+  /** Existing Mini Invis row if this looks like a duplicate */
   existingItemId: string | null;
   /** Category of the existing duplicate, when known */
   existingCategoryId: SimplifiedItemCategoryId | null;

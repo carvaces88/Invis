@@ -26,7 +26,8 @@ export function SignInScreen() {
   const [name, setName] = useState('');
   const [venue, setVenue] = useState('');
   const [email, setEmail] = useState('');
-  /** Unchecked by default — testers tick when starting a fresh kitchen. */
+  /** Unchecked by default — testers tick when starting a fresh kitchen.
+   * Ravintola Lonkka is always reset on first claim even without this. */
   const [isNew, setIsNew] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

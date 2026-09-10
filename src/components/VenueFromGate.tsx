@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../auth/AuthContext';
 import {
+  isLonkkaVenue,
   LONKKA_SEED_PLACES,
   LONKKA_SITE_NAME,
 } from '../data/seedPlaces';
@@ -20,11 +21,23 @@ import { WORKSPACE_SYNC_AT_KEY } from '../lib/workspaceSnapshot';
 
 const WORKSPACE_OWNER_KEY = 'invis.workspaceOwner.v1';
 
+function resetLonkkaEmpty(
+  resetWorkspaceLayout: (args: {
+    siteName: string;
+    places: typeof LONKKA_SEED_PLACES;
+  }) => void,
+) {
+  resetWorkspaceLayout({
+    siteName: LONKKA_SITE_NAME,
+    places: LONKKA_SEED_PLACES,
+  });
+}
+
 /**
  * First claim on this device:
  * - Named beta (joonas/jani): seeded or cleared layouts
- * - New testers (isNew + email): empty normal inventory + empty Simple invis
- * Venue label from the gate is applied for non-beta users.
+ * - Ravintola Lonkka (any new / first-claim tester): always empty fridge+freezer
+ * - Other new testers (isNew + email): empty normal inventory + empty Mini Invis
  */
 export function VenueFromGate() {
   const { session } = useAuth();
@@ -36,8 +49,9 @@ export function VenueFromGate() {
   useEffect(() => {
     const venue = session?.venue?.trim();
     if (!venue || venueApplied.current === venue) return;
-    // Bypass users (e.g. joonas) apply site+places together in the owner effect.
+    // Bypass / Lonkka apply site+places together in the owner effect.
     if (isBetaTesterName(session?.name ?? '')) return;
+    if (isLonkkaVenue(venue)) return;
     venueApplied.current = venue;
     setSiteName(venue);
   }, [session?.venue, session?.name, setSiteName]);
@@ -57,6 +71,10 @@ export function VenueFromGate() {
         const bypass = isGateBypassName(session.name);
         const beta = isBetaTesterName(session.name);
         const isNewTester = Boolean(session.isNew) && !bypass;
+        const lonkka =
+          isLonkkaVenue(session.venue) ||
+          (beta &&
+            normalizeGateName(session.name).toLowerCase() === 'joonas');
 
         if (firstClaim) {
           // New owner on this device — force a fresh cloud pull next.
@@ -65,17 +83,21 @@ export function VenueFromGate() {
           if (beta) {
             const key = normalizeGateName(session.name).toLowerCase();
             if (key === 'joonas') {
-              resetWorkspaceLayout({
-                siteName: LONKKA_SITE_NAME,
-                places: LONKKA_SEED_PLACES,
-              });
+              // Every new claim of joonas / Lonkka starts empty.
+              resetLonkkaEmpty(resetWorkspaceLayout);
+              await markSimpCountEmptyStart();
             } else if (!isSupabaseConfigured) {
               clearAllInventory();
               setSiteName('Jani · beta 1');
+              await clearSimpCountEmptyStart();
+            } else {
+              await clearSimpCountEmptyStart();
             }
-            await clearSimpCountEmptyStart();
+          } else if (lonkka && !bypass) {
+            // Any new person entering Ravintola Lonkka → empty fridge + freezer.
+            resetLonkkaEmpty(resetWorkspaceLayout);
+            await markSimpCountEmptyStart();
           } else if (isNewTester) {
-            // Empty normal Invis + empty Simple invis; keep catalog, wipe counts.
             clearAllInventory();
             const venue = session.venue?.trim();
             if (venue) setSiteName(venue);

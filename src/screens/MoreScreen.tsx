@@ -42,9 +42,15 @@ export function MoreScreen() {
   const navigation = useNavigation<MoreNav>();
   const { t, locale, setLocale } = useI18n();
   const { unitSystem, setUnitSystem } = useUnitSystem();
-  const { clearAllInventory } = useInventory();
+  const { clearAllInventory, siteName } = useInventory();
   const { profile, isMaster, isInvestor, isPro, signOut } = useAuth();
   const [valueOpen, setValueOpen] = useState(false);
+  const kitchenLine =
+    siteName?.trim() && profile?.displayName?.trim()
+      ? `${siteName.trim()} · ${profile.displayName.trim()}`
+      : profile
+        ? t('signedInAs').replace('{name}', profile.displayName)
+        : null;
   const [refreshing, setRefreshing] = useState(false);
 
   const openRoot = (
@@ -136,10 +142,8 @@ export function MoreScreen() {
       />
       <Text style={styles.title}>{t('moreTitle')}</Text>
       <Text style={styles.sub}>{t('moreSub')}</Text>
-      {profile ? (
-        <Text style={styles.signedIn}>
-          {t('signedInAs').replace('{name}', profile.displayName)}
-        </Text>
+      {kitchenLine ? (
+        <Text style={styles.signedIn}>{kitchenLine}</Text>
       ) : null}
       <Text style={styles.credit}>{t('kruokaPhotoCredit')}</Text>
 
@@ -290,21 +294,9 @@ export function MoreScreen() {
         </View>
       </View>
 
-      {items.map((item) => (
+      {items.map((item, index) => (
         <React.Fragment key={item.route}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.card,
-              pressed && styles.pressed,
-            ]}
-            onPress={() => navigation.navigate(item.route)}
-            accessibilityRole="button"
-            accessibilityLabel={item.title}
-          >
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardSub}>{item.subtitle}</Text>
-          </Pressable>
-          {item.route === 'InventoryPhotos' ? (
+          {index === 4 ? (
             <Pressable
               style={({ pressed }) => [
                 styles.simpleInvisOuter,
@@ -348,6 +340,18 @@ export function MoreScreen() {
               </View>
             </Pressable>
           ) : null}
+          <Pressable
+            style={({ pressed }) => [
+              styles.card,
+              pressed && styles.pressed,
+            ]}
+            onPress={() => navigation.navigate(item.route)}
+            accessibilityRole="button"
+            accessibilityLabel={item.title}
+          >
+            <Text style={styles.cardTitle}>{item.title}</Text>
+            <Text style={styles.cardSub}>{item.subtitle}</Text>
+          </Pressable>
         </React.Fragment>
       ))}
 

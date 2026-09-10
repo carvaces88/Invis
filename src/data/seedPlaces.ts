@@ -75,3 +75,17 @@ export const LONKKA_SEED_PLACES: Place[] = [
     sortOrder: 1,
   },
 ];
+
+/** Gate / site labels that map to the Lonkka empty-start layout. */
+export function isLonkkaVenue(raw: string | null | undefined): boolean {
+  const v = (raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+  if (!v) return false;
+  return (
+    v === 'ravintola lonkka' ||
+    v === 'lonkka' ||
+    v.includes('ravintola lonkka')
+  );
+}

@@ -1,5 +1,5 @@
 ---
-description: New welcome-gate testers start with empty inventory (normal + Simple invis)
+description: New welcome-gate testers start empty; Ravintola Lonkka always resets for each new user
 alwaysApply: true
 ---
 
@@ -9,10 +9,23 @@ When someone enters via the welcome gate as a **new name + email** (not a kitche
 
 1. **Email is required** and must be logged to `app_entries` for traction (`name`, `email`, `venue`, `kind`, `is_new`).
 2. Offer an **“I’m a new user”** checkbox (unchecked by default). When checked:
-   - **Normal Invis**: wipe counted stock (`clearAllInventory`) on first claim for that name on the device; apply venue as `siteName` when provided.
-   - **Simple invis (mini)**: set `invis.simpCount.emptyStart.v1` so category lists start **empty** (no Lönkka demo quantities) — users add their own products.
+   - **Normal Invis**: wipe counted stock on first claim for that name on the device; apply venue as `siteName` when provided.
+   - **Mini Invis**: set `invis.simpCount.emptyStart.v1` so category lists start **empty** (no Lönkka demo quantities) — users add their own products.
 3. Do **not** leave Kamppi demo counts as the starting sheet for opted-in new testers.
-4. Returning users (checkbox off) keep / sync existing cloud workspace for that email.
-5. Bypass names (`cesar`, `elena`, `ivan`, `guest`, `jani`, `joonas`, `investor`) skip the checkbox and keep their seeded/demo flows.
+4. Returning users (checkbox off) keep / sync existing cloud workspace for that email — **except Ravintola Lonkka** (see below).
+5. Bypass names (`cesar`, `elena`, `ivan`, `guest`, `jani`, `joonas`, `investor`) skip the checkbox; `joonas` still gets the Lonkka empty layout on first claim.
+6. When a kitchen/venue is registered, **both Invis and Mini Invis** show **location title + user name** in headers (`kitchenIdentityTitle` / Home · More · Mini Invis brand).
 
-Key files: `SignInScreen.tsx`, `AuthContext.tsx`, `VenueFromGate.tsx`, `simpCountNewUser.ts`, `SimplifiedCountingScreen.tsx`, `app_entries.is_new` migration.
+## Ravintola Lonkka — reset every new user
+
+**Every time a new person** first claims this device with venue **Ravintola Lonkka** (or `lonkka` / contains that name), or logs in as **joonas**:
+
+- Reset normal inventory to **empty** with site `Ravintola Lonkka` and places **Fridge** + **Freezer** only (`resetWorkspaceLayout` + `LONKKA_SEED_PLACES`).
+- Reset Mini Invis to empty start (`markSimpCountEmptyStart`).
+- Do **not** carry over prior counts, Kamppi places, or previous Lonkka stock from another user on the same device.
+
+Helper: `isLonkkaVenue()` in `src/data/seedPlaces.ts`.
+
+Product name in UI: **Mini Invis** (not “Simple invis”).
+
+Key files: `SignInScreen.tsx`, `AuthContext.tsx`, `VenueFromGate.tsx`, `seedPlaces.ts`, `simpCountNewUser.ts`, `kitchenIdentity.ts`, `SimplifiedCountingScreen.tsx`, `MoreScreen.tsx`, `app_entries.is_new` migration.

@@ -27,7 +27,9 @@ import type {
   RootStackParamList,
   StorageType,
 } from '../data/types';
+import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n';
+import { kitchenIdentityTitle } from '../lib/kitchenIdentity';
 import { alertAck, alertConfirm, alertInfo } from '../lib/alertAck';
 import {
   applyColumnOrder,
@@ -212,7 +214,13 @@ export function InventaarioScreen() {
     clearAllInventory,
     getOpeningQuantity,
   } = useInventory();
+  const { profile } = useAuth();
   const { t, strings, locale } = useI18n();
+  const kitchenTitle =
+    kitchenIdentityTitle({
+      siteName,
+      displayName: profile?.displayName,
+    }) || t('appBrand');
   const { displayUnit, toDisplayQty, toStorageQty, formatQty } = useUnitSystem();
   const [storageFilter, setStorageFilter] = useState<StorageType | 'all'>(
     'all',
@@ -950,7 +958,7 @@ export function InventaarioScreen() {
       <View style={styles.chrome}>
         <View style={[styles.titleRow, isCompact && styles.titleRowCompact]}>
           <View style={styles.titleBlock}>
-            <Text style={styles.kicker}>{t('appBrand')}</Text>
+            <Text style={styles.kicker}>{kitchenTitle}</Text>
             <Text
               style={[styles.title, isCompact && styles.titleCompact]}
               numberOfLines={1}

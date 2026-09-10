@@ -72,7 +72,9 @@ import {
 } from '../lib/simpCountProductSuggest';
 import { isSimpCountEmptyStart } from '../lib/simpCountNewUser';
 import { printHtmlOrSharePdf } from '../lib/export/download';
+import { kitchenIdentityTitle } from '../lib/kitchenIdentity';
 import { analyzePriorStockListImages } from '../lib/vision';
+import { useAuth } from '../auth/AuthContext';
 import { useInventory } from '../data/store';
 import { colors, radius, spacing } from '../theme/colors';
 import * as Print from 'expo-print';
@@ -391,8 +393,15 @@ function CountRow({
 export function SimplifiedCountingScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { t, locale } = useI18n();
-  const { products, places } = useInventory();
+  const { profile } = useAuth();
+  const { products, places, siteName } = useInventory();
   const months = locale === 'fi' ? MONTHS_FI : MONTHS_EN;
+
+  const workspaceTitle =
+    kitchenIdentityTitle({
+      siteName,
+      displayName: profile?.displayName,
+    }) || t('simpCountBrand');
 
   const [monthIndex, setMonthIndex] = useState(SIMP_COUNT_LIVE_MONTH_INDEX);
   const [categoryId, setCategoryId] =
@@ -1181,7 +1190,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
           <Text style={styles.backGlyph}>‹</Text>
         </Pressable>
         <Text style={styles.brand} numberOfLines={1}>
-          {t('simpCountBrand')}
+          {workspaceTitle}
         </Text>
         <Pressable
           style={styles.settingsBtn}

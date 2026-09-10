@@ -556,7 +556,7 @@ export const fi: Messages = {
   crossRefCatalogHit: 'Katalogiosuma: {name}',
   crossRefPriorOnly: 'Edellinen lista: “{prior}” — valitse tai lisää katalogiin',
 
-  simpCountOpen: 'Simple invis',
+  simpCountOpen: 'Mini Invis',
   simpCountOpenSub: 'Nopea kuukausilaskenta kategoriittain · varaston arvot · skannaus',
   simpCountBrand: 'Lönkka Bull & Bottle',
   simpCountMonth: 'Kuukausi',
@@ -953,7 +953,7 @@ export const fi: Messages = {
     'Käytä samaa sähköpostia puhelimessa ja tietokoneella, jotta inventaario pysyy synkassa — ei salasanaa.',
   gateIsNew: 'Olen uusi käyttäjä',
   gateIsNewHint:
-    'Aloita tyhjällä inventaariolla Invisissä ja Simple invisissä — lisää oma varasto.',
+    'Aloita tyhjällä inventaariolla Invisissä ja Mini Invisissä — lisää oma varasto.',
   gateKitchenHint:
     'Keittiökirjautumiset synkataan pilveen (sama inventaario kaikilla laitteilla).',
   gateSubmit: 'Jatka',

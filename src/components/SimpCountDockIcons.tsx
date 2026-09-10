@@ -126,7 +126,7 @@ export function PlusFiveBadge({
   );
 }
 
-/** Simple invis — compact count checklist (More entry glyph). */
+/** Mini Invis — compact count checklist (More entry glyph). */
 export function SimpleInvisIcon({
   size = 22,
   color = colors.primary,

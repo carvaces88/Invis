@@ -561,7 +561,7 @@ export const en = {
   crossRefCatalogHit: 'Matched catalog: {name}',
   crossRefPriorOnly: 'Prior list hit: “{prior}” — pick or add in catalog',
 
-  simpCountOpen: 'Simple invis',
+  simpCountOpen: 'Mini Invis',
   simpCountOpenSub: 'Fast monthly count by category · stock values · scan lists',
   simpCountBrand: 'Lönkka Bull & Bottle',
   simpCountMonth: 'Month',
@@ -956,7 +956,7 @@ export const en = {
     'Use the same email on phone and computer so inventory stays in sync — no password.',
   gateIsNew: 'I’m a new user',
   gateIsNewHint:
-    'Start with empty inventory in Invis and Simple invis — add your own stock.',
+    'Start with empty inventory in Invis and Mini Invis — add your own stock.',
   gateKitchenHint:
     'Kitchen logins sync to the cloud automatically (same inventory on every device).',
   gateSubmit: 'Continue',

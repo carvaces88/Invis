@@ -49,7 +49,7 @@ export function HomeScreen() {
   const { t } = useI18n();
   const { yesChef } = useChefNudge();
   const { profile } = useAuth();
-  const { session } = useInventory();
+  const { session, siteName } = useInventory();
   const { width } = useWindowDimensions();
   const gap = spacing.md;
   const pad = spacing.lg;
@@ -59,6 +59,13 @@ export function HomeScreen() {
   const [welcomeDismissed, setWelcomeDismissed] = useState<boolean | null>(
     null,
   );
+
+  const displayName =
+    profile?.displayName?.trim() || t('homeGreetingNameFallback');
+  const location = siteName?.trim() || '';
+  const kitchenSubtitle = location
+    ? `${location} · ${displayName}`
+    : `${t('appBrand')} · ${t('kitchenInventory').toLowerCase()}`;
 
   const inventoryEmpty = !hasRecordedInventory(session);
 
@@ -189,14 +196,9 @@ export function HomeScreen() {
         </View>
         <View style={styles.brandText}>
           <Text style={styles.greeting}>
-            {t('homeGreeting').replace(
-              '{name}',
-              profile?.displayName?.trim() || t('homeGreetingNameFallback'),
-            )}
+            {t('homeGreeting').replace('{name}', displayName)}
           </Text>
-          <Text style={styles.subtitle}>
-            {t('appBrand')} · {t('kitchenInventory').toLowerCase()}
-          </Text>
+          <Text style={styles.subtitle}>{kitchenSubtitle}</Text>
         </View>
       </View>
 

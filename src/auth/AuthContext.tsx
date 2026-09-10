@@ -29,7 +29,7 @@ export type GateSession = {
   venue: string | null;
   email: string | null;
   kind: 'kitchen' | 'tester' | 'investor';
-  /** Tester checked “I’m new” — inventory starts empty (normal + Simple invis). */
+  /** Tester checked “I’m new” — inventory starts empty (normal + Mini Invis). */
   isNew: boolean;
   enteredAt: string;
 };
