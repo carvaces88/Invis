@@ -70,6 +70,7 @@ import {
   suggestSimpCountProduct,
   type SimpProductSuggestion,
 } from '../lib/simpCountProductSuggest';
+import { isSimpCountEmptyStart } from '../lib/simpCountNewUser';
 import { printHtmlOrSharePdf } from '../lib/export/download';
 import { analyzePriorStockListImages } from '../lib/vision';
 import { useInventory } from '../data/store';
@@ -157,11 +158,14 @@ function emptyByCategory(): Record<SimplifiedCategoryId, SimplifiedCountItem[]> 
 function cloneSeed(
   monthIndex: number,
   extras: ExtraProduct[] = [],
+  opts?: { emptyStart?: boolean },
 ): Record<SimplifiedCategoryId, SimplifiedCountItem[]> {
   const out = emptyByCategory();
-  const monthInv = inventoryForMonthIndex(monthIndex);
-  for (const cid of ITEM_CATEGORY_IDS) {
-    out[cid] = (monthInv[cid] ?? []).map((row) => ({ ...row }));
+  if (!opts?.emptyStart) {
+    const monthInv = inventoryForMonthIndex(monthIndex);
+    for (const cid of ITEM_CATEGORY_IDS) {
+      out[cid] = (monthInv[cid] ?? []).map((row) => ({ ...row }));
+    }
   }
   for (const extra of extras) {
     if (!isItemCategoryId(extra.categoryId)) continue;
@@ -431,6 +435,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   const [editAliases, setEditAliases] = useState('');
   const [extras, setExtras] = useState<ExtraProduct[]>([]);
   const [extrasHydrated, setExtrasHydrated] = useState(false);
+  const [emptyStart, setEmptyStart] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [hiddenSheetOpen, setHiddenSheetOpen] = useState(false);
   const [hiddenHydrated, setHiddenHydrated] = useState(false);
@@ -452,11 +457,13 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
     let alive = true;
     void (async () => {
       try {
-        const [hiddenRaw, extrasRaw] = await Promise.all([
+        const [hiddenRaw, extrasRaw, empty] = await Promise.all([
           AsyncStorage.getItem(HIDDEN_STORAGE_KEY),
           AsyncStorage.getItem(EXTRAS_STORAGE_KEY),
+          isSimpCountEmptyStart(),
         ]);
         if (!alive) return;
+        setEmptyStart(empty);
         if (hiddenRaw) {
           const parsed = JSON.parse(hiddenRaw) as unknown;
           if (Array.isArray(parsed)) {
@@ -496,13 +503,13 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   // Swap inventory lines when the selected month changes (Jul/Aug samples vs Sept live).
   useEffect(() => {
     if (!extrasHydrated) return;
-    setByCategory(cloneSeed(monthIndex, extras));
+    setByCategory(cloneSeed(monthIndex, extras, { emptyStart }));
     setSelectedId(null);
     setArmedItemId(null);
     setGameMode(false);
     // Intentional: don't re-run on every extras edit — only month / hydrate.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthIndex, extrasHydrated]);
+  }, [monthIndex, extrasHydrated, emptyStart]);
 
   useEffect(() => {
     if (!hiddenHydrated) return;
@@ -813,7 +820,9 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
 
   const stockOverview = useMemo(() => {
     const priorTotals =
-      monthIndex > 0 ? categoryTotalsForMonth(monthIndex - 1) : null;
+      emptyStart || monthIndex <= 0
+        ? null
+        : categoryTotalsForMonth(monthIndex - 1);
     const rows = ITEM_CATEGORY_IDS.map((cid) => {
       const meta = SIMPLIFIED_CATEGORIES.find((c) => c.id === cid);
       const catRows = (byCategory[cid] ?? []).filter(
@@ -843,7 +852,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
       })),
       foodTotal,
     };
-  }, [byCategory, hiddenSet, monthIndex, t]);
+  }, [byCategory, emptyStart, hiddenSet, monthIndex, t]);
 
   const runExport = useCallback(async () => {
     setExportBusy(true);

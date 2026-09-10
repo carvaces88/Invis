@@ -1,0 +1,18 @@
+---
+description: New welcome-gate testers start with empty inventory (normal + Simple invis)
+alwaysApply: true
+---
+
+# New user empty inventory (welcome gate)
+
+When someone enters via the welcome gate as a **new name + email** (not a kitchen/beta/investor bypass):
+
+1. **Email is required** and must be logged to `app_entries` for traction (`name`, `email`, `venue`, `kind`, `is_new`).
+2. Offer an **“I’m a new user”** checkbox (unchecked by default). When checked:
+   - **Normal Invis**: wipe counted stock (`clearAllInventory`) on first claim for that name on the device; apply venue as `siteName` when provided.
+   - **Simple invis (mini)**: set `invis.simpCount.emptyStart.v1` so category lists start **empty** (no Lönkka demo quantities) — users add their own products.
+3. Do **not** leave Kamppi demo counts as the starting sheet for opted-in new testers.
+4. Returning users (checkbox off) keep / sync existing cloud workspace for that email.
+5. Bypass names (`cesar`, `elena`, `ivan`, `guest`, `jani`, `joonas`, `investor`) skip the checkbox and keep their seeded/demo flows.
+
+Key files: `SignInScreen.tsx`, `AuthContext.tsx`, `VenueFromGate.tsx`, `simpCountNewUser.ts`, `SimplifiedCountingScreen.tsx`, `app_entries.is_new` migration.

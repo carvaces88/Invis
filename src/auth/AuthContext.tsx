@@ -29,6 +29,8 @@ export type GateSession = {
   venue: string | null;
   email: string | null;
   kind: 'kitchen' | 'tester' | 'investor';
+  /** Tester checked “I’m new” — inventory starts empty (normal + Simple invis). */
+  isNew: boolean;
   enteredAt: string;
 };
 
@@ -36,6 +38,8 @@ type EnterInput = {
   name: string;
   venue?: string;
   email?: string;
+  /** Welcome-gate “I’m a new user” checkbox (non-bypass only). */
+  isNew?: boolean;
 };
 
 type AuthContextValue = {
@@ -86,7 +90,8 @@ async function logEntry(session: GateSession) {
       name: session.name,
       venue: session.venue,
       email: session.email,
-      kind: session.kind,
+      kind: session.kind === 'investor' ? 'tester' : session.kind,
+      is_new: session.isNew,
     });
   } catch {
     /* best-effort */
@@ -106,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!cancelled && raw) {
           const parsed = JSON.parse(raw) as GateSession;
           if (parsed?.name) {
+            if (typeof parsed.isNew !== 'boolean') parsed.isNew = false;
             const patchedEmail = resolveSyncEmail(parsed);
             if (patchedEmail && parsed.email !== patchedEmail) {
               parsed.email = patchedEmail;
@@ -157,12 +163,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const account = resolveAuthAccount(name);
     const syncEmail = bypass
       ? (account?.email?.trim().toLowerCase() ?? null)
-      : email;
+      : email?.trim().toLowerCase() ?? null;
 
     const defaultVenue =
       beta && normalizeGateName(name).toLowerCase() === 'joonas'
         ? 'Ravintola Lonkka'
         : null;
+
+    // Known kitchen / beta / investor keep demo or seeded workspaces.
+    // Unknown testers can opt into an empty start via the gate checkbox.
+    const isNew = bypass ? false : Boolean(input.isNew);
 
     const next: GateSession = {
       name:
@@ -170,6 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       venue: bypass ? defaultVenue : venue,
       email: syncEmail,
       kind: kitchen ? 'kitchen' : investor ? 'investor' : 'tester',
+      isNew,
       enteredAt: new Date().toISOString(),
     };
 

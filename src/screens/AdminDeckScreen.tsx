@@ -25,6 +25,7 @@ type EntryRow = {
   venue: string | null;
   email: string | null;
   kind: string;
+  is_new?: boolean | null;
   created_at: string;
 };
 
@@ -130,7 +131,7 @@ export function AdminDeckScreen({ navigation }: Props) {
     if (tractionOnly) {
       const e = await supabase
         .from('app_entries')
-        .select('id, name, venue, email, kind, created_at')
+        .select('id, name, venue, email, kind, is_new, created_at')
         .order('created_at', { ascending: false })
         .limit(500);
       if (e.error) {
@@ -147,7 +148,7 @@ export function AdminDeckScreen({ navigation }: Props) {
     const [e, f] = await Promise.all([
       supabase
         .from('app_entries')
-        .select('id, name, venue, email, kind, created_at')
+        .select('id, name, venue, email, kind, is_new, created_at')
         .order('created_at', { ascending: false })
         .limit(200),
       supabase
@@ -275,6 +276,9 @@ export function AdminDeckScreen({ navigation }: Props) {
               </Text>
             ) : null}
             {row.email ? <Text style={styles.meta}>{row.email}</Text> : null}
+            {row.is_new ? (
+              <Text style={styles.meta}>{t('adminIsNew')}</Text>
+            ) : null}
             <Text style={styles.meta}>{formatWhen(row.created_at, locale)}</Text>
           </View>
         ))

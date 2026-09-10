@@ -951,6 +951,9 @@ export const fi: Messages = {
   gateEmailPlaceholder: 'sina@yritys.fi',
   gateTesterHint:
     'Käytä samaa sähköpostia puhelimessa ja tietokoneella, jotta inventaario pysyy synkassa — ei salasanaa.',
+  gateIsNew: 'Olen uusi käyttäjä',
+  gateIsNewHint:
+    'Aloita tyhjällä inventaariolla Invisissä ja Simple invisissä — lisää oma varasto.',
   gateKitchenHint:
     'Keittiökirjautumiset synkataan pilveen (sama inventaario kaikilla laitteilla).',
   gateSubmit: 'Jatka',
@@ -993,6 +996,7 @@ export const fi: Messages = {
   adminFeedback: 'Palaute',
   adminFeedbackEmpty: 'Ei palautetta vielä.',
   adminVenue: 'Toimipiste',
+  adminIsNew: 'Uusi käyttäjä · tyhjä aloitus',
   adminRoleKitchen: 'Keittiö',
   adminRoleTester: 'Testaaja',
   adminRoleInvestor: 'Sijoittaja',

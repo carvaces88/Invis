@@ -26,6 +26,8 @@ export function SignInScreen() {
   const [name, setName] = useState('');
   const [venue, setVenue] = useState('');
   const [email, setEmail] = useState('');
+  /** Unchecked by default — testers tick when starting a fresh kitchen. */
+  const [isNew, setIsNew] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +37,12 @@ export function SignInScreen() {
     setError(null);
     setBusy(true);
     try {
-      const result = await enter({ name, venue, email });
+      const result = await enter({
+        name,
+        venue,
+        email,
+        isNew: bypass ? false : isNew,
+      });
       if (!result.ok) setError(result.message);
     } catch {
       setError(t('gateEnterFailed'));
@@ -125,6 +132,28 @@ export function SignInScreen() {
                   if (canSubmit && !busy) void onSubmit();
                 }}
               />
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.checkRow,
+                  pressed && styles.pressed,
+                ]}
+                onPress={() => setIsNew((v) => !v)}
+                disabled={busy}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: isNew }}
+                accessibilityLabel={t('gateIsNew')}
+              >
+                <View
+                  style={[styles.checkBox, isNew && styles.checkBoxOn]}
+                >
+                  {isNew ? <Text style={styles.checkMark}>✓</Text> : null}
+                </View>
+                <View style={styles.checkCopy}>
+                  <Text style={styles.checkLabel}>{t('gateIsNew')}</Text>
+                  <Text style={styles.checkHint}>{t('gateIsNewHint')}</Text>
+                </View>
+              </Pressable>
             </>
           ) : (
             <Text style={styles.kitchenHint}>{t('gateKitchenHint')}</Text>
@@ -225,6 +254,45 @@ const styles = StyleSheet.create({
     color: colors.inkFaint,
     fontSize: 13,
     lineHeight: 18,
+  },
+  checkRow: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  checkBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: colors.inkFaint,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  checkBoxOn: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  checkMark: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 16,
+  },
+  checkCopy: { flex: 1 },
+  checkLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.ink,
+  },
+  checkHint: {
+    marginTop: 2,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.inkFaint,
   },
   kitchenHint: {
     marginTop: spacing.md,

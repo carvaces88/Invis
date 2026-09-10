@@ -954,6 +954,9 @@ export const en = {
   gateEmailPlaceholder: 'you@company.com',
   gateTesterHint:
     'Use the same email on phone and computer so inventory stays in sync — no password.',
+  gateIsNew: 'I’m a new user',
+  gateIsNewHint:
+    'Start with empty inventory in Invis and Simple invis — add your own stock.',
   gateKitchenHint:
     'Kitchen logins sync to the cloud automatically (same inventory on every device).',
   gateSubmit: 'Continue',
@@ -996,6 +999,7 @@ export const en = {
   adminFeedback: 'Feedback',
   adminFeedbackEmpty: 'No feedback yet.',
   adminVenue: 'Venue',
+  adminIsNew: 'New user · empty start',
   adminRoleKitchen: 'Kitchen',
   adminRoleTester: 'Tester',
   adminRoleInvestor: 'Investor',
