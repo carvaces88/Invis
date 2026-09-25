@@ -13,19 +13,21 @@ When someone enters via the welcome gate as a **new name + email** (not a kitche
    - **Mini Invis**: set `invis.simpCount.emptyStart.v1` so category lists start **empty** (no Lönkka demo quantities) — users add their own products.
 3. Do **not** leave Kamppi demo counts as the starting sheet for opted-in new testers.
 4. Returning users (checkbox off) keep / sync existing cloud workspace for that email — **except Ravintola Lonkka** (see below).
-5. Bypass names (`cesar`, `elena`, `ivan`, `guest`, `jani`, `joonas`, `investor`) skip the checkbox; `joonas` still gets the Lonkka empty layout on first claim.
+5. Bypass names (`cesar`, `elena`, `ivan`, `guest`, `jani`, `joonas`, `patricio`, `heidi`, `investor`) skip the checkbox.
 6. When a kitchen/venue is registered, **both Invis and Mini Invis** show **location title + user name** in headers (`kitchenIdentityTitle` / Home · More · Mini Invis brand).
 
-## Ravintola Lonkka — reset every new user
+## Named pilots
 
-**Every time a new person** first claims this device with venue **Ravintola Lonkka** (or `lonkka` / contains that name), or logs in as **joonas**:
+| Login | Venue | Notes |
+|---|---|---|
+| `joonas` | Ravintola Lonkka | Empty fridge + freezer; reset on new Lonkka users |
+| `jani` | Kamppi · Kulturikasarmi | Kamppi-style places |
+| `patricio` | Daily Dose | Empty fridge + freezer |
+| `heidi` | Fair Buffet · Messukeskus | **Pro**; 6 places; **20 sample products each** (dry, freezer, vegetables, cleaning, dairy, meats) via `seedFairBuffet.ts` |
+| `investor` | — | Pro + pitch deck |
 
-- Reset normal inventory to **empty** with site `Ravintola Lonkka` and places **Fridge** + **Freezer** only (`resetWorkspaceLayout` + `LONKKA_SEED_PLACES`).
-- Reset Mini Invis to empty start (`markSimpCountEmptyStart`).
-- Do **not** carry over prior counts, Kamppi places, or previous Lonkka stock from another user on the same device.
-
-Helper: `isLonkkaVenue()` in `src/data/seedPlaces.ts`.
+Pro unlock: `PRO_NAMES` / `isProName` in `authAccounts.ts` (not only investor).
 
 Product name in UI: **Mini Invis** (not “Simple invis”).
 
-Key files: `SignInScreen.tsx`, `AuthContext.tsx`, `VenueFromGate.tsx`, `seedPlaces.ts`, `simpCountNewUser.ts`, `kitchenIdentity.ts`, `SimplifiedCountingScreen.tsx`, `MoreScreen.tsx`, `app_entries.is_new` migration.
+Key files: `SignInScreen.tsx`, `AuthContext.tsx`, `VenueFromGate.tsx`, `seedFairBuffet.ts`, `seedPlaces.ts`, `simpCountNewUser.ts`, `kitchenIdentity.ts`, `store.tsx` (`seedWorkspaceSample`).

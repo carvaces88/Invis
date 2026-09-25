@@ -76,6 +76,29 @@ export const LONKKA_SEED_PLACES: Place[] = [
   },
 ];
 
+/** Jani — Kamppi / Kulturikasarmi (Kamppi-style storages). */
+export const JANI_SITE_NAME = 'Kamppi · Kulturikasarmi';
+
+/** Patricio — Daily Dose (empty fridge + freezer start). */
+export const DAILY_DOSE_SITE_NAME = 'Daily Dose';
+
+export const DAILY_DOSE_SEED_PLACES: Place[] = [
+  {
+    id: 'place-dailydose-fridge',
+    name: 'Fridge',
+    kind: 'kitchen',
+    storageType: 'prep_fridge',
+    sortOrder: 0,
+  },
+  {
+    id: 'place-dailydose-freezer',
+    name: 'Freezer',
+    kind: 'freezer',
+    storageType: 'freezer',
+    sortOrder: 1,
+  },
+];
+
 /** Gate / site labels that map to the Lonkka empty-start layout. */
 export function isLonkkaVenue(raw: string | null | undefined): boolean {
   const v = (raw ?? '')
@@ -87,5 +110,29 @@ export function isLonkkaVenue(raw: string | null | undefined): boolean {
     v === 'ravintola lonkka' ||
     v === 'lonkka' ||
     v.includes('ravintola lonkka')
+  );
+}
+
+export function isDailyDoseVenue(raw: string | null | undefined): boolean {
+  const v = (raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+  if (!v) return false;
+  return v === 'daily dose' || v.includes('daily dose');
+}
+
+export function isJaniVenue(raw: string | null | undefined): boolean {
+  const v = (raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+  if (!v) return false;
+  return (
+    v.includes('kulturikasarmi') ||
+    v.includes('kulturikasaarmi') ||
+    v.includes('kulttuurikasarmi') ||
+    v === 'kamppi · kulturikasarmi' ||
+    v === 'kamppi'
   );
 }
