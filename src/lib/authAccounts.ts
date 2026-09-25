@@ -9,6 +9,12 @@ export const AUTH_ACCOUNTS: Record<
   guest: { email: 'guest@invis.app', displayName: 'Guest', role: 'guest' },
   jani: { email: 'jani@invis.app', displayName: 'Jani', role: 'guest' },
   joonas: { email: 'joonas@invis.app', displayName: 'Joonas', role: 'guest' },
+  heidi: { email: 'heidi@invis.app', displayName: 'Heidi', role: 'guest' },
+  patricio: {
+    email: 'patricio@invis.app',
+    displayName: 'Patricio',
+    role: 'guest',
+  },
   investor: {
     email: 'investor@invis.app',
     displayName: 'Investor',
@@ -18,11 +24,32 @@ export const AUTH_ACCOUNTS: Record<
 
 export const KITCHEN_NAMES = ['cesar', 'elena', 'ivan', 'guest'] as const;
 
-/** Named beta testers — cloud sync via canonical account email (e.g. jani@invis.app) */
-export const BETA_TESTER_NAMES = ['jani', 'joonas'] as const;
+/**
+ * Named beta testers — cloud sync via canonical account email.
+ * Venue ownership (authoritative):
+ * - joonas → Ravintola Lonkka
+ * - jani → Kamppi · Kulturikasarmi
+ * - patricio → Daily Dose
+ * - heidi → Fair Buffet · Messukeskus (sample inventory + Pro)
+ */
+export const BETA_TESTER_NAMES = ['jani', 'joonas', 'patricio', 'heidi'] as const;
+
+/** Canonical venue / site label per beta gate name (lowercase key). */
+export const BETA_DEFAULT_VENUE: Record<
+  (typeof BETA_TESTER_NAMES)[number],
+  string
+> = {
+  joonas: 'Ravintola Lonkka',
+  jani: 'Kamppi · Kulturikasarmi',
+  patricio: 'Daily Dose',
+  heidi: 'Fair Buffet · Messukeskus',
+};
 
 /** Investor walkthrough — full app + Pro unlock + pitch deck */
 export const INVESTOR_NAMES = ['investor'] as const;
+
+/** Pro unlocks (video walkthrough, etc.) — investors + selected pilots */
+export const PRO_NAMES = ['investor', 'heidi'] as const;
 
 export function resolveAuthAccount(usernameRaw: string) {
   const username = usernameRaw.trim().toLowerCase();
@@ -45,9 +72,23 @@ export function isBetaTesterName(raw: string): boolean {
   return (BETA_TESTER_NAMES as readonly string[]).includes(key);
 }
 
+/** Canonical restaurant for a known beta tester, or null. */
+export function defaultVenueForName(raw: string): string | null {
+  const key = normalizeGateName(raw).toLowerCase();
+  if ((BETA_TESTER_NAMES as readonly string[]).includes(key)) {
+    return BETA_DEFAULT_VENUE[key as (typeof BETA_TESTER_NAMES)[number]];
+  }
+  return null;
+}
+
 export function isInvestorName(raw: string): boolean {
   const key = normalizeGateName(raw).toLowerCase();
   return (INVESTOR_NAMES as readonly string[]).includes(key);
+}
+
+export function isProName(raw: string): boolean {
+  const key = normalizeGateName(raw).toLowerCase();
+  return (PRO_NAMES as readonly string[]).includes(key);
 }
 
 /** Skip email/venue on the welcome gate */

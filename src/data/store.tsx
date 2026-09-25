@@ -304,6 +304,20 @@ type Store = {
     siteName: string;
     places: Place[];
   }) => void;
+  /**
+   * Provision a restaurant with places + custom products + sample counts
+   * (e.g. Heidi / Fair Buffet).
+   */
+  seedWorkspaceSample: (args: {
+    siteName: string;
+    places: Place[];
+    products: Product[];
+    stock: Array<{
+      productId: string;
+      placeId: string;
+      quantity: number;
+    }>;
+  }) => void;
   /** Signed delta — kuorma_in (+), havikki_out (-), adjustment */
   applyStockDelta: (args: {
     productId: string;
@@ -1620,6 +1634,92 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     [products],
   );
 
+  const seedWorkspaceSample = useCallback(
+    (args: {
+      siteName: string;
+      places: Place[];
+      products: Product[];
+      stock: Array<{
+        productId: string;
+        placeId: string;
+        quantity: number;
+      }>;
+    }) => {
+      const nextPlaces =
+        args.places.length > 0
+          ? args.places.map(migratePlace)
+          : SEED_PLACES.map(migratePlace);
+      const defaultPlaceId = nextPlaces[0]?.id ?? DEFAULT_PLACE_ID;
+      const site = args.siteName.trim() || SEED_SITE_NAME;
+      const nowDate = todayIsoDate();
+      const now = new Date().toISOString();
+      const customs = args.products.map((p) => ({ ...p }));
+      const merged = mergeCatalog(
+        SEED_PRODUCTS,
+        customs,
+        {},
+        {},
+        {},
+      );
+      const byId = new Map(merged.map((p) => [p.id, p]));
+      const lineMap = new Map<string, InventoryLine>();
+      for (const line of createInitialSessionLines(merged, defaultPlaceId, {
+        seeded: false,
+      })) {
+        lineMap.set(`${line.productId}::${line.placeId}`, line);
+      }
+      for (const row of args.stock) {
+        const product = byId.get(row.productId);
+        if (!product) continue;
+        if (!nextPlaces.some((p) => p.id === row.placeId)) continue;
+        lineMap.set(`${row.productId}::${row.placeId}`, {
+          id: `line-${row.productId}-${row.placeId}`,
+          productId: row.productId,
+          placeId: row.placeId,
+          quantity: row.quantity,
+          officialName: product.officialName,
+          unit: product.unit,
+          unitPriceAlv0: product.unitPriceAlv0,
+          countedAt: now,
+          lastUpdatedAt: now,
+          verificationStatus: 'correct',
+        });
+      }
+      const nextSession: InventorySession = {
+        id: `session-${Date.now()}`,
+        title: 'Inventory sheet RR',
+        date: nowDate,
+        status: 'in_progress',
+        lines: [...lineMap.values()],
+      };
+
+      setCustomProducts(customs);
+      setProducts(merged);
+      setPlaces(nextPlaces);
+      setSiteNameState(site);
+      setActivePlaceIdState(defaultPlaceId);
+      setInventoryCleared(true);
+      setSession(nextSession);
+      setMovements((m) => m.filter((x) => x.type !== 'inventory_count'));
+      setRecentActivity([]);
+      setPeriodSnapshot(null);
+
+      void AsyncStorage.multiSet([
+        [CUSTOM_PRODUCTS_KEY, JSON.stringify(customs)],
+        [PLACES_KEY, JSON.stringify(nextPlaces)],
+        [SITE_NAME_KEY, site],
+        [ACTIVE_PLACE_KEY, defaultPlaceId],
+        [SESSION_KEY, JSON.stringify(nextSession)],
+        [INVENTORY_CLEARED_KEY, '1'],
+      ]).catch(() => {});
+      void AsyncStorage.multiRemove([
+        ACTIVITY_KEY,
+        PERIOD_SNAPSHOT_KEY,
+      ]).catch(() => {});
+    },
+    [],
+  );
+
   const applyStockDelta = useCallback(
     (args: {
       productId: string;
@@ -1909,6 +2009,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       getRecentAddWarning,
       clearAllInventory,
       resetWorkspaceLayout,
+      seedWorkspaceSample,
       applyStockDelta,
       recordHavikki,
       replaceProducts,
@@ -1957,6 +2058,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       getRecentAddWarning,
       clearAllInventory,
       resetWorkspaceLayout,
+      seedWorkspaceSample,
       applyStockDelta,
       recordHavikki,
       replaceProducts,

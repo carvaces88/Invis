@@ -15,8 +15,10 @@ import {
   isInvestorName,
   isKitchenName,
   isMasterName,
+  isProName,
   isValidEmail,
   normalizeGateName,
+  defaultVenueForName,
   resolveAuthAccount,
   resolveSyncEmail,
 } from '../lib/authAccounts';
@@ -115,6 +117,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const patchedEmail = resolveSyncEmail(parsed);
             if (patchedEmail && parsed.email !== patchedEmail) {
               parsed.email = patchedEmail;
+            }
+            const canonicalVenue = defaultVenueForName(parsed.name);
+            if (canonicalVenue && parsed.venue !== canonicalVenue) {
+              parsed.venue = canonicalVenue;
+            }
+            if (
+              (patchedEmail && parsed.email === patchedEmail) ||
+              canonicalVenue
+            ) {
               await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(parsed));
             }
             setSession(parsed);
@@ -165,10 +176,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ? (account?.email?.trim().toLowerCase() ?? null)
       : email?.trim().toLowerCase() ?? null;
 
-    const defaultVenue =
-      beta && normalizeGateName(name).toLowerCase() === 'joonas'
-        ? 'Ravintola Lonkka'
-        : null;
+    const defaultVenue = bypass
+      ? defaultVenueForName(name)
+      : null;
 
     // Known kitchen / beta / investor keep demo or seeded workspaces.
     // Unknown testers can opt into an empty start via the gate checkbox.
@@ -177,7 +187,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const next: GateSession = {
       name:
         kitchen || beta || investor ? displayKitchenName(name) : name,
-      venue: bypass ? defaultVenue : venue,
+      // Beta testers always get their restaurant — never leave venue blank.
+      venue: bypass ? defaultVenue : venue || defaultVenueForName(name),
       email: syncEmail,
       kind: kitchen ? 'kitchen' : investor ? 'investor' : 'tester',
       isNew,
@@ -206,6 +217,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const profile = session ? toProfile(session) : null;
 
   const isInvestor = session ? isInvestorName(session.name) : false;
+  const isPro = session
+    ? isInvestor || isProName(session.name)
+    : false;
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -215,7 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAdmin: profile?.role === 'admin',
       isMaster: session ? isMasterName(session.name) : false,
       isInvestor,
-      isPro: isInvestor,
+      isPro,
       configured: true,
       justSignedIn,
       clearJustSignedIn,
@@ -227,6 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       profile,
       isInvestor,
+      isPro,
       justSignedIn,
       clearJustSignedIn,
       enter,
