@@ -70,11 +70,21 @@ import {
   suggestSimpCountProduct,
   type SimpProductSuggestion,
 } from '../lib/simpCountProductSuggest';
-import { isSimpCountEmptyStart } from '../lib/simpCountNewUser';
+import {
+  clearLegacySimpCountGlobals,
+  isSimpCountEmptyStart,
+  simpCountOwnerKey,
+  simpCountStorageKeys,
+} from '../lib/simpCountNewUser';
+import {
+  buildSimpCategoriesFromInventory,
+  preferredPlaceForProduct,
+} from '../lib/simpCountFromInventory';
 import { printHtmlOrSharePdf } from '../lib/export/download';
 import { kitchenIdentityTitle } from '../lib/kitchenIdentity';
 import { analyzePriorStockListImages } from '../lib/vision';
 import { useAuth } from '../auth/AuthContext';
+import { resolveSyncEmail } from '../lib/authAccounts';
 import { useInventory } from '../data/store';
 import { colors, radius, spacing } from '../theme/colors';
 import * as Print from 'expo-print';
@@ -85,8 +95,6 @@ type ExtraProduct = {
 };
 
 const LIST_SCAN_MAX_PHOTOS = 8;
-const HIDDEN_STORAGE_KEY = 'invis.simpCount.hiddenIds.v1';
-const EXTRAS_STORAGE_KEY = 'invis.simpCount.extraProducts.v1';
 const ADD_UNIT_CHOICES: UnitCode[] = [
   'KG',
   'L',
@@ -393,25 +401,39 @@ function CountRow({
 export function SimplifiedCountingScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { t, locale } = useI18n();
-  const { profile } = useAuth();
-  const { products, places, siteName } = useInventory();
+  const { profile, session: gateSession } = useAuth();
+  const {
+    products,
+    places,
+    siteName,
+    session: inventorySession,
+    activePlaceId,
+    upsertCountedProduct,
+    updateLineQuantity,
+  } = useInventory();
   const months = locale === 'fi' ? MONTHS_FI : MONTHS_EN;
+
+  const ownerKey = simpCountOwnerKey(
+    resolveSyncEmail(gateSession ?? { name: '', email: null }) ??
+      gateSession?.name ??
+      profile?.displayName,
+  );
+  const storageKeys = useMemo(
+    () => simpCountStorageKeys(ownerKey),
+    [ownerKey],
+  );
 
   const workspaceTitle =
     kitchenIdentityTitle({
       siteName,
       displayName: profile?.displayName,
-    }) || t('simpCountBrand');
+    }) || t('simpCountOpen');
 
   const [monthIndex, setMonthIndex] = useState(SIMP_COUNT_LIVE_MONTH_INDEX);
   const [categoryId, setCategoryId] =
     useState<SimplifiedCategoryId>('dairy');
-  const [byCategory, setByCategory] = useState(() =>
-    cloneSeed(SIMP_COUNT_LIVE_MONTH_INDEX),
-  );
-  const [selectedId, setSelectedId] = useState<string | null>(
-    DAIRY_FIRST_ID,
-  );
+  const [byCategory, setByCategory] = useState(() => emptyByCategory());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [picker, setPicker] = useState<'month' | 'category' | null>(null);
   const [calcOpen, setCalcOpen] = useState(false);
   const [calcDigits, setCalcDigits] = useState('');
@@ -448,6 +470,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [hiddenSheetOpen, setHiddenSheetOpen] = useState(false);
   const [hiddenHydrated, setHiddenHydrated] = useState(false);
+  const [ownerReady, setOwnerReady] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportScope, setExportScope] = useState<SimpExportScope>('category');
   const [exportFormat, setExportFormat] = useState<SimpExportFormat>('pdf');
@@ -464,15 +487,21 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
 
   useEffect(() => {
     let alive = true;
+    setOwnerReady(false);
+    setExtrasHydrated(false);
+    setHiddenHydrated(false);
     void (async () => {
       try {
+        await clearLegacySimpCountGlobals();
         const [hiddenRaw, extrasRaw, empty] = await Promise.all([
-          AsyncStorage.getItem(HIDDEN_STORAGE_KEY),
-          AsyncStorage.getItem(EXTRAS_STORAGE_KEY),
-          isSimpCountEmptyStart(),
+          AsyncStorage.getItem(storageKeys.hidden),
+          AsyncStorage.getItem(storageKeys.extras),
+          isSimpCountEmptyStart(ownerKey),
         ]);
         if (!alive) return;
         setEmptyStart(empty);
+        setHiddenIds([]);
+        setExtras([]);
         if (hiddenRaw) {
           const parsed = JSON.parse(hiddenRaw) as unknown;
           if (Array.isArray(parsed)) {
@@ -481,11 +510,10 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
             );
           }
         }
-        let cleanedExtras: ExtraProduct[] = [];
         if (extrasRaw) {
           const parsed = JSON.parse(extrasRaw) as unknown;
           if (Array.isArray(parsed)) {
-            cleanedExtras = parsed.filter(
+            const cleanedExtras = parsed.filter(
               (row): row is ExtraProduct =>
                 !!row &&
                 typeof row === 'object' &&
@@ -501,40 +529,63 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
         if (alive) {
           setHiddenHydrated(true);
           setExtrasHydrated(true);
+          setOwnerReady(true);
         }
       }
     })();
     return () => {
       alive = false;
     };
-  }, []);
+  }, [ownerKey, storageKeys.hidden, storageKeys.extras]);
 
-  // Swap inventory lines when the selected month changes (Jul/Aug samples vs Sept live).
+  // Mini Invis mirrors this user's main inventory — never a shared Lönkka/Daily Dose sheet.
   useEffect(() => {
-    if (!extrasHydrated) return;
-    setByCategory(cloneSeed(monthIndex, extras, { emptyStart }));
+    if (!ownerReady || !extrasHydrated) return;
+    const fromInventory = buildSimpCategoriesFromInventory(
+      products,
+      inventorySession,
+    );
+    const next = emptyByCategory();
+    for (const cid of ITEM_CATEGORY_IDS) {
+      next[cid] = fromInventory[cid] ?? [];
+    }
+    // Owner-scoped extras that are not already in main inventory stay visible.
+    for (const extra of extras) {
+      if (!isItemCategoryId(extra.categoryId)) continue;
+      const list = next[extra.categoryId] ?? [];
+      if (list.some((row) => row.id === extra.item.id)) continue;
+      if (products.some((p) => p.id === extra.item.id)) continue;
+      next[extra.categoryId] = [...list, { ...extra.item }];
+    }
+    setByCategory(next);
     setSelectedId(null);
     setArmedItemId(null);
     setGameMode(false);
-    // Intentional: don't re-run on every extras edit — only month / hydrate.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthIndex, extrasHydrated, emptyStart]);
+  }, [
+    ownerReady,
+    extrasHydrated,
+    ownerKey,
+    products,
+    inventorySession,
+    extras,
+    emptyStart,
+  ]);
 
   useEffect(() => {
     if (!hiddenHydrated) return;
     void AsyncStorage.setItem(
-      HIDDEN_STORAGE_KEY,
+      storageKeys.hidden,
       JSON.stringify(hiddenIds),
     ).catch(() => {});
-  }, [hiddenIds, hiddenHydrated]);
+  }, [hiddenIds, hiddenHydrated, storageKeys.hidden]);
 
   useEffect(() => {
     if (!extrasHydrated) return;
     void AsyncStorage.setItem(
-      EXTRAS_STORAGE_KEY,
+      storageKeys.extras,
       JSON.stringify(extras),
     ).catch(() => {});
-  }, [extras, extrasHydrated]);
+  }, [extras, extrasHydrated, storageKeys.extras]);
 
   const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
 
@@ -599,6 +650,32 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
       'simpCountCatDairy',
   );
 
+  const writeQtyToMainInventory = useCallback(
+    (productId: string, quantity: number) => {
+      const placeId = preferredPlaceForProduct(
+        inventorySession,
+        productId,
+        activePlaceId || places[0]?.id || '',
+      );
+      if (!placeId) return;
+      // Collapse multi-place totals onto one place so Mini Invis stays the source of truth.
+      for (const line of inventorySession.lines) {
+        if (line.productId !== productId) continue;
+        if (line.placeId === placeId) continue;
+        if (line.quantity == null) continue;
+        updateLineQuantity(line.id, null);
+      }
+      upsertCountedProduct({ productId, quantity, placeId });
+    },
+    [
+      inventorySession,
+      activePlaceId,
+      places,
+      updateLineQuantity,
+      upsertCountedProduct,
+    ],
+  );
+
   const patchItem = useCallback(
     (id: string, map: (row: SimplifiedCountItem) => SimplifiedCountItem) => {
       setByCategory((prev) => {
@@ -619,12 +696,27 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   const applyDelta = useCallback(
     (id: string, delta: number) => {
       if (isOverview) return;
-      patchItem(id, (row) => {
-        const next = Math.max(0, Math.round((row.quantity + delta) * 100) / 100);
-        return { ...row, quantity: next };
-      });
+      const home = findItemCategory(byCategory, id);
+      const row = home
+        ? (byCategory[home] ?? []).find((r) => r.id === id)
+        : undefined;
+      if (!row) return;
+      const nextQty = Math.max(
+        0,
+        Math.round((row.quantity + delta) * 100) / 100,
+      );
+      patchItem(id, () => ({ ...row, quantity: nextQty }));
+      if (products.some((p) => p.id === id)) {
+        writeQtyToMainInventory(id, nextQty);
+      }
     },
-    [isOverview, patchItem],
+    [
+      isOverview,
+      byCategory,
+      patchItem,
+      products,
+      writeQtyToMainInventory,
+    ],
   );
 
   const setQuantity = useCallback(
@@ -632,8 +724,11 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
       if (isOverview) return;
       const next = Math.max(0, Math.round(quantity * 100) / 100);
       patchItem(id, (row) => ({ ...row, quantity: next }));
+      if (products.some((p) => p.id === id)) {
+        writeQtyToMainInventory(id, next);
+      }
     },
-    [isOverview, patchItem],
+    [isOverview, patchItem, products, writeQtyToMainInventory],
   );
 
   const setUnit = useCallback(
@@ -828,10 +923,8 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   }, [monthIndex, months, priceHistoryMonthKey, priceHistoryRows, t]);
 
   const stockOverview = useMemo(() => {
-    const priorTotals =
-      emptyStart || monthIndex <= 0
-        ? null
-        : categoryTotalsForMonth(monthIndex - 1);
+    // Mini Invis mirrors live main inventory — no shared Lönkka/Daily Dose month demos.
+    const priorTotals = null as Record<SimplifiedItemCategoryId, number> | null;
     const rows = ITEM_CATEGORY_IDS.map((cid) => {
       const meta = SIMPLIFIED_CATEGORIES.find((c) => c.id === cid);
       const catRows = (byCategory[cid] ?? []).filter(
@@ -861,7 +954,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
       })),
       foodTotal,
     };
-  }, [byCategory, emptyStart, hiddenSet, monthIndex, t]);
+  }, [byCategory, hiddenSet, t]);
 
   const runExport = useCallback(async () => {
     setExportBusy(true);

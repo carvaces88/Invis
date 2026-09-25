@@ -1,33 +1,42 @@
 ---
-description: New welcome-gate testers start empty; Ravintola Lonkka always resets for each new user
+description: New welcome-gate testers start empty; Mini Invis is per-user and mirrors main Invis
 alwaysApply: true
 ---
 
-# New user empty inventory (welcome gate)
+# New user empty inventory + Mini Invis per user
 
 When someone enters via the welcome gate as a **new name + email** (not a kitchen/beta/investor bypass):
 
 1. **Email is required** and must be logged to `app_entries` for traction (`name`, `email`, `venue`, `kind`, `is_new`).
 2. Offer an **“I’m a new user”** checkbox (unchecked by default). When checked:
    - **Normal Invis**: wipe counted stock on first claim for that name on the device; apply venue as `siteName` when provided.
-   - **Mini Invis**: set `invis.simpCount.emptyStart.v1` so category lists start **empty** (no Lönkka demo quantities) — users add their own products.
+   - **Mini Invis**: owner-scoped empty start (`invis.simpCount.emptyStart.{owner}.v1`).
 3. Do **not** leave Kamppi demo counts as the starting sheet for opted-in new testers.
 4. Returning users (checkbox off) keep / sync existing cloud workspace for that email — **except Ravintola Lonkka** (see below).
 5. Bypass names (`cesar`, `elena`, `ivan`, `guest`, `jani`, `joonas`, `patricio`, `heidi`, `investor`) skip the checkbox.
-6. When a kitchen/venue is registered, **both Invis and Mini Invis** show **location title + user name** in headers (`kitchenIdentityTitle` / Home · More · Mini Invis brand).
+6. When a kitchen/venue is registered, **both Invis and Mini Invis** show **location title + user name** in headers.
+
+## Mini Invis = same inventory as main Invis (per user)
+
+- Mini Invis **must not** use a shared global sheet (no leaking Daily Dose / Lönkka demo between users).
+- Storage keys are **scoped by owner** (`simpCountStorageKeys` / sync email or gate name).
+- Product lines + quantities come from the user’s **main inventory** (`buildSimpCategoriesFromInventory`).
+- Quantity edits in Mini Invis write back via `upsertCountedProduct`.
+- On **user switch**, Mini Invis reloads that user’s keys + rebuilds from their main inventory.
+- Clear legacy global keys (`clearLegacySimpCountGlobals`) so old shared data cannot resurface.
 
 ## Named pilots
 
 | Login | Venue | Notes |
 |---|---|---|
-| `joonas` | Ravintola Lonkka | Empty fridge + freezer; reset on new Lonkka users |
+| `joonas` | Ravintola Lonkka | Empty fridge + freezer; Mini Invis empty until they count |
 | `jani` | Kamppi · Kulturikasarmi | Kamppi-style places |
 | `patricio` | Daily Dose | Empty fridge + freezer |
-| `heidi` | Fair Buffet · Messukeskus | **Pro**; 6 places; **20 sample products each** (dry, freezer, vegetables, cleaning, dairy, meats) via `seedFairBuffet.ts` |
+| `heidi` | Fair Buffet · Messukeskus | **Pro**; sample stock visible in both Invis + Mini Invis |
 | `investor` | — | Pro + pitch deck |
 
-Pro unlock: `PRO_NAMES` / `isProName` in `authAccounts.ts` (not only investor).
+Pro unlock: `PRO_NAMES` / `isProName` in `authAccounts.ts`.
 
-Product name in UI: **Mini Invis** (not “Simple invis”).
+Product name in UI: **Mini Invis**.
 
-Key files: `SignInScreen.tsx`, `AuthContext.tsx`, `VenueFromGate.tsx`, `seedFairBuffet.ts`, `seedPlaces.ts`, `simpCountNewUser.ts`, `kitchenIdentity.ts`, `store.tsx` (`seedWorkspaceSample`).
+Key files: `SimplifiedCountingScreen.tsx`, `simpCountFromInventory.ts`, `simpCountNewUser.ts`, `VenueFromGate.tsx`, `AuthContext.tsx`, `store.tsx`.

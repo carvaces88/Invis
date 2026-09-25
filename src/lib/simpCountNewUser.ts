@@ -1,30 +1,63 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-/** When set, Mini Invis starts with empty lists — no Lönkka demo stock. */
-export const SIMP_EMPTY_START_KEY = 'invis.simpCount.emptyStart.v1';
+/** Normalize gate name / email into a stable Mini Invis workspace id. */
+export function simpCountOwnerKey(
+  nameOrEmail: string | null | undefined,
+): string {
+  const raw = (nameOrEmail ?? '').trim().toLowerCase();
+  return raw || 'anon';
+}
 
-const SIMP_MONTH_STOCK_KEY = 'invis.simpCount.monthStock.v1';
-const SIMP_HIDDEN_KEY = 'invis.simpCount.hiddenIds.v1';
-const SIMP_EXTRAS_KEY = 'invis.simpCount.extraProducts.v1';
+export function simpCountStorageKeys(ownerKey: string) {
+  const o = simpCountOwnerKey(ownerKey);
+  return {
+    hidden: `invis.simpCount.hiddenIds.${o}.v1`,
+    extras: `invis.simpCount.extraProducts.${o}.v1`,
+    emptyStart: `invis.simpCount.emptyStart.${o}.v1`,
+    monthStock: `invis.simpCount.monthStock.${o}.v1`,
+  };
+}
 
-/** Wipe Mini Invis demo data so a new tester starts from zero. */
-export async function markSimpCountEmptyStart(): Promise<void> {
-  await AsyncStorage.multiSet([[SIMP_EMPTY_START_KEY, '1']]);
+/** Legacy global keys (pre–per-user) — only cleared, never shared across users. */
+export const SIMP_LEGACY_KEYS = [
+  'invis.simpCount.hiddenIds.v1',
+  'invis.simpCount.extraProducts.v1',
+  'invis.simpCount.emptyStart.v1',
+  'invis.simpCount.monthStock.v1',
+] as const;
+
+/** Wipe Mini Invis for this owner so they start empty (no shared demo sheet). */
+export async function markSimpCountEmptyStart(
+  ownerKey: string,
+): Promise<void> {
+  const keys = simpCountStorageKeys(ownerKey);
+  await AsyncStorage.multiSet([[keys.emptyStart, '1']]);
   await AsyncStorage.multiRemove([
-    SIMP_MONTH_STOCK_KEY,
-    SIMP_HIDDEN_KEY,
-    SIMP_EXTRAS_KEY,
+    keys.monthStock,
+    keys.hidden,
+    keys.extras,
   ]);
 }
 
-export async function clearSimpCountEmptyStart(): Promise<void> {
-  await AsyncStorage.removeItem(SIMP_EMPTY_START_KEY);
+export async function clearSimpCountEmptyStart(
+  ownerKey: string,
+): Promise<void> {
+  const keys = simpCountStorageKeys(ownerKey);
+  await AsyncStorage.removeItem(keys.emptyStart);
 }
 
-export async function isSimpCountEmptyStart(): Promise<boolean> {
+export async function isSimpCountEmptyStart(
+  ownerKey: string,
+): Promise<boolean> {
   try {
-    return (await AsyncStorage.getItem(SIMP_EMPTY_START_KEY)) === '1';
+    const keys = simpCountStorageKeys(ownerKey);
+    return (await AsyncStorage.getItem(keys.emptyStart)) === '1';
   } catch {
     return false;
   }
+}
+
+/** Drop legacy global Mini Invis keys so they cannot leak between users. */
+export async function clearLegacySimpCountGlobals(): Promise<void> {
+  await AsyncStorage.multiRemove([...SIMP_LEGACY_KEYS]);
 }

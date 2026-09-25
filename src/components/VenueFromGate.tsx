@@ -24,10 +24,13 @@ import {
   isBetaTesterName,
   isGateBypassName,
   normalizeGateName,
+  resolveSyncEmail,
 } from '../lib/authAccounts';
 import {
+  clearLegacySimpCountGlobals,
   clearSimpCountEmptyStart,
   markSimpCountEmptyStart,
+  simpCountOwnerKey,
 } from '../lib/simpCountNewUser';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { WORKSPACE_SYNC_AT_KEY } from '../lib/workspaceSnapshot';
@@ -147,6 +150,9 @@ export function VenueFromGate() {
         const beta = isBetaTesterName(session.name);
         const isNewTester = Boolean(session.isNew) && !bypass;
         const key = normalizeGateName(session.name).toLowerCase();
+        const simpOwner = simpCountOwnerKey(
+          resolveSyncEmail(session) ?? session.name,
+        );
         const lonkka =
           isLonkkaVenue(session.venue) || key === 'joonas';
         const dailyDose =
@@ -157,46 +163,47 @@ export function VenueFromGate() {
         if (firstClaim) {
           // New owner on this device — force a fresh cloud pull next.
           await AsyncStorage.removeItem(WORKSPACE_SYNC_AT_KEY);
+          await clearLegacySimpCountGlobals();
 
           if (beta) {
             if (key === 'heidi' || fairBuffet) {
               seedFairBuffet(seedWorkspaceSample);
-              await clearSimpCountEmptyStart();
+              await clearSimpCountEmptyStart(simpOwner);
             } else if (key === 'joonas' || lonkka) {
               resetLonkkaEmpty(resetWorkspaceLayout);
-              await markSimpCountEmptyStart();
+              await markSimpCountEmptyStart(simpOwner);
             } else if (key === 'patricio' || dailyDose) {
               resetDailyDoseEmpty(resetWorkspaceLayout);
-              await markSimpCountEmptyStart();
+              await markSimpCountEmptyStart(simpOwner);
             } else if (key === 'jani') {
               resetJaniKamppi(resetWorkspaceLayout);
-              await clearSimpCountEmptyStart();
+              await clearSimpCountEmptyStart(simpOwner);
             } else if (!isSupabaseConfigured) {
               clearAllInventory();
               const venue = defaultVenueForName(session.name);
               if (venue) setSiteName(venue);
-              await clearSimpCountEmptyStart();
+              await clearSimpCountEmptyStart(simpOwner);
             } else {
               const venue = defaultVenueForName(session.name);
               if (venue) setSiteName(venue);
-              await clearSimpCountEmptyStart();
+              await clearSimpCountEmptyStart(simpOwner);
             }
           } else if (fairBuffet && !bypass) {
             seedFairBuffet(seedWorkspaceSample);
-            await clearSimpCountEmptyStart();
+            await clearSimpCountEmptyStart(simpOwner);
           } else if (lonkka && !bypass) {
             resetLonkkaEmpty(resetWorkspaceLayout);
-            await markSimpCountEmptyStart();
+            await markSimpCountEmptyStart(simpOwner);
           } else if (dailyDose && !bypass) {
             resetDailyDoseEmpty(resetWorkspaceLayout);
-            await markSimpCountEmptyStart();
+            await markSimpCountEmptyStart(simpOwner);
           } else if (isNewTester) {
             clearAllInventory();
             const venue = session.venue?.trim();
             if (venue) setSiteName(venue);
-            await markSimpCountEmptyStart();
+            await markSimpCountEmptyStart(simpOwner);
           } else {
-            await clearSimpCountEmptyStart();
+            await clearSimpCountEmptyStart(simpOwner);
           }
         } else {
           // Returning user — still correct the site label if it drifted.
