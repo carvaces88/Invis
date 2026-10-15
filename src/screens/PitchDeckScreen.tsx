@@ -41,6 +41,7 @@ import {
   pitchFeatureShots,
   pitchScreensBody,
   pitchScreensHeadline,
+  pitchWho,
 } from '../data/pitchScreenshots';
 import {
   exportPitchDeckPdf,
@@ -606,6 +607,106 @@ function PriceBars() {
   );
 }
 
+/**
+ * Interactive product showcase — phone frame + feature tabs (Chameleo-style).
+ * Tap Photo / Voice / Places / Mini Invis / Fire mode to swap the mockup.
+ */
+function ProductPhoneShowcase() {
+  const [activeId, setActiveId] = useState(pitchFeatureShots[0]?.id ?? 'photo');
+  const active =
+    pitchFeatureShots.find((s) => s.id === activeId) ?? pitchFeatureShots[0];
+  if (!active) return null;
+
+  return (
+    <View style={styles.phoneShowcase}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.featureTabRow}
+      >
+        {pitchFeatureShots.map((shot) => {
+          const on = shot.id === activeId;
+          return (
+            <Pressable
+              key={shot.id}
+              onPress={() => setActiveId(shot.id)}
+              style={[styles.featureTab, on && styles.featureTabOn]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={shot.tab}
+            >
+              <Text style={[styles.featureTabText, on && styles.featureTabTextOn]}>
+                {shot.tab}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <View style={styles.phoneShowcaseBody}>
+        <View style={styles.phoneFrame}>
+          <View style={styles.phoneNotch} />
+          <Image
+            source={active.source}
+            style={styles.phoneScreen}
+            resizeMode="cover"
+            accessibilityLabel={active.title}
+          />
+        </View>
+
+        <View style={styles.phoneCopy}>
+          <Text style={styles.phoneBeat}>{active.beat}</Text>
+          <Text style={styles.phoneTitle}>{active.title}</Text>
+          <Text style={styles.phoneCaption}>{active.caption}</Text>
+          <View style={styles.phoneDotRow}>
+            {pitchFeatureShots.map((shot) => (
+              <Pressable
+                key={shot.id}
+                onPress={() => setActiveId(shot.id)}
+                style={[
+                  styles.phoneDot,
+                  shot.id === activeId && styles.phoneDotOn,
+                ]}
+                accessibilityLabel={shot.tab}
+              />
+            ))}
+          </View>
+        </View>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.shotRow}
+      >
+        {pitchFeatureShots.map((shot) => {
+          const on = shot.id === activeId;
+          return (
+            <Pressable
+              key={shot.id}
+              style={[styles.shotCard, on && styles.shotCardOn]}
+              onPress={() => setActiveId(shot.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+            >
+              <Image
+                source={shot.source}
+                style={styles.shotImage}
+                resizeMode="cover"
+                accessibilityLabel={shot.title}
+              />
+              <Text style={[styles.shotTitle, on && { color: T.teal }]}>
+                {shot.tab}
+              </Text>
+              <Text style={styles.shotCaption}>{shot.beat}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
 export function PitchDeckScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const width = Dimensions.get('window').width;
@@ -806,8 +907,17 @@ export function PitchDeckScreen({ navigation }: Props) {
         </View>
       </View>
 
+      {/* Who we are · what we do */}
+      <Slide title={pitchWho.headline} tealTitle>
+        <Text style={styles.body}>{pitchWho.body}</Text>
+        <Text style={styles.whoSubHead}>{pitchWho.whatWeDoTitle}</Text>
+        <Text style={styles.bodyMuted}>{pitchWho.whatWeDo}</Text>
+        <Text style={styles.whoSubHead}>{pitchWho.nicheTitle}</Text>
+        <Text style={styles.bodyMuted}>{pitchWho.niche}</Text>
+      </Slide>
+
       {/* Solution */}
-      <Slide title={pitchVision.headline} tealTitle>
+      <Slide title={pitchVision.headline} tealTitle band>
         <Text style={styles.body}>{pitchVision.body}</Text>
         <View style={styles.compareRow}>
           <View style={styles.compareCol}>
@@ -832,7 +942,7 @@ export function PitchDeckScreen({ navigation }: Props) {
       </Slide>
 
       {/* Product + how it works */}
-      <Slide title={pitchProduct.headline} tealTitle band>
+      <Slide title={pitchProduct.headline} tealTitle>
         <Text style={styles.body}>{pitchProduct.body}</Text>
         <Text style={styles.flowLabel}>{pitchProduct.flowLabel}</Text>
         <View style={styles.flowRow}>
@@ -851,27 +961,10 @@ export function PitchDeckScreen({ navigation }: Props) {
         </View>
       </Slide>
 
-      {/* Live product screenshots — also embedded in PDF / PPTX export */}
-      <Slide title={pitchScreensHeadline} tealTitle>
+      {/* Interactive feature phone — screenshots also embed in PDF / PPTX */}
+      <Slide title={pitchScreensHeadline} tealTitle band>
         <Text style={styles.body}>{pitchScreensBody}</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.shotRow}
-        >
-          {pitchFeatureShots.map((shot) => (
-            <View key={shot.id} style={styles.shotCard}>
-              <Image
-                source={shot.source}
-                style={styles.shotImage}
-                resizeMode="cover"
-                accessibilityLabel={shot.title}
-              />
-              <Text style={styles.shotTitle}>{shot.title}</Text>
-              <Text style={styles.shotCaption}>{shot.caption}</Text>
-            </View>
-          ))}
-        </ScrollView>
+        <ProductPhoneShowcase />
       </Slide>
 
       {/* Market analysis peaks */}
@@ -1204,23 +1297,105 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   flowBody: { color: T.muted, fontSize: 13, lineHeight: 19 },
+  whoSubHead: {
+    marginTop: spacing.md,
+    fontSize: 14,
+    fontWeight: '800',
+    color: T.tealDeep,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  phoneShowcase: { marginTop: spacing.md, gap: 12 },
+  featureTabRow: { gap: 8, paddingBottom: 4 },
+  featureTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: T.white,
+    borderWidth: 1,
+    borderColor: T.line,
+  },
+  featureTabOn: { backgroundColor: T.teal, borderColor: T.teal },
+  featureTabText: { color: T.muted, fontWeight: '700', fontSize: 13 },
+  featureTabTextOn: { color: T.white },
+  phoneShowcaseBody: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    alignItems: 'center',
+  },
+  phoneFrame: {
+    width: 220,
+    borderRadius: 28,
+    borderWidth: 3,
+    borderColor: T.ink,
+    backgroundColor: '#0F172A',
+    padding: 8,
+    paddingTop: 14,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  phoneNotch: {
+    alignSelf: 'center',
+    width: 72,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: '#334155',
+    marginBottom: 8,
+  },
+  phoneScreen: {
+    width: '100%',
+    height: 380,
+    borderRadius: 18,
+    backgroundColor: T.page,
+  },
+  phoneCopy: { flex: 1, minWidth: 180, gap: 6 },
+  phoneBeat: {
+    color: T.teal,
+    fontWeight: '800',
+    fontSize: 12,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  phoneTitle: {
+    color: T.ink,
+    fontWeight: '800',
+    fontSize: 22,
+    letterSpacing: -0.3,
+  },
+  phoneCaption: { color: T.muted, fontSize: 14, lineHeight: 21 },
+  phoneDotRow: { flexDirection: 'row', gap: 6, marginTop: 10 },
+  phoneDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: T.line,
+  },
+  phoneDotOn: { backgroundColor: T.teal, width: 18 },
   shotRow: {
     gap: 12,
-    paddingTop: 8,
+    paddingTop: 4,
     paddingBottom: 4,
     paddingRight: 8,
   },
   shotCard: {
-    width: 220,
+    width: 160,
     backgroundColor: T.white,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: T.line,
     overflow: 'hidden',
   },
+  shotCardOn: {
+    borderColor: T.teal,
+    borderWidth: 2,
+  },
   shotImage: {
     width: '100%',
-    height: 280,
+    height: 200,
     backgroundColor: T.page,
   },
   shotTitle: {

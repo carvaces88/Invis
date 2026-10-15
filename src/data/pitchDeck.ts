@@ -43,14 +43,19 @@ export const pitchProduct = {
       body: 'Snap a fridge shelf, freezer, or product label. One photo can cover many items mid-prep.',
     },
     {
-      short: 'Match',
-      title: 'Recognize products',
-      body: 'AI reads names, size, and EAN, then matches the kitchen catalog — or suggests adding a new SKU.',
+      short: 'Voice',
+      title: 'Dictate the walk-in',
+      body: 'Hands-free walk-through: speak items while you move; transcript becomes reviewable stock lines.',
     },
     {
-      short: 'Count',
-      title: 'Confirm inventory',
-      body: 'Adjust quantities in kitchen units (KPL, KG, L…). Delivery and hävikki stay in the same flow.',
+      short: 'Places',
+      title: 'Multi-fridge · multi-site',
+      body: 'Tag counts to kitchens, freezers, and dry stores — groups and venues stay separate.',
+    },
+    {
+      short: 'Fire',
+      title: 'Mini Invis + fire mode',
+      body: 'Mid-service swipe ±1 counting. Fire mode focuses one item at a time so the sheet stays alive during service.',
     },
     {
       short: 'Export',

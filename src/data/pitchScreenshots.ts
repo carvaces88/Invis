@@ -3,53 +3,94 @@ import { Image, Platform, type ImageSourcePropType } from 'react-native';
 
 /**
  * Live product screenshots for the investor pitch deck (on-screen + PDF/PPTX).
- * Captured from production Invis UI.
+ * Interactive showcase highlights kitchen-speed features — not a generic gallery.
  */
 export type PitchFeatureShot = {
   id: string;
+  /** Short tab label */
+  tab: string;
   title: string;
   caption: string;
+  /** One-line “what chefs get” */
+  beat: string;
   /** Metro bundler asset module */
   source: ImageSourcePropType;
 };
 
 export const pitchFeatureShots: PitchFeatureShot[] = [
   {
-    id: 'home',
-    title: 'Home · start counting',
-    caption: 'Scan fridge / photos, import a prior list, or start from catalog.',
+    id: 'photo',
+    tab: 'Photo',
+    title: 'Photo → inventaario',
+    caption:
+      'Snap a fridge shelf, freezer, or pack label. Vision matches catalog / K-Ruoka; chefs confirm qty in kitchen units.',
+    beat: 'Fridge & pack photos become counted stock',
     source: require('../../assets/pitch/pitch-home.png'),
   },
   {
-    id: 'mini-invis',
-    title: 'Mini Invis · fast count',
+    id: 'voice',
+    tab: 'Voice',
+    title: 'Voice walk-through',
     caption:
-      'Category lists, swipe ±1, stock totals at 0% ALV, fire/speed mode.',
-    source: require('../../assets/pitch/pitch-mini-invis.png'),
-  },
-  {
-    id: 'inventory',
-    title: 'Inventory · sheet & export',
-    caption: 'Recorded stock, 0% ALV toggle, Excel / PDF / Word, Restolution path.',
+      'Dictate while walking the walk-in — transcript → review lines → confirm. Hands stay free mid-count (beta).',
+    beat: 'Mic in, stock lines out',
+    // Inventory sheet is where Mic / voice dictate lives; dedicated mic shot pending capture.
     source: require('../../assets/pitch/pitch-inventory.png'),
   },
   {
-    id: 'catalog',
-    title: 'Catalog · Nordic match',
-    caption: 'Searchable kitchen catalog with K-Ruoka / S-kaupat / Lidl price columns.',
-    source: require('../../assets/pitch/pitch-catalog.png'),
+    id: 'places',
+    tab: 'Places',
+    title: 'Multi-location · multi-fridge',
+    caption:
+      'Sites and storages — kitchens, freezers, dry stores. Counts stay tagged to the right place, not one flat list.',
+    beat: 'Every fridge / site has its own sheet',
+    source: require('../../assets/pitch/pitch-more-mini.png'),
   },
   {
-    id: 'more',
-    title: 'More · Mini Invis entry',
-    caption: 'Ops tools in one place — Mini Invis highlighted for mid-service counts.',
-    source: require('../../assets/pitch/pitch-more-mini.png'),
+    id: 'mini',
+    tab: 'Mini Invis',
+    title: 'Mini Invis · mid-service count',
+    caption:
+      'Category lists, search, swipe ±1, stock € at 0% ALV. Built for speed between tickets — not desk ERP.',
+    beat: 'Open mid-service, finish the count',
+    source: require('../../assets/pitch/pitch-mini-invis.png'),
+  },
+  {
+    id: 'fire',
+    tab: 'Fire mode',
+    title: 'Fire mode · swipe counting',
+    caption:
+      'Play / fire mode: focus one item at a time, swipe to bump qty, stay in the flow. 🔥 On fire when the kitchen is moving.',
+    beat: 'One item · swipe · next — no clipboard',
+    // Same Mini Invis surface until dedicated fire-mode capture lands.
+    source: require('../../assets/pitch/pitch-mini-invis.png'),
+  },
+  {
+    id: 'catalog',
+    tab: 'Catalog',
+    title: 'Nordic catalog match',
+    caption:
+      'Searchable kitchen catalog with K-Ruoka / S-kaupat / Lidl price columns — EAN, pack size, 0% ALV.',
+    beat: 'Distributor prices without retyping',
+    source: require('../../assets/pitch/pitch-catalog.png'),
   },
 ];
 
 export const pitchScreensHeadline = 'Product in the kitchen';
 export const pitchScreensBody =
-  'Real screens from INVIS: photo-first counting, Mini Invis mid-service speed, inventaario export, and Nordic catalog pricing.';
+  'Tap a feature — real INVIS screens: photo counting, voice walk-through, multi-fridge places, Mini Invis, and fire-mode speed.';
+
+/** Who we are / what we do (Chameleo-style narrative opener) */
+export const pitchWho = {
+  headline: 'Who we are',
+  body: 'INVIS (by Countro) is a kitchen inventaario app built by a former professional chef. We replace clipboard stock counts with photo, voice, and swipe-speed tools chefs actually open mid-service.',
+  whatWeDoTitle: 'What we do',
+  whatWeDo:
+    'Help full-service kitchens count stock accurately across fridges and sites, keep prices at 0% ALV, cut hävikki admin, and export Restolution-ready sheets — without enterprise ERP bloat.',
+  nicheTitle: 'Our niche',
+  niche:
+    'Finnish (then Nordic) full-service restaurant kitchens — head chefs and kitchen managers who still close inventaario on paper or clunky desktop tools.',
+};
 
 async function uriToDataUri(uri: string): Promise<string> {
   if (uri.startsWith('data:')) return uri;
