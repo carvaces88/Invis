@@ -25,9 +25,9 @@ export const pitchVision = {
     'Enterprise ERP bloat',
   ],
   invisBullets: [
-    'Prep-room mobile speed',
-    'Count → confirm → export',
-    'Built for Nordic kitchen ops',
+    'Photo + voice → counted stock',
+    'Mini Invis · fire mode mid-service',
+    'Multi-fridge places · Nordic export',
   ],
 };
 
