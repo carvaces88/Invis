@@ -366,10 +366,16 @@ const FINLAND_REGION_FILL: Record<FinlandPitchRegionId, string> = {
 /** Accurate Finland admin regions + restaurant-density labels */
 function FinlandMap() {
   const mapW = Math.min(Dimensions.get('window').width - spacing.lg * 2, 420);
-  const mapH = Math.round(mapW * 1.05);
+  const mapH = Math.round(mapW * 1.12);
   return (
-    <View style={[styles.mapFrame, { height: mapH }]}>
-      <Svg width={mapW} height={mapH} viewBox={FINLAND_MAP_VIEWBOX}>
+    // Width MUST match SVG — otherwise desktop labels (% of frame) float off the map.
+    <View style={[styles.mapFrame, { width: mapW, height: mapH }]}>
+      <Svg
+        width={mapW}
+        height={mapH}
+        viewBox={FINLAND_MAP_VIEWBOX}
+        preserveAspectRatio="xMidYMid meet"
+      >
         {finlandMapRegions.map((region) => (
           <Path
             key={region.code}
@@ -382,21 +388,28 @@ function FinlandMap() {
       </Svg>
       {finlandRestaurantRegions
         .filter((r) => r.id !== 'other')
-        .map((r) => (
-          <View
-            key={r.id}
-            style={[
-              styles.mapLabel,
-              {
-                top: `${r.topPct}%` as `${number}%`,
-                left: `${r.leftPct}%` as `${number}%`,
-              },
-            ]}
-          >
-            <Text style={styles.mapLabelPct}>{r.pct}%</Text>
-            <Text style={styles.mapLabelName}>{r.city}</Text>
-          </View>
-        ))}
+        .map((r) => {
+          const accent =
+            FINLAND_REGION_FILL[r.id as FinlandPitchRegionId] ?? T.insight;
+          return (
+            <View
+              key={r.id}
+              style={[
+                styles.mapLabel,
+                {
+                  top: `${r.topPct}%` as `${number}%`,
+                  left: `${r.leftPct}%` as `${number}%`,
+                  borderColor: accent,
+                },
+              ]}
+            >
+              <Text style={[styles.mapLabelPct, { color: accent }]}>
+                {r.pct}%
+              </Text>
+              <Text style={styles.mapLabelName}>{r.city}</Text>
+            </View>
+          );
+        })}
     </View>
   );
 }
@@ -1821,25 +1834,31 @@ const styles = StyleSheet.create({
   insightSplit: {
     gap: spacing.lg,
   },
-  insightMapCol: { width: '100%' },
+  insightMapCol: { width: '100%', alignItems: 'flex-start' },
   insightRight: { width: '100%' },
   mapFrame: {
+    position: 'relative',
+    maxWidth: '100%',
     backgroundColor: T.white,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: T.line,
     overflow: 'hidden',
     marginBottom: spacing.md,
+    alignSelf: 'flex-start',
   },
   mapLabel: {
     position: 'absolute',
-    backgroundColor: T.white,
+    backgroundColor: 'rgba(255,255,255,0.96)',
     borderWidth: 1.5,
     borderColor: T.insight,
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 3,
     minWidth: 56,
+    // Anchor from center-ish so % coords sit on the region
+    transform: [{ translateX: -28 }, { translateY: -10 }],
+    zIndex: 2,
   },
   mapLabelPct: {
     color: T.insight,

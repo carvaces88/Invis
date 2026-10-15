@@ -109,7 +109,8 @@ export function projectionArrEur(kitchens: number, m = pitchMarket): number {
 /**
  * Approximate share of Finnish full-service restaurant density by region
  * (pitch visualization — edit as research tightens).
- * Positions are % within the Finland map frame (viewBox 0 0 1000 1000).
+ * Positions are % of the map frame (= SVG), in FINLAND_MAP_VIEWBOX
+ * crop `300 40 440 920`. Keep mapFrame width === SVG width on desktop.
  */
 export const finlandRestaurantRegions = [
   {
@@ -117,8 +118,9 @@ export const finlandRestaurantRegions = [
     name: 'Uusimaa',
     city: 'Helsinki metro',
     pct: 38.5,
-    topPct: 84,
-    leftPct: 56,
+    /** FI18 (~471, 921) → crop % */
+    topPct: 93,
+    leftPct: 42,
     size: 'lg' as const,
   },
   {
@@ -126,8 +128,9 @@ export const finlandRestaurantRegions = [
     name: 'Pirkanmaa',
     city: 'Tampere',
     pct: 9.2,
-    topPct: 72,
-    leftPct: 48,
+    /** FI11 (~431, 816) */
+    topPct: 82,
+    leftPct: 32,
     size: 'md' as const,
   },
   {
@@ -135,8 +138,9 @@ export const finlandRestaurantRegions = [
     name: 'Varsinais-Suomi',
     city: 'Turku',
     pct: 8.1,
-    topPct: 82,
-    leftPct: 34,
+    /** FI19 (~374, 909) */
+    topPct: 91,
+    leftPct: 18,
     size: 'md' as const,
   },
   {
@@ -144,8 +148,9 @@ export const finlandRestaurantRegions = [
     name: 'Pohjois-Pohjanmaa',
     city: 'Oulu',
     pct: 5.4,
-    topPct: 42,
-    leftPct: 48,
+    /** FI14 (~530, 532) */
+    topPct: 52,
+    leftPct: 54,
     size: 'sm' as const,
   },
   {
@@ -153,8 +158,9 @@ export const finlandRestaurantRegions = [
     name: 'Keski-Suomi',
     city: 'Jyväskylä',
     pct: 4.6,
-    topPct: 62,
-    leftPct: 54,
+    /** FI08 (~498, 758) */
+    topPct: 76,
+    leftPct: 48,
     size: 'sm' as const,
   },
   {
@@ -162,8 +168,8 @@ export const finlandRestaurantRegions = [
     name: 'Rest of Finland',
     city: 'Regional',
     pct: 34.2,
-    topPct: 18,
-    leftPct: 55,
+    topPct: 28,
+    leftPct: 62,
     size: 'sm' as const,
   },
 ] as const;
