@@ -47,6 +47,37 @@ export function ingredientTypeToSimpCategory(
   }
 }
 
+/**
+ * Prefer product.section for Mini Invis tabs that have no IngredientType
+ * (seafood, kitchen alcohol, waste); otherwise use ingredientType.
+ */
+export function productToSimpCategory(product: Product): SimplifiedItemCategoryId {
+  const section = (product.section ?? '').trim().toLowerCase();
+  if (
+    section === 'seafood' ||
+    section.startsWith('seafood') ||
+    section.includes('kala') ||
+    section.includes('fish')
+  ) {
+    return 'seafood';
+  }
+  if (
+    section === 'kitchen alcohol' ||
+    section.includes('alcohol') ||
+    section.includes('alko')
+  ) {
+    return 'kitchen_alcohol';
+  }
+  if (
+    section === 'waste' ||
+    section.includes('hävikki') ||
+    section.includes('havikki')
+  ) {
+    return 'waste';
+  }
+  return ingredientTypeToSimpCategory(product.ingredientType);
+}
+
 export function productTotalQuantity(
   session: InventorySession,
   productId: string,
@@ -97,7 +128,7 @@ export function buildSimpCategoriesFromInventory(
     const product = byId.get(line.productId);
     if (!product) continue;
     const qty = productTotalQuantity(session, product.id);
-    const category = ingredientTypeToSimpCategory(product.ingredientType);
+    const category = productToSimpCategory(product);
     const item: SimplifiedCountItem = {
       id: product.id,
       nameEn: product.officialName,

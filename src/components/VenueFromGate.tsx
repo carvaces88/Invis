@@ -9,6 +9,21 @@ import {
   isFairBuffetVenue,
 } from '../data/seedFairBuffet';
 import {
+  hasInvestorBuffetSeed,
+  INVESTOR_BUFFET_PRODUCTS,
+  INVESTOR_BUFFET_SEED_PLACES,
+  INVESTOR_BUFFET_SEED_VERSION,
+  INVESTOR_BUFFET_STOCK,
+  INVESTOR_SITE_NAME,
+  isInvestorBuffetVenue,
+} from '../data/seedInvestorBuffet';
+import {
+  hasLonkkaButcherySeed,
+  LONKKA_BUTCHERY_PRODUCTS,
+  LONKKA_BUTCHERY_SEED_VERSION,
+  LONKKA_BUTCHERY_STOCK,
+} from '../data/seedLonkkaButchery';
+import {
   DAILY_DOSE_SEED_PLACES,
   DAILY_DOSE_SITE_NAME,
   isDailyDoseVenue,
@@ -36,16 +51,22 @@ import { isSupabaseConfigured } from '../lib/supabase';
 import { WORKSPACE_SYNC_AT_KEY } from '../lib/workspaceSnapshot';
 
 const WORKSPACE_OWNER_KEY = 'invis.workspaceOwner.v1';
+const LONKKA_BUTCHERY_APPLIED_KEY = 'invis.lonkkaButcherySeed.v1';
+const INVESTOR_BUFFET_APPLIED_KEY = 'invis.investorBuffetSeed.v1';
 
-function resetLonkkaEmpty(
-  resetWorkspaceLayout: (args: {
+function seedLonkkaButchery(
+  seedWorkspaceSample: (args: {
     siteName: string;
     places: typeof LONKKA_SEED_PLACES;
+    products: typeof LONKKA_BUTCHERY_PRODUCTS;
+    stock: typeof LONKKA_BUTCHERY_STOCK;
   }) => void,
 ) {
-  resetWorkspaceLayout({
+  seedWorkspaceSample({
     siteName: LONKKA_SITE_NAME,
     places: LONKKA_SEED_PLACES,
+    products: LONKKA_BUTCHERY_PRODUCTS,
+    stock: LONKKA_BUTCHERY_STOCK,
   });
 }
 
@@ -89,12 +110,29 @@ function seedFairBuffet(
   });
 }
 
+function seedInvestorBuffet(
+  seedWorkspaceSample: (args: {
+    siteName: string;
+    places: typeof INVESTOR_BUFFET_SEED_PLACES;
+    products: typeof INVESTOR_BUFFET_PRODUCTS;
+    stock: typeof INVESTOR_BUFFET_STOCK;
+  }) => void,
+) {
+  seedWorkspaceSample({
+    siteName: INVESTOR_SITE_NAME,
+    places: INVESTOR_BUFFET_SEED_PLACES,
+    products: INVESTOR_BUFFET_PRODUCTS,
+    stock: INVESTOR_BUFFET_STOCK,
+  });
+}
+
 /**
  * First claim on this device + always-on venue respect:
- * - joonas → Ravintola Lonkka (empty fridge + freezer)
+ * - joonas → Ravintola Lonkka (butchery sample: 15 items × Mini Invis categories)
  * - jani → Kamppi · Kulturikasarmi (Kamppi-style places)
  * - patricio → Daily Dose (empty fridge + freezer)
  * - heidi → Fair Buffet · Messukeskus (6 places + sample stock, Pro)
+ * - investor → Catering buffet (20 SKUs × Dry/Freezer/Prep fridge/Drawers, master + Pro)
  * - Other new testers (isNew + email): empty normal inventory + empty Mini Invis
  */
 export function VenueFromGate() {
@@ -105,11 +143,13 @@ export function VenueFromGate() {
     resetWorkspaceLayout,
     seedWorkspaceSample,
     siteName,
+    products,
+    storeHydrated,
   } = useInventory();
   const venueApplied = useRef<string | null>(null);
   const ownerApplied = useRef<string | null>(null);
 
-  // Always keep beta users on their restaurant label (even after cloud pull).
+  // Always keep beta / investor users on their restaurant label (even after cloud pull).
   useEffect(() => {
     if (!session?.name) return;
     const canonical = defaultVenueForName(session.name);
@@ -126,7 +166,8 @@ export function VenueFromGate() {
     if (
       isLonkkaVenue(venue) ||
       isDailyDoseVenue(venue) ||
-      isFairBuffetVenue(venue)
+      isFairBuffetVenue(venue) ||
+      isInvestorBuffetVenue(venue)
     ) {
       return;
     }
@@ -159,6 +200,8 @@ export function VenueFromGate() {
           isDailyDoseVenue(session.venue) || key === 'patricio';
         const fairBuffet =
           isFairBuffetVenue(session.venue) || key === 'heidi';
+        const investorBuffet =
+          isInvestorBuffetVenue(session.venue) || key === 'investor';
 
         if (firstClaim) {
           // New owner on this device — force a fresh cloud pull next.
@@ -170,8 +213,12 @@ export function VenueFromGate() {
               seedFairBuffet(seedWorkspaceSample);
               await clearSimpCountEmptyStart(simpOwner);
             } else if (key === 'joonas' || lonkka) {
-              resetLonkkaEmpty(resetWorkspaceLayout);
-              await markSimpCountEmptyStart(simpOwner);
+              seedLonkkaButchery(seedWorkspaceSample);
+              await AsyncStorage.setItem(
+                LONKKA_BUTCHERY_APPLIED_KEY,
+                LONKKA_BUTCHERY_SEED_VERSION,
+              );
+              await clearSimpCountEmptyStart(simpOwner);
             } else if (key === 'patricio' || dailyDose) {
               resetDailyDoseEmpty(resetWorkspaceLayout);
               await markSimpCountEmptyStart(simpOwner);
@@ -188,12 +235,23 @@ export function VenueFromGate() {
               if (venue) setSiteName(venue);
               await clearSimpCountEmptyStart(simpOwner);
             }
+          } else if (key === 'investor' || investorBuffet) {
+            seedInvestorBuffet(seedWorkspaceSample);
+            await AsyncStorage.setItem(
+              INVESTOR_BUFFET_APPLIED_KEY,
+              INVESTOR_BUFFET_SEED_VERSION,
+            );
+            await clearSimpCountEmptyStart(simpOwner);
           } else if (fairBuffet && !bypass) {
             seedFairBuffet(seedWorkspaceSample);
             await clearSimpCountEmptyStart(simpOwner);
           } else if (lonkka && !bypass) {
-            resetLonkkaEmpty(resetWorkspaceLayout);
-            await markSimpCountEmptyStart(simpOwner);
+            seedLonkkaButchery(seedWorkspaceSample);
+            await AsyncStorage.setItem(
+              LONKKA_BUTCHERY_APPLIED_KEY,
+              LONKKA_BUTCHERY_SEED_VERSION,
+            );
+            await clearSimpCountEmptyStart(simpOwner);
           } else if (dailyDose && !bypass) {
             resetDailyDoseEmpty(resetWorkspaceLayout);
             await markSimpCountEmptyStart(simpOwner);
@@ -231,6 +289,99 @@ export function VenueFromGate() {
     resetWorkspaceLayout,
     seedWorkspaceSample,
     setSiteName,
+  ]);
+
+  // Ensure Joonas / Lonkka gets butchery sample even if first claim already
+  // ran as empty, or cloud pull restored a non-butchery workspace.
+  useEffect(() => {
+    if (!session?.name || !storeHydrated) return;
+    const key = normalizeGateName(session.name).toLowerCase();
+    const lonkka =
+      isLonkkaVenue(session.venue) || key === 'joonas';
+    if (!lonkka) return;
+
+    if (hasLonkkaButcherySeed(products)) {
+      void (async () => {
+        await AsyncStorage.setItem(
+          LONKKA_BUTCHERY_APPLIED_KEY,
+          LONKKA_BUTCHERY_SEED_VERSION,
+        );
+        const simpOwner = simpCountOwnerKey(
+          resolveSyncEmail(session) ?? session.name,
+        );
+        await clearSimpCountEmptyStart(simpOwner);
+      })();
+      return;
+    }
+
+    // Debounce so an in-flight cloud pull can land; reseed if still missing.
+    const timer = setTimeout(() => {
+      seedLonkkaButchery(seedWorkspaceSample);
+      void (async () => {
+        await AsyncStorage.setItem(
+          LONKKA_BUTCHERY_APPLIED_KEY,
+          LONKKA_BUTCHERY_SEED_VERSION,
+        );
+        const simpOwner = simpCountOwnerKey(
+          resolveSyncEmail(session) ?? session.name,
+        );
+        await clearSimpCountEmptyStart(simpOwner);
+      })();
+    }, 1800);
+
+    return () => clearTimeout(timer);
+  }, [
+    session?.name,
+    session?.venue,
+    storeHydrated,
+    products,
+    seedWorkspaceSample,
+  ]);
+
+  // Ensure Investor gets catering buffet sample even if first claim already
+  // ran empty, or cloud pull restored a non-buffet workspace.
+  useEffect(() => {
+    if (!session?.name || !storeHydrated) return;
+    const key = normalizeGateName(session.name).toLowerCase();
+    const investorBuffet =
+      isInvestorBuffetVenue(session.venue) || key === 'investor';
+    if (!investorBuffet) return;
+
+    if (hasInvestorBuffetSeed(products)) {
+      void (async () => {
+        await AsyncStorage.setItem(
+          INVESTOR_BUFFET_APPLIED_KEY,
+          INVESTOR_BUFFET_SEED_VERSION,
+        );
+        const simpOwner = simpCountOwnerKey(
+          resolveSyncEmail(session) ?? session.name,
+        );
+        await clearSimpCountEmptyStart(simpOwner);
+      })();
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      seedInvestorBuffet(seedWorkspaceSample);
+      void (async () => {
+        await AsyncStorage.setItem(
+          INVESTOR_BUFFET_APPLIED_KEY,
+          INVESTOR_BUFFET_SEED_VERSION,
+        );
+        const simpOwner = simpCountOwnerKey(
+          resolveSyncEmail(session) ?? session.name,
+        );
+        await clearSimpCountEmptyStart(simpOwner);
+      })();
+    }, 1800);
+
+    return () => clearTimeout(timer);
+  }, [
+    session?.name,
+    session?.venue,
+    storeHydrated,
+    products,
+    seedWorkspaceSample,
   ]);
 
   return null;

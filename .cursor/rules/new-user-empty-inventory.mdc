@@ -29,11 +29,11 @@ When someone enters via the welcome gate as a **new name + email** (not a kitche
 
 | Login | Venue | Notes |
 |---|---|---|
-| `joonas` | Ravintola Lonkka | Empty fridge + freezer; Mini Invis empty until they count |
+| `joonas` | Ravintola Lonkka | Butchery sample (15 items × Mini Invis category); fridge + freezer; same stock in Invis + Mini Invis |
 | `jani` | Kamppi · Kulturikasarmi | Kamppi-style places |
 | `patricio` | Daily Dose | Empty fridge + freezer |
 | `heidi` | Fair Buffet · Messukeskus | **Pro**; sample stock visible in both Invis + Mini Invis |
-| `investor` | — | Pro + pitch deck |
+| `investor` | Investor demo · Catering buffet | **Master** (same as Cesar) + Pro; 10 SKUs × ingredient categories; same stock in Invis + Mini Invis |
 
 Pro unlock: `PRO_NAMES` / `isProName` in `authAccounts.ts`.
 

@@ -27,7 +27,7 @@ export const KITCHEN_NAMES = ['cesar', 'elena', 'ivan', 'guest'] as const;
 /**
  * Named beta testers — cloud sync via canonical account email.
  * Venue ownership (authoritative):
- * - joonas → Ravintola Lonkka
+ * - joonas → Ravintola Lonkka (butchery sample inventory)
  * - jani → Kamppi · Kulturikasarmi
  * - patricio → Daily Dose
  * - heidi → Fair Buffet · Messukeskus (sample inventory + Pro)
@@ -72,12 +72,13 @@ export function isBetaTesterName(raw: string): boolean {
   return (BETA_TESTER_NAMES as readonly string[]).includes(key);
 }
 
-/** Canonical restaurant for a known beta tester, or null. */
+/** Canonical restaurant for a known beta tester or investor demo, or null. */
 export function defaultVenueForName(raw: string): string | null {
   const key = normalizeGateName(raw).toLowerCase();
   if ((BETA_TESTER_NAMES as readonly string[]).includes(key)) {
     return BETA_DEFAULT_VENUE[key as (typeof BETA_TESTER_NAMES)[number]];
   }
+  if (key === 'investor') return 'Investor demo · Catering buffet';
   return null;
 }
 
@@ -101,9 +102,10 @@ export function isAdminName(raw: string): boolean {
   return key === 'cesar' || key === 'elena' || key === 'ivan';
 }
 
-/** Cesar-only master dashboard (orange More button) */
+/** Cesar + Investor master dashboard (orange More button) */
 export function isMasterName(raw: string): boolean {
-  return normalizeGateName(raw).toLowerCase() === 'cesar';
+  const key = normalizeGateName(raw).toLowerCase();
+  return key === 'cesar' || key === 'investor';
 }
 
 export function displayKitchenName(raw: string): string {

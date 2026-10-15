@@ -228,7 +228,7 @@ export function MoreScreen() {
         </Pressable>
       ) : null}
 
-      {isInvestor ? (
+      {isInvestor && !isMaster ? (
         <Pressable
           style={({ pressed }) => [
             styles.tractionCard,

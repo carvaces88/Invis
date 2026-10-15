@@ -430,7 +430,7 @@ export type RootStackParamList = {
   InventoryPhotos: undefined;
   /** Optional feedback / comments (strongly nudged after sign-in) */
   Feedback: { nudged?: boolean } | undefined;
-  /** Cesar: full people / feedback; investor: user-count traction only */
+  /** Cesar + Investor: full master people / feedback deck */
   AdminDeck: undefined;
   /** Investor pitch deck (also previewable by Cesar) */
   PitchDeck: undefined;
