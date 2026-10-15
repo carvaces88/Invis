@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  FlatList,
   Platform,
   Pressable,
   ScrollView,
@@ -288,7 +287,7 @@ export function InventaarioScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   /** Extra actions (verify / scratch) stay collapsed so the sheet gets height. */
   const [toolsOpen, setToolsOpen] = useState(false);
-  /** Explicit pixel height — nested H-ScrollView + FlatList needs a bound on web. */
+  /** Pixel height for the sheet viewport (chrome above leaves the rest). */
   const [listHeight, setListHeight] = useState(0);
   const [micListening, setMicListening] = useState(false);
   const micSessionRef = useRef<DictationSession | null>(null);
@@ -1409,8 +1408,9 @@ export function InventaarioScreen() {
       />
 
       {/*
-        Measure listWrap height so the nested horizontal ScrollView + FlatList
-        get a hard pixel bound (web VirtualizedList absolute-fill needs this).
+        Vertical ScrollView OUTSIDE horizontal — H-outer + FlatList-inner was
+        eating downward swipes on phone/web. Inventory sheets are small enough
+        to render rows without VirtualizedList.
       */}
       <View
         style={styles.listWrap}
@@ -1420,134 +1420,120 @@ export function InventaarioScreen() {
         }}
       >
         <ScrollView
-          horizontal
           nestedScrollEnabled
-          scrollEnabled={draggingCol == null}
-          showsHorizontalScrollIndicator
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator
           style={[
             styles.tableScroll,
             listHeight > 0 ? { height: listHeight } : null,
-            // Let trackpad/touch pan both axes; FlatList still owns vertical.
             Platform.OS === 'web'
               ? ({ touchAction: 'pan-x pan-y' } as object)
               : null,
           ]}
           contentContainerStyle={[
             styles.tableScrollContent,
-            { minWidth: minTableWidthEffective },
-            listHeight > 0 ? { height: listHeight } : null,
-            Platform.OS === 'web' && listHeight <= 0
-              ? ({ height: '100%' } as object)
-              : null,
+            { paddingBottom: listPadBottom },
           ]}
         >
-          <View
-            style={[
-              styles.tableInner,
-              { minWidth: minTableWidthEffective },
-              listHeight > 0 ? { height: listHeight } : null,
-            ]}
+          <ScrollView
+            horizontal
+            nestedScrollEnabled
+            scrollEnabled={draggingCol == null}
+            showsHorizontalScrollIndicator
+            directionalLockEnabled
+            style={
+              Platform.OS === 'web'
+                ? ({ touchAction: 'pan-x pan-y' } as object)
+                : undefined
+            }
+            contentContainerStyle={{ minWidth: minTableWidthEffective }}
           >
-            {tableHead}
-            <FlatList
-              data={visibleLines}
-              keyExtractor={(item) => item.id}
-              style={[
-                styles.tableList,
-                // RN-web vertical lists set overflowX:'hidden', which eats
-                // horizontal pans. Visible lets H-scroll chain to the parent.
-                Platform.OS === 'web'
-                  ? ({
-                      overflowX: 'visible',
-                      touchAction: 'pan-x pan-y',
-                    } as object)
-                  : null,
-              ]}
-              nestedScrollEnabled
-              contentContainerStyle={{ paddingBottom: listPadBottom }}
-              ListEmptyComponent={
+            <View style={[styles.tableInner, { minWidth: minTableWidthEffective }]}>
+              {tableHead}
+              {visibleLines.length === 0 ? (
                 <Text style={styles.empty}>
                   {searchActive
                     ? t('inventorySearchEmpty')
                     : t('currentInventoryEmpty')}
                 </Text>
-              }
-              renderItem={({ item }) => {
-                const editing = editingId === item.id;
-                const uncounted = item.quantity == null;
-                return (
-                  <Pressable
-                    style={[styles.row, uncounted && styles.rowMuted]}
-                    onPress={() => {
-                      setEditingId(item.id);
-                      setDraftQty(
-                        item.quantity == null
-                          ? ''
-                          : formatQty(toDisplayQty(item.unit, item.quantity)),
-                      );
-                    }}
-                  >
-                    {columns.map((col) => renderCell(col, item, editing))}
-                  </Pressable>
-                );
-              }}
-              ListFooterComponent={
-                visibleLines.length > 0 && viewProfile.includeTotals ? (
-                  <View style={styles.footer}>
-                    {columns.map((col) => {
-                      switch (col) {
-                        case 'name':
+              ) : (
+                visibleLines.map((item) => {
+                  const editing = editingId === item.id;
+                  const uncounted = item.quantity == null;
+                  return (
+                    <Pressable
+                      key={item.id}
+                      style={[styles.row, uncounted && styles.rowMuted]}
+                      onPress={() => {
+                        setEditingId(item.id);
+                        setDraftQty(
+                          item.quantity == null
+                            ? ''
+                            : formatQty(
+                                toDisplayQty(item.unit, item.quantity),
+                              ),
+                        );
+                      }}
+                    >
+                      {columns.map((col) => renderCell(col, item, editing))}
+                    </Pressable>
+                  );
+                })
+              )}
+              {visibleLines.length > 0 && viewProfile.includeTotals ? (
+                <View style={styles.footer}>
+                  {columns.map((col) => {
+                    switch (col) {
+                      case 'name':
+                        return (
+                          <Text key={col} style={footerNameStyle}>
+                            {t('foodTotal')}
+                          </Text>
+                        );
+                      case 'qty':
+                      case 'closingStock': {
+                        const qtyStyle =
+                          col === 'closingStock'
+                            ? styles.footerQtyWide
+                            : styles.footerQty;
+                        if (compareMonths) {
                           return (
-                            <Text key={col} style={footerNameStyle}>
-                              {t('foodTotal')}
-                            </Text>
-                          );
-                        case 'qty':
-                        case 'closingStock': {
-                          const qtyStyle =
-                            col === 'closingStock'
-                              ? styles.footerQtyWide
-                              : styles.footerQty;
-                          if (compareMonths) {
-                            return (
-                              <React.Fragment key={col}>
-                                <View
-                                  style={
-                                    col === 'closingStock'
-                                      ? styles.colMove
-                                      : styles.colQty
-                                  }
-                                />
-                                <Text
-                                  key={`${col}-this`}
-                                  style={qtyStyle}
-                                >
-                                  {String(totals.quantity).replace('.', ',')}
-                                </Text>
-                              </React.Fragment>
-                            );
-                          }
-                          return (
-                            <Text key={col} style={qtyStyle}>
-                              {String(totals.quantity).replace('.', ',')}
-                            </Text>
+                            <React.Fragment key={col}>
+                              <View
+                                style={
+                                  col === 'closingStock'
+                                    ? styles.colMove
+                                    : styles.colQty
+                                }
+                              />
+                              <Text key={`${col}-this`} style={qtyStyle}>
+                                {String(totals.quantity).replace('.', ',')}
+                              </Text>
+                            </React.Fragment>
                           );
                         }
-                        case 'total':
-                          return (
-                            <Text key={col} style={styles.footerValue}>
-                              {money(totals.value * alvFactor)}
-                            </Text>
-                          );
-                        default:
-                          return <View key={col} style={colStyle(col, colOpts)} />;
+                        return (
+                          <Text key={col} style={qtyStyle}>
+                            {String(totals.quantity).replace('.', ',')}
+                          </Text>
+                        );
                       }
-                    })}
-                  </View>
-                ) : null
-              }
-            />
-          </View>
+                      case 'total':
+                        return (
+                          <Text key={col} style={styles.footerValue}>
+                            {money(totals.value * alvFactor)}
+                          </Text>
+                        );
+                      default:
+                        return (
+                          <View key={col} style={colStyle(col, colOpts)} />
+                        );
+                    }
+                  })}
+                </View>
+              ) : null}
+            </View>
+          </ScrollView>
         </ScrollView>
       </View>
     </View>
@@ -1835,12 +1821,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   tableInner: {
-    flex: 1,
-    minHeight: 0,
-  },
-  tableList: {
-    flex: 1,
-    minHeight: 0,
+    flexGrow: 0,
   },
   tableHead: {
     flexDirection: 'row',
