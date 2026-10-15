@@ -15,6 +15,11 @@ import {
   pitchVision,
   projectionArrEur,
 } from '../../data/pitchDeck';
+import {
+  loadPitchScreenshotDataUris,
+  pitchScreensBody,
+  pitchScreensHeadline,
+} from '../../data/pitchScreenshots';
 import { printHtmlOrSharePdf, shareOrDownloadBase64 } from './download';
 
 const TEAL = '0D9488';
@@ -214,12 +219,15 @@ function buildSlides(): DeckSlide[] {
 }
 
 /** Dense multi-section pages for PDF — not one sparse block per sheet. */
-function buildPitchDeckHtml(orientation: PitchDeckOrientation): string {
+function buildPitchDeckHtml(
+  orientation: PitchDeckOrientation,
+  screenshots: { id: string; title: string; caption: string; dataUri: string }[],
+): string {
   const portrait = orientation === 'vertical';
   const pageSize = portrait ? 'A4 portrait' : 'A4 landscape';
   const som = finlandSomArrEur();
   const nordics = nordicsArrEur();
-  const pageCount = 5;
+  const pageCount = 6;
 
   const footer = (n: number) => `
 <footer class="foot">
@@ -354,6 +362,31 @@ function buildPitchDeckHtml(orientation: PitchDeckOrientation): string {
     </section>`,
 
     `<section class="sheet">
+      ${header('Screens')}
+      <div class="sheet-body">
+        <div class="block grow">
+          <h2>${escapeHtml(pitchScreensHeadline)}</h2>
+          <p class="lede tight">${escapeHtml(pitchScreensBody)}</p>
+          <div class="shots">
+            ${screenshots
+              .map(
+                (shot) => `
+              <figure class="shot">
+                <img src="${shot.dataUri}" alt="${escapeHtml(shot.title)}" />
+                <figcaption>
+                  <strong>${escapeHtml(shot.title)}</strong>
+                  <span>${escapeHtml(shot.caption)}</span>
+                </figcaption>
+              </figure>`,
+              )
+              .join('')}
+          </div>
+        </div>
+      </div>
+      ${footer(3)}
+    </section>`,
+
+    `<section class="sheet">
       ${header('Market')}
       <div class="sheet-body">
         <div class="block">
@@ -398,7 +431,7 @@ function buildPitchDeckHtml(orientation: PitchDeckOrientation): string {
           <div class="proj-row">${projCards}</div>
         </div>
       </div>
-      ${footer(3)}
+      ${footer(4)}
     </section>`,
 
     `<section class="sheet">
@@ -417,7 +450,7 @@ function buildPitchDeckHtml(orientation: PitchDeckOrientation): string {
           <div class="grid three">${moatCards}</div>
         </div>
       </div>
-      ${footer(4)}
+      ${footer(5)}
     </section>`,
 
     `<section class="sheet">
@@ -458,7 +491,7 @@ function buildPitchDeckHtml(orientation: PitchDeckOrientation): string {
           <p class="role">${escapeHtml(pitchAsk.founderRole)}</p>
         </div>
       </div>
-      ${footer(5)}
+      ${footer(6)}
     </section>`,
   ];
 
@@ -626,6 +659,45 @@ function buildPitchDeckHtml(orientation: PitchDeckOrientation): string {
   }
   .flow-title { font-weight: 700; font-size: 10px; margin: 1px 0 2px; }
   .flow-body { margin: 0; font-size: 9.5px; color: #${MUTED}; }
+  .shots {
+    display: grid;
+    grid-template-columns: ${portrait ? '1fr 1fr' : 'repeat(5, 1fr)'};
+    gap: ${portrait ? '8px' : '6px'};
+    margin-top: 6px;
+  }
+  .shot {
+    margin: 0;
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .shot img {
+    width: 100%;
+    height: ${portrait ? '150px' : '210px'};
+    object-fit: cover;
+    object-position: top center;
+    display: block;
+    background: #F1F5F9;
+  }
+  .shot figcaption {
+    padding: 5px 6px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .shot figcaption strong {
+    font-size: ${portrait ? '9px' : '10px'};
+    color: #${TEAL_DEEP};
+  }
+  .shot figcaption span {
+    font-size: ${portrait ? '8px' : '8.5px'};
+    color: #${MUTED};
+    line-height: 1.25;
+  }
   .flow-arrow {
     display: flex;
     align-items: center;
@@ -834,7 +906,8 @@ ${pages.join('\n')}
 export async function exportPitchDeckPdf(
   orientation: PitchDeckOrientation = 'horizontal',
 ): Promise<string> {
-  const html = buildPitchDeckHtml(orientation);
+  const screenshots = await loadPitchScreenshotDataUris();
+  const html = buildPitchDeckHtml(orientation, screenshots);
   const filename = `${filenameBase(orientation)}.pdf`;
   const landscape = orientation === 'horizontal';
   return printHtmlOrSharePdf({
@@ -850,6 +923,13 @@ export async function exportPitchDeckPdf(
   });
 }
 
+type PptxSlide = {
+  background: { color: string };
+  addText: (...args: unknown[]) => void;
+  addShape: (...args: unknown[]) => void;
+  addImage: (...args: unknown[]) => void;
+};
+
 type PptxCtor = new () => {
   author: string;
   title: string;
@@ -857,11 +937,7 @@ type PptxCtor = new () => {
   layout: string;
   defineLayout: (opts: { name: string; width: number; height: number }) => void;
   ShapeType: { roundRect: unknown };
-  addSlide: () => {
-    background: { color: string };
-    addText: (...args: unknown[]) => void;
-    addShape: (...args: unknown[]) => void;
-  };
+  addSlide: () => PptxSlide;
   write: (opts: {
     outputType: 'base64';
   }) => Promise<string | Uint8Array | ArrayBuffer | Blob>;
@@ -892,6 +968,7 @@ export async function exportPitchDeckPptx(
   const contentW = landscape ? 12.3 : 6.5;
   const marginX = 0.5;
   const slides = buildSlides();
+  const screenshots = await loadPitchScreenshotDataUris();
 
   for (const slide of slides) {
     const s = pptx.addSlide();
@@ -1222,6 +1299,74 @@ export async function exportPitchDeckPptx(
         color: TEAL_DEEP,
         fontSize: 13,
         bold: true,
+      });
+    }
+
+    // After the product flow slide, insert live feature screenshots.
+    if (
+      slide.kind === 'section' &&
+      slide.title === pitchProduct.headline &&
+      screenshots.length > 0
+    ) {
+      const shotSlide = pptx.addSlide();
+      shotSlide.background = { color: WHITE };
+      shotSlide.addText(pitchScreensHeadline, {
+        x: marginX,
+        y: 0.35,
+        w: contentW,
+        h: 0.45,
+        color: TEAL_DEEP,
+        fontSize: landscape ? 28 : 24,
+        bold: true,
+      });
+      shotSlide.addText(pitchScreensBody, {
+        x: marginX,
+        y: 0.85,
+        w: contentW,
+        h: 0.45,
+        color: MUTED,
+        fontSize: 13,
+      });
+      const cols = landscape ? Math.min(5, screenshots.length) : 2;
+      const gap = 0.12;
+      const shotW = (contentW - gap * (cols - 1)) / cols;
+      const shotH = landscape ? 4.6 : 3.4;
+      screenshots.forEach((shot, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = marginX + col * (shotW + gap);
+        const top = 1.45 + row * (shotH + 0.55);
+        const rawB64 = shot.dataUri.includes(',')
+          ? shot.dataUri.split(',')[1]!
+          : shot.dataUri;
+        try {
+          shotSlide.addImage({
+            data: `image/png;base64,${rawB64}`,
+            x,
+            y: top,
+            w: shotW,
+            h: shotH - 0.7,
+          });
+        } catch {
+          /* skip bad image */
+        }
+        shotSlide.addText(shot.title, {
+          x,
+          y: top + shotH - 0.65,
+          w: shotW,
+          h: 0.28,
+          color: TEAL_DEEP,
+          fontSize: 10,
+          bold: true,
+        });
+        shotSlide.addText(shot.caption, {
+          x,
+          y: top + shotH - 0.38,
+          w: shotW,
+          h: 0.35,
+          color: MUTED,
+          fontSize: 9,
+        });
       });
     }
   }

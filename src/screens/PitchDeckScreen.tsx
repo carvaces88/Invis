@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -36,6 +37,11 @@ import {
   type FinlandPitchRegionId,
 } from '../data/finlandMap';
 import { useI18n } from '../i18n';
+import {
+  pitchFeatureShots,
+  pitchScreensBody,
+  pitchScreensHeadline,
+} from '../data/pitchScreenshots';
 import {
   exportPitchDeckPdf,
   exportPitchDeckPptx,
@@ -845,6 +851,29 @@ export function PitchDeckScreen({ navigation }: Props) {
         </View>
       </Slide>
 
+      {/* Live product screenshots — also embedded in PDF / PPTX export */}
+      <Slide title={pitchScreensHeadline} tealTitle>
+        <Text style={styles.body}>{pitchScreensBody}</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.shotRow}
+        >
+          {pitchFeatureShots.map((shot) => (
+            <View key={shot.id} style={styles.shotCard}>
+              <Image
+                source={shot.source}
+                style={styles.shotImage}
+                resizeMode="cover"
+                accessibilityLabel={shot.title}
+              />
+              <Text style={styles.shotTitle}>{shot.title}</Text>
+              <Text style={styles.shotCaption}>{shot.caption}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      </Slide>
+
       {/* Market analysis peaks */}
       <Slide title="Market analysis" tealTitle band>
         <MarketPeaks />
@@ -1175,6 +1204,40 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   flowBody: { color: T.muted, fontSize: 13, lineHeight: 19 },
+  shotRow: {
+    gap: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+    paddingRight: 8,
+  },
+  shotCard: {
+    width: 220,
+    backgroundColor: T.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: T.line,
+    overflow: 'hidden',
+  },
+  shotImage: {
+    width: '100%',
+    height: 280,
+    backgroundColor: T.page,
+  },
+  shotTitle: {
+    marginTop: 8,
+    marginHorizontal: 10,
+    fontSize: 13,
+    fontWeight: '800',
+    color: T.tealDeep,
+  },
+  shotCaption: {
+    marginTop: 3,
+    marginHorizontal: 10,
+    marginBottom: 10,
+    fontSize: 12,
+    lineHeight: 16,
+    color: T.muted,
+  },
   compareRow: { flexDirection: 'row', gap: 12, marginTop: spacing.lg },
   compareCol: {
     flex: 1,
