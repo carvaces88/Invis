@@ -48,9 +48,10 @@ export function MoreScreen() {
   const [valueOpen, setValueOpen] = useState(false);
   const kitchenLine = profile
     ? moreAccountStatusLine({
-        sessionName: session?.name ?? profile.username,
+        sessionName: session?.name || profile.username || profile.displayName,
         displayName: profile.displayName,
         siteName,
+        isInvestor,
       }) || t('signedInAs').replace('{name}', profile.displayName)
     : null;
   const [refreshing, setRefreshing] = useState(false);

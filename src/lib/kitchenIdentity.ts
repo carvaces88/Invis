@@ -19,14 +19,59 @@ export function kitchenUserLabel(displayName: string | null | undefined): string
   return (displayName ?? '').trim();
 }
 
+/** Stale More-meta fragments sometimes leak into siteName (e.g. "Jani · beta 1"). */
+function looksLikeBetaStatusFragment(site: string): boolean {
+  return /\bbeta\s*\d+\b/i.test(site);
+}
+
+function resolveAccountRaw(opts: {
+  sessionName?: string | null;
+  displayName?: string | null;
+}): string {
+  // Prefer || so empty string does not block displayName / username fallbacks.
+  return (opts.sessionName || opts.displayName || '').trim();
+}
+
+function isInvestorAccount(opts: {
+  sessionName?: string | null;
+  displayName?: string | null;
+  isInvestor?: boolean;
+}): boolean {
+  if (opts.isInvestor) return true;
+  if (isInvestorName(opts.sessionName ?? '')) return true;
+  if (isInvestorName(opts.displayName ?? '')) return true;
+  return false;
+}
+
 /** e.g. "Ravintola Lonkka · Joonas" — empty string if neither set. */
 export function kitchenIdentityTitle(opts: {
   siteName?: string | null;
   displayName?: string | null;
+  sessionName?: string | null;
+  isInvestor?: boolean;
 }): string {
-  const location = kitchenLocationLabel(opts.siteName);
-  const user = kitchenUserLabel(opts.displayName);
-  if (location && user) return `${location} · ${user}`;
+  const user = kitchenUserLabel(
+    opts.displayName ||
+      (opts.sessionName ? displayKitchenName(opts.sessionName) : ''),
+  );
+
+  if (isInvestorAccount(opts)) {
+    // Venue already carries "Investor"; never mash a stale name into the title.
+    const canonical = defaultVenueForName('investor');
+    return canonical || user || 'Investor';
+  }
+
+  let location = kitchenLocationLabel(opts.siteName);
+  if (location && looksLikeBetaStatusFragment(location)) {
+    const fromName = opts.sessionName || opts.displayName;
+    location = (fromName && defaultVenueForName(fromName)) || '';
+  }
+
+  if (location && user) {
+    // Avoid "Investor demo · … · Investor" style doubling when site already names the user.
+    if (location.toLowerCase().includes(user.toLowerCase())) return location;
+    return `${location} · ${user}`;
+  }
   return location || user;
 }
 
@@ -40,15 +85,22 @@ export function moreAccountStatusLine(opts: {
   sessionName?: string | null;
   displayName?: string | null;
   siteName?: string | null;
+  /** Auth flag — wins when sessionName is briefly empty/stale after switch. */
+  isInvestor?: boolean;
 }): string {
-  const raw = (opts.sessionName ?? opts.displayName ?? '').trim();
+  const raw = resolveAccountRaw(opts);
   const display = kitchenUserLabel(
     raw ? displayKitchenName(raw) : opts.displayName,
   );
-  const site = kitchenLocationLabel(opts.siteName);
+  let site = kitchenLocationLabel(opts.siteName);
 
-  if (raw && isInvestorName(raw)) {
+  if (isInvestorAccount(opts) || (raw && isInvestorName(raw))) {
     return 'Investor · beta 1';
+  }
+
+  // Never glue a leaked beta-status siteName onto another account's display name.
+  if (site && looksLikeBetaStatusFragment(site)) {
+    site = (raw && defaultVenueForName(raw)) || '';
   }
 
   if (raw && isBetaTesterName(raw)) {
@@ -60,6 +112,9 @@ export function moreAccountStatusLine(opts: {
     return venue ? `${name} · beta ${betaN} · ${venue}` : `${name} · beta ${betaN}`;
   }
 
-  if (site && display) return `${site} · ${display}`;
+  if (site && display) {
+    if (site.toLowerCase().includes(display.toLowerCase())) return site;
+    return `${site} · ${display}`;
+  }
   return site || display;
 }

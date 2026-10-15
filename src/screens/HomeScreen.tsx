@@ -27,6 +27,7 @@ import {
 } from '../data/store';
 import type { MainTabParamList, RootStackParamList, ScanMode } from '../data/types';
 import { useI18n } from '../i18n';
+import { kitchenIdentityTitle } from '../lib/kitchenIdentity';
 import { colors, radius, shadows, spacing, surfaces } from '../theme/colors';
 
 /** Dismissed for the current empty stretch; cleared once stock is recorded again. */
@@ -48,7 +49,7 @@ export function HomeScreen() {
   const navigation = useNavigation<Nav>();
   const { t } = useI18n();
   const { yesChef } = useChefNudge();
-  const { profile } = useAuth();
+  const { profile, session: gateSession, isInvestor } = useAuth();
   const { session, siteName } = useInventory();
   const { width } = useWindowDimensions();
   const gap = spacing.md;
@@ -62,10 +63,13 @@ export function HomeScreen() {
 
   const displayName =
     profile?.displayName?.trim() || t('homeGreetingNameFallback');
-  const location = siteName?.trim() || '';
-  const kitchenSubtitle = location
-    ? `${location} · ${displayName}`
-    : `${t('appBrand')} · ${t('kitchenInventory').toLowerCase()}`;
+  const kitchenSubtitle =
+    kitchenIdentityTitle({
+      siteName,
+      displayName: profile?.displayName,
+      sessionName: gateSession?.name || profile?.username || profile?.displayName,
+      isInvestor,
+    }) || `${t('appBrand')} · ${t('kitchenInventory').toLowerCase()}`;
 
   const inventoryEmpty = !hasRecordedInventory(session);
 

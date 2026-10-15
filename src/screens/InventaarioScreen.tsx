@@ -213,12 +213,14 @@ export function InventaarioScreen() {
     clearAllInventory,
     getOpeningQuantity,
   } = useInventory();
-  const { profile } = useAuth();
+  const { profile, session: gateSession, isInvestor } = useAuth();
   const { t, strings, locale } = useI18n();
   const kitchenTitle =
     kitchenIdentityTitle({
       siteName,
       displayName: profile?.displayName,
+      sessionName: gateSession?.name || profile?.username || profile?.displayName,
+      isInvestor,
     }) || t('appBrand');
   const { displayUnit, toDisplayQty, toStorageQty, formatQty } = useUnitSystem();
   const [storageFilter, setStorageFilter] = useState<StorageType | 'all'>(

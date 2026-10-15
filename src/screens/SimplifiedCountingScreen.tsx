@@ -490,7 +490,7 @@ function CountRow({
 export function SimplifiedCountingScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { t, locale } = useI18n();
-  const { profile, session: gateSession } = useAuth();
+  const { profile, session: gateSession, isInvestor } = useAuth();
   const {
     products,
     places,
@@ -516,6 +516,8 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
     kitchenIdentityTitle({
       siteName,
       displayName: profile?.displayName,
+      sessionName: gateSession?.name || profile?.username || profile?.displayName,
+      isInvestor,
     }) || t('simpCountOpen');
 
   const [monthIndex, setMonthIndex] = useState(SIMP_COUNT_LIVE_MONTH_INDEX);
