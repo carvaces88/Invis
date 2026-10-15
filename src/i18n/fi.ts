@@ -65,6 +65,8 @@ export const fi: Messages = {
   inventorySearchEmpty: 'Ei tuotteita tällä haulla.',
   inventorySearchClear: 'Tyhjennä haku',
   inventoryToolsToggle: 'Lisää inventaariotyökaluja',
+  inventoryFiltersToggle: 'Suodattimet',
+  inventoryFiltersToggleHint: 'Varasto, paikka ja listasuodattimet',
   inventorySearchMic: 'Sanele haku (beta)',
   inventorySearchMicStop: 'Lopeta sanelu',
   exportPreviewTitle: 'Viennin esikatselu',

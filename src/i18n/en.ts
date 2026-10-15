@@ -67,6 +67,8 @@ export const en = {
   inventorySearchEmpty: 'No products match this search.',
   inventorySearchClear: 'Clear search',
   inventoryToolsToggle: 'More inventory tools',
+  inventoryFiltersToggle: 'Filters',
+  inventoryFiltersToggleHint: 'Storage, place, and sheet filters',
   inventorySearchMic: 'Dictate search (beta)',
   inventorySearchMicStop: 'Stop dictation',
   exportPreviewTitle: 'Export preview',
