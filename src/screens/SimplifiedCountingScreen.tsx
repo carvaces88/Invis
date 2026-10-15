@@ -499,6 +499,8 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
     activePlaceId,
     upsertCountedProduct,
     updateLineQuantity,
+    updateProductCatalogFields,
+    addProductAlias,
   } = useInventory();
   const months = locale === 'fi' ? MONTHS_FI : MONTHS_EN;
 
@@ -832,8 +834,18 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
     (id: string, unit: UnitCode) => {
       if (isOverview) return;
       patchItem(id, (row) => ({ ...row, unit }));
+      // Persist to main catalog so inventory rebuild keeps KPL→KG (etc.).
+      if (products.some((p) => p.id === id)) {
+        updateProductCatalogFields(id, { unit });
+      } else {
+        setExtras((prev) =>
+          prev.map((e) =>
+            e.item.id === id ? { ...e, item: { ...e.item, unit } } : e,
+          ),
+        );
+      }
     },
-    [isOverview, patchItem],
+    [isOverview, patchItem, products, updateProductCatalogFields],
   );
 
   const enterGameMode = () => {
@@ -1316,6 +1328,20 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
       }));
     }
 
+    // Catalog products: persist unit/name/price so Mini Invis rebuild keeps them.
+    if (products.some((p) => p.id === id)) {
+      const displayName = locale === 'fi' ? nameFi || nameEn : nameEn || nameFi;
+      updateProductCatalogFields(id, {
+        unit: editUnit,
+        officialName: displayName,
+        unitPriceAlv0: price,
+      });
+      for (const alias of aliases) addProductAlias(id, alias);
+      if (nameEn && nameFi && nameEn !== nameFi) {
+        addProductAlias(id, locale === 'fi' ? nameEn : nameFi);
+      }
+    }
+
     setExtras((prev) => {
       const without = prev.filter((e) => e.item.id !== id);
       if (id.startsWith('custom-') || prev.some((e) => e.item.id === id)) {
@@ -1324,8 +1350,10 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
       return without;
     });
     setSelectedId(id);
+    setCategoryId(editCategoryId);
     setProductEditor(null);
   }, [
+    addProductAlias,
     byCategory,
     editAliases,
     editCategoryId,
@@ -1333,8 +1361,11 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
     editNameFi,
     editPrice,
     editUnit,
+    locale,
     productEditor,
+    products,
     t,
+    updateProductCatalogFields,
   ]);
 
   const toggleEditMode = () => {

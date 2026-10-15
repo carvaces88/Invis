@@ -245,7 +245,7 @@ type Store = {
     unitsPerPack: number,
     packBaseUnit: UnitCode,
   ) => void;
-  /** Update pack size / image / source / EAN on a catalog product (persisted). */
+  /** Update pack size / image / source / EAN / unit / name / price on a catalog product (persisted). */
   updateProductCatalogFields: (
     productId: string,
     fields: {
@@ -253,6 +253,9 @@ type Store = {
       imageUrl?: string | null;
       sourceUrl?: string | null;
       ean?: string | null;
+      unit?: UnitCode;
+      officialName?: string | null;
+      unitPriceAlv0?: number | null;
     },
   ) => void;
   /** Absolute set — Inventaario tab tap-to-edit */
@@ -449,6 +452,15 @@ function applyCatalogFieldExtras(
         ? e.sourceUrl.trim() || undefined
         : p.sourceUrl,
     ean: e.ean !== undefined ? e.ean.trim() || undefined : p.ean,
+    unit: e.unit !== undefined ? e.unit : p.unit,
+    officialName:
+      e.officialName !== undefined
+        ? e.officialName.trim() || p.officialName
+        : p.officialName,
+    unitPriceAlv0:
+      e.unitPriceAlv0 !== undefined && Number.isFinite(e.unitPriceAlv0)
+        ? e.unitPriceAlv0
+        : p.unitPriceAlv0,
   };
 }
 
@@ -1281,6 +1293,9 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         imageUrl?: string | null;
         sourceUrl?: string | null;
         ean?: string | null;
+        unit?: UnitCode;
+        officialName?: string | null;
+        unitPriceAlv0?: number | null;
       },
     ) => {
       const patch: CatalogFieldExtras[string] = {};
@@ -1295,6 +1310,19 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       }
       if (fields.ean !== undefined) {
         patch.ean = fields.ean?.replace(/\D/g, '') || '';
+      }
+      if (fields.unit !== undefined) {
+        patch.unit = fields.unit;
+      }
+      if (fields.officialName !== undefined) {
+        patch.officialName = fields.officialName?.trim() || '';
+      }
+      if (fields.unitPriceAlv0 !== undefined) {
+        const n = fields.unitPriceAlv0;
+        patch.unitPriceAlv0 =
+          n == null || !Number.isFinite(n)
+            ? 0
+            : Math.round(Math.max(0, n) * 100) / 100;
       }
       if (!Object.keys(patch).length) return;
 
@@ -1323,10 +1351,32 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
             fields.ean !== undefined
               ? fields.ean?.replace(/\D/g, '') || undefined
               : p.ean,
+          unit: fields.unit !== undefined ? fields.unit : p.unit,
+          officialName:
+            fields.officialName !== undefined
+              ? fields.officialName?.trim() || p.officialName
+              : p.officialName,
+          unitPriceAlv0:
+            fields.unitPriceAlv0 !== undefined &&
+            fields.unitPriceAlv0 != null &&
+            Number.isFinite(fields.unitPriceAlv0)
+              ? Math.round(Math.max(0, fields.unitPriceAlv0) * 100) / 100
+              : p.unitPriceAlv0,
         };
       };
       setProducts((prev) => prev.map(apply));
       setCustomProducts((prev) => prev.map(apply));
+
+      // Keep counted lines in sync so Inventaario + Mini Invis show the new unit.
+      if (fields.unit !== undefined) {
+        const nextUnit = fields.unit;
+        setSession((prev) => ({
+          ...prev,
+          lines: prev.lines.map((line) =>
+            line.productId === productId ? { ...line, unit: nextUnit } : line,
+          ),
+        }));
+      }
     },
     [],
   );

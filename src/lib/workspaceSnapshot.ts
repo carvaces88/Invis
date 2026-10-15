@@ -43,6 +43,10 @@ export type CatalogFieldExtras = Record<
     imageUrl?: string;
     sourceUrl?: string;
     ean?: string;
+    /** Mini Invis / catalog edits that must survive seed reloads */
+    unit?: UnitCode;
+    officialName?: string;
+    unitPriceAlv0?: number;
   }
 >;
 
