@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import {
   Dimensions,
   Pressable,
@@ -33,7 +33,8 @@ import {
   finlandMapRegions,
   type FinlandPitchRegionId,
 } from '../data/finlandMap';
-import { spacing } from '../theme/colors';
+import { useI18n } from '../i18n';
+import { colors, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PitchDeck'>;
 
@@ -592,9 +593,32 @@ function PriceBars() {
   );
 }
 
-export function PitchDeckScreen(_props: Props) {
+export function PitchDeckScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const width = Dimensions.get('window').width;
+  const { t } = useI18n();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <Pressable
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('MainTabs');
+            }
+          }}
+          style={styles.headerBack}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={t('pitchDeckBack')}
+        >
+          <Text style={styles.headerBackText}>← {t('pitchDeckBack')}</Text>
+        </Pressable>
+      ),
+    });
+  }, [navigation, t]);
 
   return (
     <ScrollView
@@ -778,6 +802,17 @@ function Slide({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: T.page },
+  headerBack: {
+    minWidth: 44,
+    minHeight: 44,
+    paddingHorizontal: 8,
+    justifyContent: 'center',
+  },
+  headerBackText: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 16,
+  },
   cover: {
     backgroundColor: T.teal,
     paddingHorizontal: spacing.lg,

@@ -1008,6 +1008,7 @@ export const en = {
   adminRefresh: 'Refresh',
   pitchDeckTitle: 'Investor pitch deck',
   pitchDeckMoreSub: 'Market, positioning, ROI — confidential walkthrough.',
+  pitchDeckBack: 'Back',
   tractionDeckTitle: 'Live traction',
   tractionDeckMoreSub: 'Current user count from the welcome gate.',
   tractionDeckSub:

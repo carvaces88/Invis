@@ -1005,6 +1005,7 @@ export const fi: Messages = {
   adminRefresh: 'Päivitä',
   pitchDeckTitle: 'Sijoittajapitch',
   pitchDeckMoreSub: 'Markkina, positio, ROI — luottamuksellinen.',
+  pitchDeckBack: 'Takaisin',
   tractionDeckTitle: 'Live-traction',
   tractionDeckMoreSub: 'Nykyinen käyttäjämäärä tervetuloaportista.',
   tractionDeckSub:
