@@ -4,7 +4,7 @@
  */
 
 export const en = {
-  appBrand: 'Invis by Cesar',
+  appBrand: 'Invis, by Countro',
   inventory: 'Inventory',
   kitchenInventory: 'Kitchen inventory',
   inventorySheet: 'Inventory sheet RR',

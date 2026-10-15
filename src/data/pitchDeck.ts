@@ -4,7 +4,9 @@
  */
 
 export const pitchMeta = {
-  brand: 'INVIS',
+  brand: 'Invis, by Countro',
+  /** Compact mark for hub / compare columns */
+  brandShort: 'INVIS',
   tagline: 'Kitchen inventory made simple',
   presentationLabel: 'Investor Pitch Deck',
   audience:
@@ -302,6 +304,6 @@ export const pitchAsk = {
     'Nordics after Finland SOM · Scandinavia ARR path',
   ],
   founderQuote:
-    'Built by a chef who lived the clipboard inventaario every month — so the product starts where the kitchen actually works.',
-  founderRole: 'Founder · former professional chef',
+    'Built by Cesar Carvajal — a chef who lived the clipboard inventaario every month — so the product starts where the kitchen actually works.',
+  founderRole: 'Cesar Carvajal · Founder · former professional chef',
 };

@@ -5,7 +5,7 @@ import type { Messages } from './en';
  * Catalog product official names stay as POS data (not translated).
  */
 export const fi: Messages = {
-  appBrand: 'Invis by Cesar',
+  appBrand: 'Invis, by Countro',
   inventory: 'Inventaario',
   kitchenInventory: 'Keittiön inventaario',
   inventorySheet: 'Inventaarilomake RR',

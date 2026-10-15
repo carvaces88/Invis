@@ -227,7 +227,7 @@ function ApproachHub() {
           </View>
         ))}
         <View style={styles.hubCore}>
-          <Text style={styles.hubCoreBrand}>{pitchMeta.brand}</Text>
+          <Text style={styles.hubCoreBrand}>{pitchMeta.brandShort}</Text>
           <Text style={styles.hubCoreSub}>Go-to-market</Text>
         </View>
       </View>
@@ -626,7 +626,7 @@ export function PitchDeckScreen(_props: Props) {
           </View>
           <View style={[styles.compareCol, styles.compareAccent]}>
             <Text style={[styles.compareHead, { color: T.tealDeep }]}>
-              INVIS
+              {pitchMeta.brandShort}
             </Text>
             {pitchVision.invisBullets.map((b) => (
               <Text key={b} style={styles.bullet}>
@@ -771,10 +771,10 @@ const styles = StyleSheet.create({
   },
   coverBrand: {
     marginTop: 10,
-    fontSize: 44,
+    fontSize: 36,
     fontWeight: '800',
     color: T.white,
-    letterSpacing: -1.2,
+    letterSpacing: -1,
   },
   coverTag: {
     marginTop: 8,
