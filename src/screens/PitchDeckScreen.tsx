@@ -1,5 +1,7 @@
-import React, { useLayoutEffect, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Dimensions,
   Pressable,
   ScrollView,
@@ -34,6 +36,11 @@ import {
   type FinlandPitchRegionId,
 } from '../data/finlandMap';
 import { useI18n } from '../i18n';
+import {
+  exportPitchDeckPdf,
+  exportPitchDeckPptx,
+  type PitchDeckOrientation,
+} from '../lib/export/pitchDeckExport';
 import { colors, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PitchDeck'>;
@@ -597,6 +604,29 @@ export function PitchDeckScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const width = Dimensions.get('window').width;
   const { t } = useI18n();
+  const [orientation, setOrientation] =
+    useState<PitchDeckOrientation>('horizontal');
+  const [exporting, setExporting] = useState<'pdf' | 'pptx' | null>(null);
+
+  const runExport = useCallback(
+    async (kind: 'pdf' | 'pptx') => {
+      if (exporting) return;
+      setExporting(kind);
+      try {
+        if (kind === 'pdf') {
+          await exportPitchDeckPdf(orientation);
+        } else {
+          await exportPitchDeckPptx(orientation);
+        }
+        Alert.alert(t('pitchDeckExportDone'));
+      } catch {
+        Alert.alert(t('pitchDeckExportFailed'));
+      } finally {
+        setExporting(null);
+      }
+    },
+    [exporting, orientation, t],
+  );
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -617,8 +647,51 @@ export function PitchDeckScreen({ navigation }: Props) {
           <Text style={styles.headerBackText}>← {t('pitchDeckBack')}</Text>
         </Pressable>
       ),
+      headerRight: () => (
+        <View style={styles.headerExportRow}>
+          {exporting ? (
+            <ActivityIndicator color={T.tealDeep} style={{ marginRight: 8 }} />
+          ) : null}
+          <Pressable
+            onPress={() => void runExport('pdf')}
+            disabled={Boolean(exporting)}
+            style={[
+              styles.headerExportBtn,
+              exporting === 'pdf' && styles.headerExportBtnBusy,
+            ]}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('pitchDeckExportPdf')} ${orientation}`}
+          >
+            <Text style={styles.headerExportBtnText}>
+              {t('pitchDeckExportPdf')}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => void runExport('pptx')}
+            disabled={Boolean(exporting)}
+            style={[
+              styles.headerExportBtn,
+              styles.headerExportBtnPrimary,
+              exporting === 'pptx' && styles.headerExportBtnBusy,
+            ]}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('pitchDeckExportPptx')} ${orientation}`}
+          >
+            <Text
+              style={[
+                styles.headerExportBtnText,
+                styles.headerExportBtnTextOnTeal,
+              ]}
+            >
+              {t('pitchDeckExportPptx')}
+            </Text>
+          </Pressable>
+        </View>
+      ),
     });
-  }, [navigation, t]);
+  }, [navigation, t, exporting, runExport, orientation]);
 
   return (
     <ScrollView
@@ -634,6 +707,96 @@ export function PitchDeckScreen({ navigation }: Props) {
         <View style={styles.coverCard}>
           <Text style={styles.coverCardLabel}>Target audience</Text>
           <Text style={styles.coverCardBody}>{pitchMeta.audience}</Text>
+        </View>
+
+        <View style={styles.coverExportPanel}>
+          <Text style={styles.coverExportLabel}>
+            {t('pitchDeckExport')} · {t('pitchDeckExportOrientation')}
+          </Text>
+          <View style={styles.coverExportRow}>
+            <Pressable
+              onPress={() => setOrientation('vertical')}
+              disabled={Boolean(exporting)}
+              style={[
+                styles.coverOrientBtn,
+                orientation === 'vertical' && styles.coverOrientBtnOn,
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: orientation === 'vertical' }}
+              accessibilityLabel={t('pitchDeckExportVertical')}
+            >
+              <Text
+                style={[
+                  styles.coverOrientBtnText,
+                  orientation === 'vertical' && styles.coverOrientBtnTextOn,
+                ]}
+              >
+                {t('pitchDeckExportVertical')}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setOrientation('horizontal')}
+              disabled={Boolean(exporting)}
+              style={[
+                styles.coverOrientBtn,
+                orientation === 'horizontal' && styles.coverOrientBtnOn,
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: orientation === 'horizontal' }}
+              accessibilityLabel={t('pitchDeckExportHorizontal')}
+            >
+              <Text
+                style={[
+                  styles.coverOrientBtnText,
+                  orientation === 'horizontal' && styles.coverOrientBtnTextOn,
+                ]}
+              >
+                {t('pitchDeckExportHorizontal')}
+              </Text>
+            </Pressable>
+          </View>
+          <View style={styles.coverExportRow}>
+            <Pressable
+              onPress={() => void runExport('pdf')}
+              disabled={Boolean(exporting)}
+              style={({ pressed }) => [
+                styles.coverExportBtn,
+                pressed && { opacity: 0.85 },
+                exporting === 'pdf' && styles.headerExportBtnBusy,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('pitchDeckExportPdf')}
+            >
+              <Text style={styles.coverExportBtnText}>
+                {exporting === 'pdf'
+                  ? t('pitchDeckExportBusy')
+                  : t('pitchDeckExportPdf')}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void runExport('pptx')}
+              disabled={Boolean(exporting)}
+              style={({ pressed }) => [
+                styles.coverExportBtn,
+                styles.coverExportBtnSolid,
+                pressed && { opacity: 0.85 },
+                exporting === 'pptx' && styles.headerExportBtnBusy,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('pitchDeckExportPptx')}
+            >
+              <Text
+                style={[
+                  styles.coverExportBtnText,
+                  styles.coverExportBtnTextDark,
+                ]}
+              >
+                {exporting === 'pptx'
+                  ? t('pitchDeckExportBusy')
+                  : t('pitchDeckExportPptx')}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -812,6 +975,96 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '700',
     fontSize: 16,
+  },
+  headerExportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginRight: 4,
+  },
+  headerExportBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: T.teal,
+    backgroundColor: T.white,
+  },
+  headerExportBtnPrimary: {
+    backgroundColor: T.teal,
+    borderColor: T.teal,
+  },
+  headerExportBtnBusy: {
+    opacity: 0.55,
+  },
+  headerExportBtnText: {
+    color: T.tealDeep,
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  headerExportBtnTextOnTeal: {
+    color: T.white,
+  },
+  coverExportPanel: {
+    marginTop: spacing.lg,
+    gap: 10,
+  },
+  coverExportLabel: {
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '700',
+    fontSize: 12,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  coverExportRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  coverOrientBtn: {
+    flexGrow: 1,
+    minWidth: 120,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.45)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+  },
+  coverOrientBtnOn: {
+    backgroundColor: T.white,
+    borderColor: T.white,
+  },
+  coverOrientBtnText: {
+    color: T.white,
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  coverOrientBtnTextOn: {
+    color: T.tealDeep,
+  },
+  coverExportBtn: {
+    flexGrow: 1,
+    minWidth: 120,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.65)',
+    alignItems: 'center',
+  },
+  coverExportBtnSolid: {
+    backgroundColor: T.white,
+    borderColor: T.white,
+  },
+  coverExportBtnText: {
+    color: T.white,
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  coverExportBtnTextDark: {
+    color: T.tealDeep,
   },
   cover: {
     backgroundColor: T.teal,
