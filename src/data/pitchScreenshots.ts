@@ -126,7 +126,7 @@ export const pitchScreensBody =
 /** Who we are / what we do (Chameleo-style narrative opener) */
 export const pitchWho = {
   headline: 'Who we are',
-  body: 'Countro builds INVIS — kitchen inventaario that replaces the clipboard → category hunt → computer chore with one fast step on the phone: photo, voice, swipe, and owner-ready reports.',
+  body: 'Countro — Cesar Cavajal (food & marketing) and Ivan Varvas (beverages & development) — builds INVIS: kitchen inventaario that replaces the clipboard → category hunt → computer chore with one fast step on the phone.',
   whatWeDoTitle: 'What we do',
   whatWeDo:
     'Help full-service kitchens count stock across venues and fridges, see inventory value on one tap, log kuormakirja deliveries and hävikki from a photo, find products fast, keep prices at 0% ALV, and export Restolution-ready sheets — without enterprise ERP bloat.',
@@ -136,12 +136,12 @@ export const pitchWho = {
   teamTitle: 'The team · Countro',
   team: [
     {
-      name: 'Cesar Carvajal',
+      name: 'Cesar Cavajal',
       role: 'Food division · marketing',
       body: 'Former professional chef — owns the kitchen inventaario product narrative and go-to-market.',
     },
     {
-      name: 'Ivan',
+      name: 'Ivan Varvas',
       role: 'Beverages division · development',
       body: 'Leads product development and the beverages side of Countro — shipping the app kitchens actually use.',
     },

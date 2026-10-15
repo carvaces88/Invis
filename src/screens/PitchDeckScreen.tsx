@@ -5,10 +5,14 @@ import {
   Animated,
   Dimensions,
   Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -20,7 +24,6 @@ import {
   finlandSomArrEur,
   nordicsArrEur,
   pitchApproach,
-  pitchAsk,
   pitchBusinessModel,
   pitchCompetitors,
   pitchMarket,
@@ -43,13 +46,24 @@ import {
   pitchFeatureShots,
   pitchScreensBody,
   pitchScreensHeadline,
-  pitchWho,
 } from '../data/pitchScreenshots';
 import {
   exportPitchDeckPdf,
   exportPitchDeckPptx,
   type PitchDeckOrientation,
 } from '../lib/export/pitchDeckExport';
+import {
+  clearPitchDraft,
+  defaultPitchDraft,
+  loadPitchDraft,
+  loadPitchEditUnlocked,
+  pitchEditKeywordOk,
+  resolvePitchFromDraft,
+  savePitchDraft,
+  setPitchEditUnlocked,
+  type PitchDeckDraft,
+} from '../lib/pitchDeckDraft';
+import { PitchEditableField } from '../components/PitchEditableField';
 import { colors, spacing } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PitchDeck'>;
@@ -788,6 +802,36 @@ export function PitchDeckScreen({ navigation, route }: Props) {
   const [orientation, setOrientation] =
     useState<PitchDeckOrientation>('horizontal');
   const [exporting, setExporting] = useState<'pdf' | 'pptx' | null>(null);
+  const [draft, setDraft] = useState<PitchDeckDraft>(() => defaultPitchDraft());
+  const [unlocked, setUnlocked] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  const [keyword, setKeyword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  const content = resolvePitchFromDraft(draft);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const [loaded, wasUnlocked] = await Promise.all([
+        loadPitchDraft(),
+        loadPitchEditUnlocked(),
+      ]);
+      if (!alive) return;
+      setDraft(loaded);
+      setUnlocked(wasUnlocked);
+      setReady(true);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const patchDraft = useCallback((patch: Partial<PitchDeckDraft>) => {
+    setDraft((prev) => ({ ...prev, ...patch }));
+  }, []);
 
   const runExport = useCallback(
     async (kind: 'pdf' | 'pptx') => {
@@ -795,9 +839,9 @@ export function PitchDeckScreen({ navigation, route }: Props) {
       setExporting(kind);
       try {
         if (kind === 'pdf') {
-          await exportPitchDeckPdf(orientation);
+          await exportPitchDeckPdf(orientation, draft);
         } else {
-          await exportPitchDeckPptx(orientation);
+          await exportPitchDeckPptx(orientation, draft);
         }
         Alert.alert(t('pitchDeckExportDone'));
       } catch {
@@ -806,8 +850,52 @@ export function PitchDeckScreen({ navigation, route }: Props) {
         setExporting(null);
       }
     },
-    [exporting, orientation, t],
+    [exporting, orientation, t, draft],
   );
+
+  const tryUnlock = useCallback(async () => {
+    if (!pitchEditKeywordOk(keyword)) {
+      Alert.alert(t('pitchDeckUnlockFailed'));
+      return;
+    }
+    await setPitchEditUnlocked(true);
+    setUnlocked(true);
+    setEditing(true);
+    setUnlockOpen(false);
+    setKeyword('');
+  }, [keyword, t]);
+
+  const lockEditing = useCallback(async () => {
+    setEditing(false);
+    setUnlocked(false);
+    await setPitchEditUnlocked(false);
+  }, []);
+
+  const saveEdits = useCallback(async () => {
+    setSaving(true);
+    try {
+      await savePitchDraft(draft);
+      Alert.alert(t('pitchDeckSaved'));
+    } finally {
+      setSaving(false);
+    }
+  }, [draft, t]);
+
+  const resetEdits = useCallback(() => {
+    Alert.alert(t('pitchDeckReset'), t('pitchDeckResetConfirm'), [
+      { text: t('pitchDeckCancel'), style: 'cancel' },
+      {
+        text: t('pitchDeckReset'),
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            const next = await clearPitchDraft();
+            setDraft(next);
+          })();
+        },
+      },
+    ]);
+  }, [t]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -832,6 +920,35 @@ export function PitchDeckScreen({ navigation, route }: Props) {
       ),
       headerRight: () => (
         <View style={styles.headerExportRow}>
+          <Pressable
+            onPress={() => {
+              if (editing) {
+                void lockEditing();
+              } else if (unlocked) {
+                setEditing(true);
+              } else {
+                setUnlockOpen(true);
+              }
+            }}
+            style={[
+              styles.headerExportBtn,
+              editing && styles.headerEditBtnOn,
+            ]}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={
+              editing ? t('pitchDeckLock') : t('pitchDeckEdit')
+            }
+          >
+            <Text
+              style={[
+                styles.headerExportBtnText,
+                editing && styles.headerEditBtnTextOn,
+              ]}
+            >
+              {editing ? t('pitchDeckLock') : t('pitchDeckEdit')}
+            </Text>
+          </Pressable>
           {exporting ? (
             <ActivityIndicator color={T.tealDeep} style={{ marginRight: 8 }} />
           ) : null}
@@ -874,23 +991,69 @@ export function PitchDeckScreen({ navigation, route }: Props) {
         </View>
       ),
     });
-  }, [navigation, t, exporting, runExport, orientation, publicAccess]);
+  }, [
+    navigation,
+    t,
+    exporting,
+    runExport,
+    orientation,
+    publicAccess,
+    editing,
+    unlocked,
+    lockEditing,
+  ]);
 
   return (
+    <>
     <ScrollView
       style={styles.root}
       contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
     >
       {/* Cover — teal block */}
       <View style={[styles.cover, { paddingTop: spacing.lg }]}>
-        <Text style={styles.coverKicker}>{pitchMeta.presentationLabel}</Text>
-        <Text style={styles.coverBrand}>{pitchMeta.brand}</Text>
-        <Text style={styles.coverTag}>{pitchMeta.tagline}</Text>
+        <Text style={styles.coverKicker}>{content.meta.presentationLabel}</Text>
+        <Text style={styles.coverBrand}>{content.meta.brand}</Text>
+        <PitchEditableField
+          editing={editing}
+          value={draft.tagline}
+          onChange={(tagline) => patchDraft({ tagline })}
+          style={styles.coverTag}
+          inputStyle={styles.coverTagInput}
+          accessibilityLabel="Tagline"
+        />
         <View style={styles.coverCard}>
           <Text style={styles.coverCardLabel}>Target audience</Text>
-          <Text style={styles.coverCardBody}>{pitchMeta.audience}</Text>
+          <PitchEditableField
+            editing={editing}
+            value={draft.audience}
+            onChange={(audience) => patchDraft({ audience })}
+            style={styles.coverCardBody}
+            accessibilityLabel="Audience"
+          />
         </View>
+        {editing ? (
+          <View style={styles.editToolbar}>
+            <Text style={styles.editToolbarLabel}>{t('pitchDeckEditing')}</Text>
+            <View style={styles.editToolbarRow}>
+              <Pressable
+                onPress={() => void saveEdits()}
+                disabled={saving || !ready}
+                style={styles.editToolbarBtn}
+              >
+                <Text style={styles.editToolbarBtnText}>
+                  {saving ? '…' : t('pitchDeckSave')}
+                </Text>
+              </Pressable>
+              <Pressable onPress={resetEdits} style={styles.editToolbarBtnGhost}>
+                <Text style={styles.editToolbarBtnGhostText}>
+                  {t('pitchDeckReset')}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.coverExportPanel}>
           <Text style={styles.coverExportLabel}>
@@ -984,31 +1147,90 @@ export function PitchDeckScreen({ navigation, route }: Props) {
       </View>
 
       {/* Who we are · what we do */}
-      <Slide title={pitchWho.headline} tealTitle>
-        <Text style={styles.body}>{pitchWho.body}</Text>
-        <Text style={styles.whoSubHead}>{pitchWho.teamTitle}</Text>
+      <Slide title={content.who.headline} tealTitle>
+        <PitchEditableField
+          editing={editing}
+          value={draft.whoBody}
+          onChange={(whoBody) => patchDraft({ whoBody })}
+          style={styles.body}
+          accessibilityLabel="Who we are"
+        />
+        <Text style={styles.whoSubHead}>{content.who.teamTitle}</Text>
         <View style={styles.teamRow}>
-          {pitchWho.team.map((member) => (
-            <View key={member.name} style={styles.teamCard}>
-              <Text style={styles.teamName}>{member.name}</Text>
-              <Text style={styles.teamRole}>{member.role}</Text>
-              <Text style={styles.teamBody}>{member.body}</Text>
+          {draft.team.map((member, idx) => (
+            <View key={`team-${idx}`} style={styles.teamCard}>
+              <PitchEditableField
+                editing={editing}
+                value={member.name}
+                onChange={(name) => {
+                  const team = draft.team.map((m, i) =>
+                    i === idx ? { ...m, name } : m,
+                  );
+                  patchDraft({ team });
+                }}
+                style={styles.teamName}
+                multiline={false}
+                accessibilityLabel="Team name"
+              />
+              <PitchEditableField
+                editing={editing}
+                value={member.role}
+                onChange={(role) => {
+                  const team = draft.team.map((m, i) =>
+                    i === idx ? { ...m, role } : m,
+                  );
+                  patchDraft({ team });
+                }}
+                style={styles.teamRole}
+                multiline={false}
+                accessibilityLabel="Team role"
+              />
+              <PitchEditableField
+                editing={editing}
+                value={member.body}
+                onChange={(body) => {
+                  const team = draft.team.map((m, i) =>
+                    i === idx ? { ...m, body } : m,
+                  );
+                  patchDraft({ team });
+                }}
+                style={styles.teamBody}
+                accessibilityLabel="Team bio"
+              />
             </View>
           ))}
         </View>
-        <Text style={styles.whoSubHead}>{pitchWho.whatWeDoTitle}</Text>
-        <Text style={styles.bodyMuted}>{pitchWho.whatWeDo}</Text>
-        <Text style={styles.whoSubHead}>{pitchWho.nicheTitle}</Text>
-        <Text style={styles.bodyMuted}>{pitchWho.niche}</Text>
+        <Text style={styles.whoSubHead}>{content.who.whatWeDoTitle}</Text>
+        <PitchEditableField
+          editing={editing}
+          value={draft.whatWeDo}
+          onChange={(whatWeDo) => patchDraft({ whatWeDo })}
+          style={styles.bodyMuted}
+          accessibilityLabel="What we do"
+        />
+        <Text style={styles.whoSubHead}>{content.who.nicheTitle}</Text>
+        <PitchEditableField
+          editing={editing}
+          value={draft.niche}
+          onChange={(niche) => patchDraft({ niche })}
+          style={styles.bodyMuted}
+          accessibilityLabel="Niche"
+        />
       </Slide>
 
       {/* Problem — clipboard multi-step vs 1-step */}
-      <Slide title={pitchProblem.headline} tealTitle band>
-        <Text style={styles.body}>{pitchProblem.body}</Text>
+      <Slide title={content.problem.headline} tealTitle band>
+        <PitchEditableField
+          editing={editing}
+          value={draft.problemBody}
+          onChange={(problemBody) => patchDraft({ problemBody })}
+          style={styles.body}
+          accessibilityLabel="Problem"
+        />
         <View style={styles.problemCompare}>
           <View style={styles.problemLegacy}>
-            <Text style={styles.problemColHead}>{pitchProblem.legacyTitle}</Text>
-            {pitchProblem.legacySteps.map((step) => (
+            <Text style={styles.problemColHead}>{content.problem.legacyTitle}</Text>
+            {content.problem.legacySteps.map((step) => (
               <View key={step.n} style={styles.problemStep}>
                 <View style={styles.problemStepNum}>
                   <Text style={styles.problemStepNumText}>{step.n}</Text>
@@ -1022,10 +1244,16 @@ export function PitchDeckScreen({ navigation, route }: Props) {
           </View>
           <View style={styles.problemInvis}>
             <Text style={[styles.problemColHead, { color: T.tealDeep }]}>
-              {pitchProblem.solutionTitle}
+              {content.problem.solutionTitle}
             </Text>
-            <Text style={styles.problemSolutionBody}>{pitchProblem.solutionBody}</Text>
-            {pitchProblem.contrast.map((row) => (
+            <PitchEditableField
+              editing={editing}
+              value={draft.solutionBody}
+              onChange={(solutionBody) => patchDraft({ solutionBody })}
+              style={styles.problemSolutionBody}
+              accessibilityLabel="Solution contrast"
+            />
+            {content.problem.contrast.map((row) => (
               <View key={row.invis} style={styles.contrastRow}>
                 <Text style={styles.contrastLegacy}>{row.legacy}</Text>
                 <Text style={styles.contrastArrow}>→</Text>
@@ -1037,12 +1265,18 @@ export function PitchDeckScreen({ navigation, route }: Props) {
       </Slide>
 
       {/* Solution */}
-      <Slide title={pitchVision.headline} tealTitle>
-        <Text style={styles.body}>{pitchVision.body}</Text>
+      <Slide title={content.vision.headline} tealTitle>
+        <PitchEditableField
+          editing={editing}
+          value={draft.visionBody}
+          onChange={(visionBody) => patchDraft({ visionBody })}
+          style={styles.body}
+          accessibilityLabel="Our solution"
+        />
         <View style={styles.compareRow}>
           <View style={styles.compareCol}>
             <Text style={styles.compareHead}>Legacy</Text>
-            {pitchVision.legacyBullets.map((b) => (
+            {content.vision.legacyBullets.map((b) => (
               <Text key={b} style={styles.bullet}>
                 · {b}
               </Text>
@@ -1050,9 +1284,9 @@ export function PitchDeckScreen({ navigation, route }: Props) {
           </View>
           <View style={[styles.compareCol, styles.compareAccent]}>
             <Text style={[styles.compareHead, { color: T.tealDeep }]}>
-              {pitchMeta.brandShort}
+              {content.meta.brandShort}
             </Text>
-            {pitchVision.invisBullets.map((b) => (
+            {content.vision.invisBullets.map((b) => (
               <Text key={b} style={styles.bullet}>
                 · {b}
               </Text>
@@ -1062,11 +1296,17 @@ export function PitchDeckScreen({ navigation, route }: Props) {
       </Slide>
 
       {/* Product + how it works */}
-      <Slide title={pitchProduct.headline} tealTitle>
-        <Text style={styles.body}>{pitchProduct.body}</Text>
-        <Text style={styles.flowLabel}>{pitchProduct.flowLabel}</Text>
+      <Slide title={content.product.headline} tealTitle>
+        <PitchEditableField
+          editing={editing}
+          value={draft.productBody}
+          onChange={(productBody) => patchDraft({ productBody })}
+          style={styles.body}
+          accessibilityLabel="The product"
+        />
+        <Text style={styles.flowLabel}>{content.product.flowLabel}</Text>
         <View style={styles.flowRow}>
-          {pitchProduct.steps.map((step, i) => (
+          {content.product.steps.map((step, i) => (
             <View key={step.short} style={styles.flowStep}>
               <View style={styles.flowStepHead}>
                 <View style={styles.flowNum}>
@@ -1170,31 +1410,150 @@ export function PitchDeckScreen({ navigation, route }: Props) {
 
       {/* Ask + team + use of funds */}
       <View style={[styles.askBand, { maxWidth: width }]}>
-        <Text style={styles.askQuote}>“{pitchAsk.founderQuote}”</Text>
-        <Text style={styles.askRole}>{pitchAsk.founderRole}</Text>
-        <Text style={styles.askHeadline}>{pitchAsk.headline}</Text>
-        <Text style={styles.askAmount}>{pitchAsk.amountLabel}</Text>
-        <Text style={styles.askBody}>{pitchAsk.body}</Text>
+        <PitchEditableField
+          editing={editing}
+          value={draft.founderQuote}
+          onChange={(founderQuote) => patchDraft({ founderQuote })}
+          style={styles.askQuote}
+          accessibilityLabel="Founder quote"
+        />
+        <PitchEditableField
+          editing={editing}
+          value={draft.founderRole}
+          onChange={(founderRole) => patchDraft({ founderRole })}
+          style={styles.askRole}
+          multiline={false}
+          accessibilityLabel="Founder role"
+        />
+        <PitchEditableField
+          editing={editing}
+          value={draft.askHeadline}
+          onChange={(askHeadline) => patchDraft({ askHeadline })}
+          style={styles.askHeadline}
+          multiline={false}
+          accessibilityLabel="Ask headline"
+        />
+        <PitchEditableField
+          editing={editing}
+          value={draft.askAmountLabel}
+          onChange={(askAmountLabel) => patchDraft({ askAmountLabel })}
+          style={styles.askAmount}
+          multiline={false}
+          accessibilityLabel="Ask amount"
+        />
+        <PitchEditableField
+          editing={editing}
+          value={draft.askBody}
+          onChange={(askBody) => patchDraft({ askBody })}
+          style={styles.askBody}
+          accessibilityLabel="Ask body"
+        />
         <Text style={styles.askFundsLabel}>Use of funds</Text>
-        {pitchAsk.useOfFunds.map((row) => (
-          <View key={row.label} style={styles.fundRow}>
+        {draft.useOfFunds.map((row, idx) => (
+          <View key={`fund-${idx}`} style={styles.fundRow}>
             <View style={styles.fundHead}>
-              <Text style={styles.fundLabel}>{row.label}</Text>
+              <PitchEditableField
+                editing={editing}
+                value={row.label}
+                onChange={(label) => {
+                  const useOfFunds = draft.useOfFunds.map((r, i) =>
+                    i === idx ? { ...r, label } : r,
+                  );
+                  patchDraft({ useOfFunds });
+                }}
+                style={styles.fundLabel}
+                multiline={false}
+                accessibilityLabel="Fund label"
+              />
               <Text style={styles.fundEur}>{formatEur(row.eur)}</Text>
             </View>
             <View style={styles.fundTrack}>
               <View style={[styles.fundFill, { width: `${row.pct}%` }]} />
             </View>
-            <Text style={styles.fundBody}>{row.body}</Text>
+            <PitchEditableField
+              editing={editing}
+              value={row.body}
+              onChange={(body) => {
+                const useOfFunds = draft.useOfFunds.map((r, i) =>
+                  i === idx ? { ...r, body } : r,
+                );
+                patchDraft({ useOfFunds });
+              }}
+              style={styles.fundBody}
+              accessibilityLabel="Fund body"
+            />
           </View>
         ))}
-        {pitchAsk.bullets.map((b) => (
-          <Text key={b} style={styles.askBullet}>
-            → {b}
-          </Text>
+        {draft.askBullets.map((b, idx) => (
+          <View key={`ask-b-${idx}`} style={styles.askBulletRow}>
+            <Text style={styles.askBulletArrow}>→ </Text>
+            <PitchEditableField
+              editing={editing}
+              value={b}
+              onChange={(next) => {
+                const askBullets = draft.askBullets.map((x, i) =>
+                  i === idx ? next : x,
+                );
+                patchDraft({ askBullets });
+              }}
+              style={styles.askBullet}
+              accessibilityLabel="Ask bullet"
+            />
+          </View>
         ))}
       </View>
     </ScrollView>
+
+    <Modal
+      visible={unlockOpen}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setUnlockOpen(false)}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.unlockOverlay}
+      >
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => setUnlockOpen(false)}
+        />
+        <View style={styles.unlockCard}>
+          <Text style={styles.unlockTitle}>{t('pitchDeckUnlockTitle')}</Text>
+          <Text style={styles.unlockHint}>{t('pitchDeckUnlockHint')}</Text>
+          <TextInput
+            value={keyword}
+            onChangeText={setKeyword}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+            placeholder={t('pitchDeckUnlockPlaceholder')}
+            placeholderTextColor="#94A3B8"
+            style={styles.unlockInput}
+            onSubmitEditing={() => void tryUnlock()}
+            accessibilityLabel={t('pitchDeckUnlockPlaceholder')}
+          />
+          <View style={styles.unlockActions}>
+            <Pressable
+              onPress={() => {
+                setUnlockOpen(false);
+                setKeyword('');
+              }}
+              style={styles.unlockCancel}
+            >
+              <Text style={styles.unlockCancelText}>{t('pitchDeckCancel')}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void tryUnlock()}
+              style={styles.unlockConfirm}
+            >
+              <Text style={styles.unlockConfirmText}>{t('pitchDeckUnlock')}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+    </>
   );
 }
 
@@ -1260,6 +1619,110 @@ const styles = StyleSheet.create({
   },
   headerExportBtnTextOnTeal: {
     color: T.white,
+  },
+  headerEditBtnOn: {
+    backgroundColor: T.tealSoft,
+    borderColor: T.tealDeep,
+  },
+  headerEditBtnTextOn: {
+    color: T.tealDeep,
+  },
+  coverTagInput: {
+    color: T.ink,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+  },
+  editToolbar: {
+    marginTop: spacing.md,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+    gap: 8,
+  },
+  editToolbarLabel: {
+    color: T.white,
+    fontWeight: '800',
+    fontSize: 12,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  editToolbarRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  editToolbarBtn: {
+    backgroundColor: T.white,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  editToolbarBtnText: { color: T.tealDeep, fontWeight: '800', fontSize: 13 },
+  editToolbarBtnGhost: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.55)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  editToolbarBtnGhostText: { color: T.white, fontWeight: '700', fontSize: 13 },
+  unlockOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  unlockCard: {
+    backgroundColor: T.white,
+    borderRadius: 16,
+    padding: 20,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: T.line,
+  },
+  unlockTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: T.ink,
+  },
+  unlockHint: { fontSize: 14, lineHeight: 20, color: T.muted },
+  unlockInput: {
+    borderWidth: 1.5,
+    borderColor: T.teal,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: T.ink,
+    backgroundColor: T.tealPale,
+  },
+  unlockActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 4,
+  },
+  unlockCancel: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  unlockCancelText: { color: T.muted, fontWeight: '700' },
+  unlockConfirm: {
+    backgroundColor: T.teal,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  unlockConfirmText: { color: T.white, fontWeight: '800' },
+  askBulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 8,
+    gap: 2,
+  },
+  askBulletArrow: {
+    color: T.tealSoft,
+    fontWeight: '700',
+    fontSize: 14,
+    marginTop: 2,
   },
   coverExportPanel: {
     marginTop: spacing.lg,
@@ -1934,7 +2397,7 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   askBullet: {
-    marginTop: 8,
+    flex: 1,
     color: T.tealSoft,
     fontWeight: '600',
     fontSize: 14,

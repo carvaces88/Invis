@@ -3,17 +3,12 @@ import {
   finlandSomArrEur,
   nordicsArrEur,
   pitchApproach,
-  pitchAsk,
   pitchBusinessModel,
   pitchCompetitors,
   pitchMarket,
-  pitchMeta,
   pitchMoat,
-  pitchProblem,
-  pitchProduct,
   pitchProjections,
   pitchRoi,
-  pitchVision,
   projectionArrEur,
 } from '../../data/pitchDeck';
 import {
@@ -21,6 +16,11 @@ import {
   pitchScreensBody,
   pitchScreensHeadline,
 } from '../../data/pitchScreenshots';
+import {
+  defaultPitchDraft,
+  resolvePitchFromDraft,
+  type PitchDeckDraft,
+} from '../pitchDeckDraft';
 import { printHtmlOrSharePdf, shareOrDownloadBase64 } from './download';
 
 const TEAL = '0D9488';
@@ -78,53 +78,54 @@ type DeckSlide =
       role?: string;
     };
 
-function buildSlides(): DeckSlide[] {
+function buildSlides(draft: PitchDeckDraft = defaultPitchDraft()): DeckSlide[] {
   const som = finlandSomArrEur();
   const nordics = nordicsArrEur();
+  const { meta, problem, vision, product, ask } = resolvePitchFromDraft(draft);
 
   return [
     {
       kind: 'cover',
-      kicker: pitchMeta.presentationLabel,
-      brand: pitchMeta.brand,
-      tagline: pitchMeta.tagline,
+      kicker: meta.presentationLabel,
+      brand: meta.brand,
+      tagline: meta.tagline,
       audienceLabel: 'Target audience',
-      audience: pitchMeta.audience,
+      audience: meta.audience,
     },
     {
       kind: 'section',
-      title: pitchProblem.headline,
-      body: pitchProblem.body,
+      title: problem.headline,
+      body: problem.body,
       columns: [
         {
-          head: pitchProblem.legacyTitle,
-          bullets: pitchProblem.legacySteps.map(
+          head: problem.legacyTitle,
+          bullets: problem.legacySteps.map(
             (s) => `${s.n}. ${s.title} — ${s.body}`,
           ),
         },
         {
-          head: pitchProblem.solutionTitle,
+          head: problem.solutionTitle,
           bullets: [
-            pitchProblem.solutionBody,
-            ...pitchProblem.contrast.map((c) => `${c.legacy} → ${c.invis}`),
+            problem.solutionBody,
+            ...problem.contrast.map((c) => `${c.legacy} → ${c.invis}`),
           ],
         },
       ],
     },
     {
       kind: 'section',
-      title: pitchVision.headline,
-      body: pitchVision.body,
+      title: vision.headline,
+      body: vision.body,
       columns: [
-        { head: 'Legacy', bullets: [...pitchVision.legacyBullets] },
-        { head: pitchMeta.brandShort, bullets: [...pitchVision.invisBullets] },
+        { head: 'Legacy', bullets: [...vision.legacyBullets] },
+        { head: meta.brandShort, bullets: [...vision.invisBullets] },
       ],
     },
     {
       kind: 'section',
-      title: pitchProduct.headline,
-      body: pitchProduct.body,
-      cards: pitchProduct.steps.map((s) => ({
+      title: product.headline,
+      body: product.body,
+      cards: product.steps.map((s) => ({
         title: `${s.short} — ${s.title}`,
         body: s.body,
       })),
@@ -230,16 +231,16 @@ function buildSlides(): DeckSlide[] {
     },
     {
       kind: 'section',
-      title: `${pitchAsk.headline} · ${pitchAsk.amountLabel}`,
-      body: pitchAsk.body,
+      title: `${ask.headline} · ${ask.amountLabel}`,
+      body: ask.body,
       bullets: [
-        ...pitchAsk.useOfFunds.map(
+        ...ask.useOfFunds.map(
           (u) => `${u.label}: €${Math.round(u.eur / 1000)}k (${u.pct}%) — ${u.body}`,
         ),
-        ...pitchAsk.bullets,
+        ...ask.bullets,
       ],
-      quote: pitchAsk.founderQuote,
-      role: pitchAsk.founderRole,
+      quote: ask.founderQuote,
+      role: ask.founderRole,
     },
   ];
 }
@@ -248,28 +249,30 @@ function buildSlides(): DeckSlide[] {
 function buildPitchDeckHtml(
   orientation: PitchDeckOrientation,
   screenshots: { id: string; title: string; caption: string; dataUri: string }[],
+  draft: PitchDeckDraft = defaultPitchDraft(),
 ): string {
   const portrait = orientation === 'vertical';
   const pageSize = portrait ? 'A4 portrait' : 'A4 landscape';
   const som = finlandSomArrEur();
   const nordics = nordicsArrEur();
   const pageCount = 6;
+  const { meta, problem, vision, product, ask } = resolvePitchFromDraft(draft);
 
   const footer = (n: number) => `
 <footer class="foot">
-  <span class="foot-brand">${escapeHtml(pitchMeta.brandShort)}</span>
-  <span class="foot-mid">${escapeHtml(pitchMeta.tagline)}</span>
+  <span class="foot-brand">${escapeHtml(meta.brandShort)}</span>
+  <span class="foot-mid">${escapeHtml(meta.tagline)}</span>
   <span class="foot-page">${n} / ${pageCount}</span>
 </footer>`;
 
   const header = (section: string) => `
 <header class="head">
-  <span class="head-brand">${escapeHtml(pitchMeta.brandShort)}</span>
+  <span class="head-brand">${escapeHtml(meta.brandShort)}</span>
   <span class="head-sec">${escapeHtml(section)}</span>
-  <span class="head-label">${escapeHtml(pitchMeta.presentationLabel)}</span>
+  <span class="head-label">${escapeHtml(meta.presentationLabel)}</span>
 </header>`;
 
-  const flowSteps = pitchProduct.steps
+  const flowSteps = product.steps
     .map(
       (s, i) => `
       <div class="flow-step">
@@ -279,7 +282,7 @@ function buildPitchDeckHtml(
         <p class="flow-body">${escapeHtml(s.body)}</p>
       </div>
       ${
-        i < pitchProduct.steps.length - 1
+        i < product.steps.length - 1
           ? '<div class="flow-arrow" aria-hidden="true">→</div>'
           : ''
       }`,
@@ -334,28 +337,28 @@ function buildPitchDeckHtml(
     )
     .join('');
 
-  const askBullets = pitchAsk.bullets
+  const askBullets = ask.bullets
     .map((b) => `<li>${escapeHtml(b)}</li>`)
     .join('');
 
-  const coverFlow = pitchProduct.steps
+  const coverFlow = product.steps
     .map((s) => `<span>${escapeHtml(s.short)}</span>`)
     .join('<span class="sep">→</span>');
 
   const pages = [
     `<section class="sheet cover">
       <div class="cover-inner">
-        <p class="kicker">${escapeHtml(pitchMeta.presentationLabel)}</p>
-        <h1>${escapeHtml(pitchMeta.brand)}</h1>
-        <p class="tag">${escapeHtml(pitchMeta.tagline)}</p>
+        <p class="kicker">${escapeHtml(meta.presentationLabel)}</p>
+        <h1>${escapeHtml(meta.brand)}</h1>
+        <p class="tag">${escapeHtml(meta.tagline)}</p>
         <div class="cover-card">
           <p class="card-label">Target audience</p>
-          <p>${escapeHtml(pitchMeta.audience)}</p>
+          <p>${escapeHtml(meta.audience)}</p>
         </div>
         <div class="cover-flow">${coverFlow}</div>
       </div>
       <div class="cover-foot">
-        <span>${escapeHtml(pitchMeta.brandShort)} · Confidential · ${escapeHtml(stamp())}</span>
+        <span>${escapeHtml(meta.brandShort)} · Confidential · ${escapeHtml(stamp())}</span>
         <span>1 / ${pageCount}</span>
       </div>
     </section>`,
@@ -364,12 +367,12 @@ function buildPitchDeckHtml(
       ${header('Problem')}
       <div class="sheet-body">
         <div class="block">
-          <h2>${escapeHtml(pitchProblem.headline)}</h2>
-          <p class="lede">${escapeHtml(pitchProblem.body)}</p>
+          <h2>${escapeHtml(problem.headline)}</h2>
+          <p class="lede">${escapeHtml(problem.body)}</p>
           <div class="cols two">
             <div class="col muted-col">
-              <h3>${escapeHtml(pitchProblem.legacyTitle)}</h3>
-              <ul>${pitchProblem.legacySteps
+              <h3>${escapeHtml(problem.legacyTitle)}</h3>
+              <ul>${problem.legacySteps
                 .map(
                   (s) =>
                     `<li><strong>${escapeHtml(s.n)}. ${escapeHtml(s.title)}</strong> — ${escapeHtml(s.body)}</li>`,
@@ -377,9 +380,9 @@ function buildPitchDeckHtml(
                 .join('')}</ul>
             </div>
             <div class="col accent-col">
-              <h3>${escapeHtml(pitchProblem.solutionTitle)}</h3>
-              <p>${escapeHtml(pitchProblem.solutionBody)}</p>
-              <ul>${pitchProblem.contrast
+              <h3>${escapeHtml(problem.solutionTitle)}</h3>
+              <p>${escapeHtml(problem.solutionBody)}</p>
+              <ul>${problem.contrast
                 .map(
                   (c) =>
                     `<li>${escapeHtml(c.legacy)} → <strong>${escapeHtml(c.invis)}</strong></li>`,
@@ -389,23 +392,23 @@ function buildPitchDeckHtml(
           </div>
         </div>
         <div class="block">
-          <h2>${escapeHtml(pitchVision.headline)}</h2>
-          <p class="lede tight">${escapeHtml(pitchVision.body)}</p>
+          <h2>${escapeHtml(vision.headline)}</h2>
+          <p class="lede tight">${escapeHtml(vision.body)}</p>
           <div class="cols two">
             <div class="col muted-col">
               <h3>Legacy</h3>
-              <ul>${pitchVision.legacyBullets.map((b) => `<li>${escapeHtml(b)}</li>`).join('')}</ul>
+              <ul>${vision.legacyBullets.map((b) => `<li>${escapeHtml(b)}</li>`).join('')}</ul>
             </div>
             <div class="col accent-col">
-              <h3>${escapeHtml(pitchMeta.brandShort)}</h3>
-              <ul>${pitchVision.invisBullets.map((b) => `<li>${escapeHtml(b)}</li>`).join('')}</ul>
+              <h3>${escapeHtml(meta.brandShort)}</h3>
+              <ul>${vision.invisBullets.map((b) => `<li>${escapeHtml(b)}</li>`).join('')}</ul>
             </div>
           </div>
         </div>
         <div class="block grow">
-          <h2>${escapeHtml(pitchProduct.headline)}</h2>
-          <p class="lede tight">${escapeHtml(pitchProduct.body)}</p>
-          <p class="eyebrow">${escapeHtml(pitchProduct.flowLabel)}</p>
+          <h2>${escapeHtml(product.headline)}</h2>
+          <p class="lede tight">${escapeHtml(product.body)}</p>
+          <p class="eyebrow">${escapeHtml(product.flowLabel)}</p>
           <div class="flow">${flowSteps}</div>
         </div>
       </div>
@@ -535,16 +538,16 @@ function buildPitchDeckHtml(
           </div>
         </div>
         <div class="block ask">
-          <h2>${escapeHtml(pitchAsk.headline)} · ${escapeHtml(pitchAsk.amountLabel)}</h2>
-          <p class="lede tight">${escapeHtml(pitchAsk.body)}</p>
-          <ul class="ask-list">${pitchAsk.useOfFunds
+          <h2>${escapeHtml(ask.headline)} · ${escapeHtml(ask.amountLabel)}</h2>
+          <p class="lede tight">${escapeHtml(ask.body)}</p>
+          <ul class="ask-list">${ask.useOfFunds
             .map(
               (u) =>
                 `<li><strong>${escapeHtml(u.label)}</strong> — €${Math.round(u.eur / 1000)}k (${u.pct}%) · ${escapeHtml(u.body)}</li>`,
             )
             .join('')}${askBullets}</ul>
-          <blockquote>“${escapeHtml(pitchAsk.founderQuote)}”</blockquote>
-          <p class="role">${escapeHtml(pitchAsk.founderRole)}</p>
+          <blockquote>“${escapeHtml(ask.founderQuote)}”</blockquote>
+          <p class="role">${escapeHtml(ask.founderRole)}</p>
         </div>
       </div>
       ${footer(6)}
@@ -568,7 +571,7 @@ function buildPitchDeckHtml(
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>${escapeHtml(pitchMeta.brand)} — ${escapeHtml(pitchMeta.presentationLabel)}</title>
+<title>${escapeHtml(meta.brand)} — ${escapeHtml(meta.presentationLabel)}</title>
 <style>
   @page { size: ${pageSize}; margin: 0; }
   * { box-sizing: border-box; }
@@ -961,15 +964,17 @@ ${pages.join('\n')}
 
 export async function exportPitchDeckPdf(
   orientation: PitchDeckOrientation = 'horizontal',
+  draft: PitchDeckDraft = defaultPitchDraft(),
 ): Promise<string> {
   const screenshots = await loadPitchScreenshotDataUris();
-  const html = buildPitchDeckHtml(orientation, screenshots);
+  const html = buildPitchDeckHtml(orientation, screenshots, draft);
   const filename = `${filenameBase(orientation)}.pdf`;
   const landscape = orientation === 'horizontal';
+  const { meta } = resolvePitchFromDraft(draft);
   return printHtmlOrSharePdf({
     html,
     filename,
-    dialogTitle: `${pitchMeta.brand} — PDF (${orientation})`,
+    dialogTitle: `${meta.brand} — PDF (${orientation})`,
     nativePrint: () =>
       Print.printToFileAsync({
         html,
@@ -1001,16 +1006,18 @@ type PptxCtor = new () => {
 
 export async function exportPitchDeckPptx(
   orientation: PitchDeckOrientation = 'horizontal',
+  draft: PitchDeckDraft = defaultPitchDraft(),
 ): Promise<string> {
   // Dynamic import keeps the pitch screen light until export is tapped.
   const mod = await import('pptxgenjs');
   const PptxGenJS = ((mod as { default?: PptxCtor }).default ??
     mod) as unknown as PptxCtor;
 
+  const { meta, product } = resolvePitchFromDraft(draft);
   const pptx = new PptxGenJS();
-  pptx.author = 'Cesar Carvajal';
-  pptx.title = `${pitchMeta.brand} — ${pitchMeta.presentationLabel}`;
-  pptx.subject = pitchMeta.tagline;
+  pptx.author = 'Cesar Cavajal';
+  pptx.title = `${meta.brand} — ${meta.presentationLabel}`;
+  pptx.subject = meta.tagline;
 
   const landscape = orientation === 'horizontal';
   // Wide 16:9 vs tall phone/print portrait
@@ -1023,7 +1030,7 @@ export async function exportPitchDeckPptx(
 
   const contentW = landscape ? 12.3 : 6.5;
   const marginX = 0.5;
-  const slides = buildSlides();
+  const slides = buildSlides(draft);
   const screenshots = await loadPitchScreenshotDataUris();
 
   for (const slide of slides) {
@@ -1361,7 +1368,7 @@ export async function exportPitchDeckPptx(
     // After the product flow slide, insert live feature screenshots.
     if (
       slide.kind === 'section' &&
-      slide.title === pitchProduct.headline &&
+      slide.title === product.headline &&
       screenshots.length > 0
     ) {
       const shotSlide = pptx.addSlide();
@@ -1436,6 +1443,6 @@ export async function exportPitchDeckPptx(
     mimeType:
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     uti: 'org.openxmlformats.presentationml.presentation',
-    dialogTitle: `${pitchMeta.brand} — PowerPoint (${orientation})`,
+    dialogTitle: `${meta.brand} — PowerPoint (${orientation})`,
   });
 }

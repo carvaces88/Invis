@@ -3,9 +3,9 @@ export const AUTH_ACCOUNTS: Record<
   string,
   { email: string; displayName: string; role: 'admin' | 'guest' }
 > = {
-  cesar: { email: 'cesar@invis.app', displayName: 'Cesar', role: 'admin' },
+  cesar: { email: 'cesar@invis.app', displayName: 'Cesar Cavajal', role: 'admin' },
   elena: { email: 'elena@invis.app', displayName: 'Elena', role: 'admin' },
-  ivan: { email: 'ivan@invis.app', displayName: 'Ivan', role: 'admin' },
+  ivan: { email: 'ivan@invis.app', displayName: 'Ivan Varvas', role: 'admin' },
   guest: { email: 'guest@invis.app', displayName: 'Guest', role: 'guest' },
   jani: { email: 'jani@invis.app', displayName: 'Jani', role: 'guest' },
   joonas: { email: 'joonas@invis.app', displayName: 'Joonas', role: 'guest' },

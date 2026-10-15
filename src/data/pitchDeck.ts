@@ -387,6 +387,6 @@ export const pitchAsk = {
     'Nordics after Finland SOM · Scandinavia ARR path',
   ],
   founderQuote:
-    'Countro is Cesar (food & marketing) and Ivan (beverages & development) — inventaario built from the walk-in, not from a desk ERP.',
-  founderRole: 'Countro · Cesar Carvajal & Ivan',
+    'Countro is Cesar Cavajal (food & marketing) and Ivan Varvas (beverages & development) — inventaario built from the walk-in, not from a desk ERP.',
+  founderRole: 'Countro · Cesar Cavajal & Ivan Varvas',
 };
