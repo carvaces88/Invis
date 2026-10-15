@@ -215,6 +215,18 @@ type CountRowProps = {
   onDelta: (delta: number) => void;
 };
 
+/** Short-lived +1 / −1 float particles after a swipe bump. */
+type QtyFloatPop = {
+  id: number;
+  delta: 1 | -1;
+  opacity: Animated.Value;
+  translateY: Animated.Value;
+  scale: Animated.Value;
+  driftX: number;
+};
+
+const QTY_FLOAT_MAX = 6;
+
 function hasRecordedValue(item: SimplifiedCountItem): boolean {
   return item.quantity > 0;
 }
@@ -243,15 +255,69 @@ function CountRow({
 }: CountRowProps) {
   const pan = useRef(new Animated.Value(0)).current;
   const flash = useRef(new Animated.Value(0)).current;
+  const floatSeq = useRef(0);
+  const [floats, setFloats] = useState<QtyFloatPop[]>([]);
 
-  const bumpFlash = (dir: 1 | -1) => {
-    flash.setValue(dir);
-    Animated.timing(flash, {
-      toValue: 0,
-      duration: 280,
-      useNativeDriver: false,
-    }).start();
-  };
+  const spawnQtyFloat = useCallback((dir: 1 | -1) => {
+    const id = ++floatSeq.current;
+    const opacity = new Animated.Value(0);
+    const translateY = new Animated.Value(10);
+    const scale = new Animated.Value(0.55);
+    // Slight horizontal jitter so rapid swipes don't fully overlap.
+    const driftX = ((id % 5) - 2) * 8 + (dir > 0 ? 10 : -10);
+    const pop: QtyFloatPop = { id, delta: dir, opacity, translateY, scale, driftX };
+    setFloats((prev) => [...prev.slice(-(QTY_FLOAT_MAX - 1)), pop]);
+
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 80,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 380,
+          delay: 140,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.timing(translateY, {
+        toValue: -42,
+        duration: 640,
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.spring(scale, {
+          toValue: 1.14,
+          friction: 4,
+          tension: 160,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 0.88,
+          duration: 260,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start(({ finished }) => {
+      if (!finished) return;
+      setFloats((prev) => prev.filter((p) => p.id !== id));
+    });
+  }, []);
+
+  const bumpFeedback = useCallback(
+    (dir: 1 | -1) => {
+      flash.setValue(dir);
+      Animated.timing(flash, {
+        toValue: 0,
+        duration: 280,
+        useNativeDriver: false,
+      }).start();
+      spawnQtyFloat(dir);
+    },
+    [flash, spawnQtyFloat],
+  );
 
   const panResponder = useMemo(
     () =>
@@ -267,10 +333,10 @@ function CountRow({
         onPanResponderRelease: (_, g) => {
           if (g.dx > SWIPE_THRESHOLD) {
             onDelta(1);
-            bumpFlash(1);
+            bumpFeedback(1);
           } else if (g.dx < -SWIPE_THRESHOLD) {
             onDelta(-1);
-            bumpFlash(-1);
+            bumpFeedback(-1);
           }
           Animated.spring(pan, {
             toValue: 0,
@@ -285,7 +351,7 @@ function CountRow({
           }).start();
         },
       }),
-    [armed, onDelta, onSelect, pan],
+    [armed, bumpFeedback, onDelta, onSelect, pan],
   );
 
   const tint = flash.interpolate({
@@ -394,6 +460,29 @@ function CountRow({
           {formatMoney(total)}
         </Text>
       </Pressable>
+      {floats.length > 0 ? (
+        <View pointerEvents="none" style={styles.qtyFloatLayer}>
+          {floats.map((pop) => (
+            <Animated.Text
+              key={pop.id}
+              style={[
+                styles.qtyFloatText,
+                pop.delta > 0 ? styles.qtyFloatPlus : styles.qtyFloatMinus,
+                {
+                  opacity: pop.opacity,
+                  transform: [
+                    { translateX: pop.driftX },
+                    { translateY: pop.translateY },
+                    { scale: pop.scale },
+                  ],
+                },
+              ]}
+            >
+              {pop.delta > 0 ? '+1' : '−1'}
+            </Animated.Text>
+          ))}
+        </View>
+      ) : null}
     </Animated.View>
   );
 }
@@ -2685,6 +2774,34 @@ const styles = StyleSheet.create({
     backgroundColor: NEO_CARD,
     borderRadius: radius.lg,
     ...neoShadow,
+    overflow: 'visible',
+  },
+  qtyFloatLayer: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 8,
+  },
+  qtyFloatText: {
+    position: 'absolute',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    ...(Platform.OS === 'web'
+      ? ({
+          textShadow: '0 1px 2px rgba(11, 31, 51, 0.18)',
+        } as object)
+      : {
+          textShadowColor: 'rgba(11, 31, 51, 0.18)',
+          textShadowOffset: { width: 0, height: 1 },
+          textShadowRadius: 2,
+        }),
+  },
+  qtyFloatPlus: {
+    color: colors.success,
+  },
+  qtyFloatMinus: {
+    color: colors.danger,
   },
   rowCardSelected: {
     borderWidth: 1.5,
