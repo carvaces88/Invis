@@ -15,7 +15,7 @@ export const pitchMeta = {
 
 export const pitchVision = {
   headline: 'Our solution',
-  body: 'INVIS turns fridge and pack photos into counted stock. Vision + K-Ruoka recognize products, chefs confirm quantities in kitchen units (YKSIKKÖ) with prices at 0% ALV, Mini Invis keeps counts fast mid-service, and Restolution-ready export closes the period — accurate inventaario without the clipboard grind.',
+  body: 'INVIS turns fridge and pack photos into counted stock. Vision + K-Ruoka recognize products, chefs confirm quantities in kitchen units (YKSIKKÖ) with prices at 0% ALV. Main Invis is the full sheet; Mini / Simple Invis + fire mode keep counts alive mid-service — then Restolution-ready export closes the period.',
   vsLegacyTitle: 'vs legacy software',
   vsLegacy:
     'Legacy kitchen systems (MarketMan, Restaurant365) are desktop-heavy, clunky, and require months of onboarding. INVIS is built for prep-room speed: mobile counting, delivery & waste lists, POS-ready exports, and Nordic distributor price checks.',
@@ -25,16 +25,16 @@ export const pitchVision = {
     'Enterprise ERP bloat',
   ],
   invisBullets: [
-    'Photo + voice → counted stock',
+    'Main Invis · photo + voice stock',
     'Mini Invis · fire mode mid-service',
-    'Multi-fridge places · Nordic export',
+    'Multi-venue · multi-fridge places',
   ],
 };
 
 /** Product + how-it-works (core kitchen flow) */
 export const pitchProduct = {
   headline: 'The product',
-  body: 'INVIS is mobile inventaario for Finnish full-service kitchens — photo counting, catalog match, stock at 0% ALV, and Restolution-ready export. Chefs finish the count on the phone, not on a clipboard.',
+  body: 'Two modes, one kitchen truth: Main Invis for full inventaario (photo, voice, export), and Mini / Simple Invis for mid-service speed — including fire mode. Stock stays at 0% ALV across venues and fridges.',
   flowLabel: 'How it works',
   steps: [
     {
@@ -49,13 +49,13 @@ export const pitchProduct = {
     },
     {
       short: 'Places',
-      title: 'Multi-fridge · multi-site',
-      body: 'Tag counts to kitchens, freezers, and dry stores — groups and venues stay separate.',
+      title: 'Venues & fridges',
+      body: 'A company can run several restaurants; each site has walk-ins, freezers, dry stores. Counts always belong to one place.',
     },
     {
-      short: 'Fire',
+      short: 'Mini',
       title: 'Mini Invis + fire mode',
-      body: 'Mid-service swipe ±1 counting. Fire mode focuses one item at a time so the sheet stays alive during service.',
+      body: 'Simple Invis for mid-service: swipe ±1 by category, or open fire mode for one-item focused counting.',
     },
     {
       short: 'Export',
@@ -195,7 +195,7 @@ export const pitchProjections: {
     ofSomPct: 1,
     mrrEur: 3 * pitchMarket.arpuEurMonth,
     scope: 'finland',
-    note: 'Design partners & kitchen pilots in Finland',
+    note: '3 pilot kitchens in Finland (anonymous design partners)',
   },
   {
     id: '6m',
@@ -331,13 +331,35 @@ export const pitchRoi = {
 
 export const pitchAsk = {
   headline: 'The ask',
-  body: "Pilot Finnish full-service kitchens → prove waste & labor ROI → expand across the Nordics — on the path to becoming Europe's kitchen inventory app. Edit this block with raise size, use of funds, and pilot logos when ready.",
+  amountEur: 60_000,
+  amountLabel: '€60k',
+  body: '€60k to land Finland beachhead: ship Main + Mini Invis harder, fill 40 kitchen seats, and keep ops tight — then prove waste & labor ROI before Nordics.',
+  useOfFunds: [
+    {
+      label: 'Product development',
+      pct: 42,
+      eur: 25_000,
+      body: 'Main Invis depth, Mini / fire mode, voice, Restolution & POS sync.',
+    },
+    {
+      label: 'Marketing & acquisition',
+      pct: 33,
+      eur: 20_000,
+      body: 'Chef-led pilots, Helsinki/Tampere beachhead, content & kitchen demos.',
+    },
+    {
+      label: 'Operations',
+      pct: 25,
+      eur: 15_000,
+      body: 'Onboarding, support for pilot kitchens, and day-to-day run costs.',
+    },
+  ],
   bullets: [
-    'Finland beachhead with real kitchen workflows',
-    'Pro tools: live walkthrough + deeper POS sync',
+    '3 anonymous pilot kitchens → path to 40 FI seats',
+    'Main Invis + Mini Invis / fire mode product velocity',
     'Nordics after Finland SOM · Scandinavia ARR path',
   ],
   founderQuote:
-    'Built by Cesar Carvajal — a chef who lived the clipboard inventaario every month — so the product starts where the kitchen actually works.',
-  founderRole: 'Cesar Carvajal · Founder · former professional chef',
+    'Countro is Cesar (food & marketing) and Ivan (beverages & development) — inventaario built from the walk-in, not from a desk ERP.',
+  founderRole: 'Countro · Cesar Carvajal & Ivan',
 };

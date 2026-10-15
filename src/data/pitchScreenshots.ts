@@ -19,6 +19,15 @@ export type PitchFeatureShot = {
 
 export const pitchFeatureShots: PitchFeatureShot[] = [
   {
+    id: 'main',
+    tab: 'Main Invis',
+    title: 'Main Invis · full inventaario',
+    caption:
+      'The full kitchen sheet: photo & voice entry, storages, 0% ALV values, filters, and Restolution-ready export.',
+    beat: 'Full inventaario on the phone',
+    source: require('../../assets/pitch/pitch-voice.png'),
+  },
+  {
     id: 'photo',
     tab: 'Photo',
     title: 'Photo → inventaario',
@@ -39,27 +48,27 @@ export const pitchFeatureShots: PitchFeatureShot[] = [
   {
     id: 'places',
     tab: 'Places',
-    title: 'Multi-location · multi-fridge',
+    title: 'Venues · fridges · walk-ins',
     caption:
-      'Site + named places: Dry storage, Freezer, Prep fridge, Drawers… Counts always belong to one place.',
-    beat: 'Every fridge / site has its own sheet',
+      'One company can run several restaurants/sites; each site has Dry storage, Freezer, Prep fridge, Drawers… Counts always belong to one place.',
+    beat: 'Multi-venue groups · multi-fridge sites',
     source: require('../../assets/pitch/pitch-places.png'),
   },
   {
     id: 'mini',
     tab: 'Mini Invis',
-    title: 'Mini Invis · mid-service count',
+    title: 'Mini Invis · Simple Invis',
     caption:
-      'Category lists, search, swipe ±1, stock € at 0% ALV. Built for speed between tickets — not desk ERP.',
-    beat: 'Open mid-service, finish the count',
+      'The fast twin of Main Invis: category lists, swipe ±1, stock € at 0% ALV — built for mid-service, not desk ERP.',
+    beat: 'Simple count when service is on',
     source: require('../../assets/pitch/pitch-mini-invis.png'),
   },
   {
     id: 'fire',
     tab: 'Fire mode',
-    title: 'Fire mode · focused counting',
+    title: 'Fire mode (inside Mini Invis)',
     caption:
-      'One item at a time with keypad + swipe next/prev. Stay in the flow mid-service — no scrolling a clipboard.',
+      'Inside Mini / Simple Invis: focus one item, keypad qty, swipe next/prev. Stay in the flow mid-service.',
     beat: 'One item · set qty · next',
     source: require('../../assets/pitch/pitch-fire.png'),
   },
@@ -76,18 +85,31 @@ export const pitchFeatureShots: PitchFeatureShot[] = [
 
 export const pitchScreensHeadline = 'Product in the kitchen';
 export const pitchScreensBody =
-  'Tap a feature — real INVIS screens: photo counting, voice walk-through, multi-fridge places, Mini Invis, and fire-mode speed.';
+  'Tap a feature — Main Invis, photo & voice, multi-venue places, Mini / Simple Invis, and fire mode. Real screens from the investor demo.';
 
 /** Who we are / what we do (Chameleo-style narrative opener) */
 export const pitchWho = {
   headline: 'Who we are',
-  body: 'INVIS (by Countro) is a kitchen inventaario app built by a former professional chef. We replace clipboard stock counts with photo, voice, and swipe-speed tools chefs actually open mid-service.',
+  body: 'Countro builds INVIS — kitchen inventaario that replaces clipboard stock counts with photo, voice, and swipe-speed tools chefs open mid-service.',
   whatWeDoTitle: 'What we do',
   whatWeDo:
-    'Help full-service kitchens count stock accurately across fridges and sites, keep prices at 0% ALV, cut hävikki admin, and export Restolution-ready sheets — without enterprise ERP bloat.',
+    'Help full-service kitchens count stock across venues and fridges, keep prices at 0% ALV, cut hävikki admin, and export Restolution-ready sheets — without enterprise ERP bloat.',
   nicheTitle: 'Our niche',
   niche:
-    'Finnish (then Nordic) full-service restaurant kitchens — head chefs and kitchen managers who still close inventaario on paper or clunky desktop tools.',
+    'Finnish (then Nordic) full-service restaurant kitchens and multi-concept groups — head chefs and kitchen managers who still close inventaario on paper or clunky desktop tools.',
+  teamTitle: 'The team · Countro',
+  team: [
+    {
+      name: 'Cesar Carvajal',
+      role: 'Food division · marketing',
+      body: 'Former professional chef — owns the kitchen inventaario product narrative and go-to-market.',
+    },
+    {
+      name: 'Ivan',
+      role: 'Beverages division · development',
+      body: 'Leads product development and the beverages side of Countro — shipping the app kitchens actually use.',
+    },
+  ],
 };
 
 async function uriToDataUri(uri: string): Promise<string> {

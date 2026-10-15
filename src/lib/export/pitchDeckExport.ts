@@ -209,9 +209,14 @@ function buildSlides(): DeckSlide[] {
     },
     {
       kind: 'section',
-      title: pitchAsk.headline,
+      title: `${pitchAsk.headline} · ${pitchAsk.amountLabel}`,
       body: pitchAsk.body,
-      bullets: [...pitchAsk.bullets],
+      bullets: [
+        ...pitchAsk.useOfFunds.map(
+          (u) => `${u.label}: €${Math.round(u.eur / 1000)}k (${u.pct}%) — ${u.body}`,
+        ),
+        ...pitchAsk.bullets,
+      ],
       quote: pitchAsk.founderQuote,
       role: pitchAsk.founderRole,
     },
@@ -484,9 +489,14 @@ function buildPitchDeckHtml(
           </div>
         </div>
         <div class="block ask">
-          <h2>${escapeHtml(pitchAsk.headline)}</h2>
+          <h2>${escapeHtml(pitchAsk.headline)} · ${escapeHtml(pitchAsk.amountLabel)}</h2>
           <p class="lede tight">${escapeHtml(pitchAsk.body)}</p>
-          <ul class="ask-list">${askBullets}</ul>
+          <ul class="ask-list">${pitchAsk.useOfFunds
+            .map(
+              (u) =>
+                `<li><strong>${escapeHtml(u.label)}</strong> — €${Math.round(u.eur / 1000)}k (${u.pct}%) · ${escapeHtml(u.body)}</li>`,
+            )
+            .join('')}${askBullets}</ul>
           <blockquote>“${escapeHtml(pitchAsk.founderQuote)}”</blockquote>
           <p class="role">${escapeHtml(pitchAsk.founderRole)}</p>
         </div>

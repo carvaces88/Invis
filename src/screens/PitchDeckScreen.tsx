@@ -1,7 +1,8 @@
-import React, { useCallback, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Dimensions,
   Image,
   Pressable,
@@ -609,12 +610,58 @@ function PriceBars() {
 
 /**
  * Interactive product showcase — phone frame + feature tabs (Chameleo-style).
- * Tap Photo / Voice / Places / Mini Invis / Fire mode to swap the mockup.
+ * Tap Main / Photo / Voice / Places / Mini / Fire to swap the mockup with a short fade.
  */
 function ProductPhoneShowcase() {
-  const [activeId, setActiveId] = useState(pitchFeatureShots[0]?.id ?? 'photo');
+  const [activeId, setActiveId] = useState(pitchFeatureShots[0]?.id ?? 'main');
+  const fade = useRef(new Animated.Value(1)).current;
+  const slide = useRef(new Animated.Value(0)).current;
   const active =
     pitchFeatureShots.find((s) => s.id === activeId) ?? pitchFeatureShots[0];
+
+  const selectFeature = useCallback(
+    (id: string) => {
+      if (id === activeId) return;
+      Animated.parallel([
+        Animated.timing(fade, {
+          toValue: 0,
+          duration: 120,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slide, {
+          toValue: 12,
+          duration: 120,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setActiveId(id);
+        slide.setValue(-10);
+        Animated.parallel([
+          Animated.timing(fade, {
+            toValue: 1,
+            duration: 220,
+            useNativeDriver: true,
+          }),
+          Animated.spring(slide, {
+            toValue: 0,
+            friction: 8,
+            tension: 80,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    },
+    [activeId, fade, slide],
+  );
+
+  useEffect(() => {
+    // Soft pulse on first mount so the phone feels alive
+    Animated.sequence([
+      Animated.timing(fade, { toValue: 0.92, duration: 400, useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: true }),
+    ]).start();
+  }, [fade]);
+
   if (!active) return null;
 
   return (
@@ -629,7 +676,7 @@ function ProductPhoneShowcase() {
           return (
             <Pressable
               key={shot.id}
-              onPress={() => setActiveId(shot.id)}
+              onPress={() => selectFeature(shot.id)}
               style={[styles.featureTab, on && styles.featureTabOn]}
               accessibilityRole="button"
               accessibilityState={{ selected: on }}
@@ -646,15 +693,27 @@ function ProductPhoneShowcase() {
       <View style={styles.phoneShowcaseBody}>
         <View style={styles.phoneFrame}>
           <View style={styles.phoneNotch} />
-          <Image
-            source={active.source}
-            style={styles.phoneScreen}
-            resizeMode="cover"
-            accessibilityLabel={active.title}
-          />
+          <Animated.View
+            style={{
+              opacity: fade,
+              transform: [{ translateX: slide }],
+            }}
+          >
+            <Image
+              source={active.source}
+              style={styles.phoneScreen}
+              resizeMode="cover"
+              accessibilityLabel={active.title}
+            />
+          </Animated.View>
         </View>
 
-        <View style={styles.phoneCopy}>
+        <Animated.View
+          style={[
+            styles.phoneCopy,
+            { opacity: fade, transform: [{ translateY: slide }] },
+          ]}
+        >
           <Text style={styles.phoneBeat}>{active.beat}</Text>
           <Text style={styles.phoneTitle}>{active.title}</Text>
           <Text style={styles.phoneCaption}>{active.caption}</Text>
@@ -662,7 +721,7 @@ function ProductPhoneShowcase() {
             {pitchFeatureShots.map((shot) => (
               <Pressable
                 key={shot.id}
-                onPress={() => setActiveId(shot.id)}
+                onPress={() => selectFeature(shot.id)}
                 style={[
                   styles.phoneDot,
                   shot.id === activeId && styles.phoneDotOn,
@@ -671,7 +730,7 @@ function ProductPhoneShowcase() {
               />
             ))}
           </View>
-        </View>
+        </Animated.View>
       </View>
 
       <ScrollView
@@ -685,7 +744,7 @@ function ProductPhoneShowcase() {
             <Pressable
               key={shot.id}
               style={[styles.shotCard, on && styles.shotCardOn]}
-              onPress={() => setActiveId(shot.id)}
+              onPress={() => selectFeature(shot.id)}
               accessibilityRole="button"
               accessibilityState={{ selected: on }}
             >
@@ -910,6 +969,16 @@ export function PitchDeckScreen({ navigation }: Props) {
       {/* Who we are · what we do */}
       <Slide title={pitchWho.headline} tealTitle>
         <Text style={styles.body}>{pitchWho.body}</Text>
+        <Text style={styles.whoSubHead}>{pitchWho.teamTitle}</Text>
+        <View style={styles.teamRow}>
+          {pitchWho.team.map((member) => (
+            <View key={member.name} style={styles.teamCard}>
+              <Text style={styles.teamName}>{member.name}</Text>
+              <Text style={styles.teamRole}>{member.role}</Text>
+              <Text style={styles.teamBody}>{member.body}</Text>
+            </View>
+          ))}
+        </View>
         <Text style={styles.whoSubHead}>{pitchWho.whatWeDoTitle}</Text>
         <Text style={styles.bodyMuted}>{pitchWho.whatWeDo}</Text>
         <Text style={styles.whoSubHead}>{pitchWho.nicheTitle}</Text>
@@ -1048,12 +1117,26 @@ export function PitchDeckScreen({ navigation }: Props) {
         ))}
       </Slide>
 
-      {/* Ask + founder */}
+      {/* Ask + team + use of funds */}
       <View style={[styles.askBand, { maxWidth: width }]}>
         <Text style={styles.askQuote}>“{pitchAsk.founderQuote}”</Text>
         <Text style={styles.askRole}>{pitchAsk.founderRole}</Text>
         <Text style={styles.askHeadline}>{pitchAsk.headline}</Text>
+        <Text style={styles.askAmount}>{pitchAsk.amountLabel}</Text>
         <Text style={styles.askBody}>{pitchAsk.body}</Text>
+        <Text style={styles.askFundsLabel}>Use of funds</Text>
+        {pitchAsk.useOfFunds.map((row) => (
+          <View key={row.label} style={styles.fundRow}>
+            <View style={styles.fundHead}>
+              <Text style={styles.fundLabel}>{row.label}</Text>
+              <Text style={styles.fundEur}>{formatEur(row.eur)}</Text>
+            </View>
+            <View style={styles.fundTrack}>
+              <View style={[styles.fundFill, { width: `${row.pct}%` }]} />
+            </View>
+            <Text style={styles.fundBody}>{row.body}</Text>
+          </View>
+        ))}
         {pitchAsk.bullets.map((b) => (
           <Text key={b} style={styles.askBullet}>
             → {b}
@@ -1305,6 +1388,30 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
+  teamRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  teamCard: {
+    flex: 1,
+    minWidth: 160,
+    backgroundColor: T.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: T.line,
+    padding: 12,
+  },
+  teamName: { color: T.ink, fontWeight: '800', fontSize: 16 },
+  teamRole: {
+    marginTop: 4,
+    color: T.tealDeep,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  teamBody: { marginTop: 6, color: T.muted, fontSize: 13, lineHeight: 18 },
   phoneShowcase: { marginTop: spacing.md, gap: 12 },
   featureTabRow: { gap: 8, paddingBottom: 4 },
   featureTab: {
@@ -1657,11 +1764,52 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
+  askAmount: {
+    marginTop: 6,
+    color: T.white,
+    fontWeight: '800',
+    fontSize: 40,
+    letterSpacing: -1,
+  },
   askBody: {
     marginTop: 8,
     color: T.white,
     fontSize: 15,
     lineHeight: 22,
+  },
+  askFundsLabel: {
+    marginTop: spacing.lg,
+    marginBottom: 8,
+    color: T.tealSoft,
+    fontWeight: '800',
+    fontSize: 12,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  fundRow: { marginBottom: 12 },
+  fundHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  fundLabel: { color: T.white, fontWeight: '700', fontSize: 14 },
+  fundEur: { color: T.tealSoft, fontWeight: '800', fontSize: 14 },
+  fundTrack: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    overflow: 'hidden',
+  },
+  fundFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: T.tealSoft,
+  },
+  fundBody: {
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    lineHeight: 17,
   },
   askBullet: {
     marginTop: 8,
