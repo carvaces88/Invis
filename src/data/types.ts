@@ -433,7 +433,8 @@ export type RootStackParamList = {
   /** Cesar + Investor: full master people / feedback deck */
   AdminDeck: undefined;
   /** Investor pitch deck (also previewable by Cesar) */
-  PitchDeck: undefined;
+  /** publicAccess: opened as standalone /pitch or /investor (no login) */
+  PitchDeck: { publicAccess?: boolean } | undefined;
   /** Catalog product detail (identity + inventory price + distributor lookups) */
   ProductDetail: { productId: string };
   /** Compare inventory 0% ALV vs competitor / distributor shelf prices */

@@ -779,10 +779,11 @@ function ProductPhoneShowcase() {
   );
 }
 
-export function PitchDeckScreen({ navigation }: Props) {
+export function PitchDeckScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const width = Dimensions.get('window').width;
   const { t } = useI18n();
+  const publicAccess = Boolean(route.params?.publicAccess);
   const [orientation, setOrientation] =
     useState<PitchDeckOrientation>('horizontal');
   const [exporting, setExporting] = useState<'pdf' | 'pptx' | null>(null);
@@ -809,7 +810,9 @@ export function PitchDeckScreen({ navigation }: Props) {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerLeft: () => (
+      headerLeft: publicAccess
+        ? () => null
+        : () => (
         <Pressable
           onPress={() => {
             if (navigation.canGoBack()) {
@@ -870,7 +873,7 @@ export function PitchDeckScreen({ navigation }: Props) {
         </View>
       ),
     });
-  }, [navigation, t, exporting, runExport, orientation]);
+  }, [navigation, t, exporting, runExport, orientation, publicAccess]);
 
   return (
     <ScrollView

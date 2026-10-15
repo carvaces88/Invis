@@ -54,6 +54,7 @@ import { UnitsGuideScreen } from './src/screens/UnitsGuideScreen';
 import { VerifyAmountsScreen } from './src/screens/VerifyAmountsScreen';
 import { VideoDemoScreen } from './src/screens/VideoDemoScreen';
 import { linking } from './src/navigation/linking';
+import { isPublicPitchPath } from './src/lib/publicPitchPath';
 import { colors } from './src/theme/colors';
 
 /**
@@ -506,8 +507,62 @@ function RootNavigator() {
   );
 }
 
+/** Standalone investor pitch — no gate, no app tabs. */
+function PublicPitchNavigator() {
+  const { t } = useI18n();
+  return (
+    <NavigationContainer
+      linking={{
+        prefixes: linking.prefixes,
+        config: {
+          screens: {
+            PitchDeck: {
+              path: 'pitch',
+              parse: {},
+            },
+          },
+        },
+        getStateFromPath(path) {
+          const clean = path.split('?')[0]?.replace(/^\//, '').replace(/\/$/, '') ?? '';
+          if (clean === 'pitch' || clean === 'investor' || clean === '') {
+            return { routes: [{ name: 'PitchDeck' as const }] };
+          }
+          return { routes: [{ name: 'PitchDeck' as const }] };
+        },
+      }}
+      fallback={linkingFallback}
+      theme={navTheme}
+    >
+      <StatusBar style="dark" />
+      <Stack.Navigator>
+        <Stack.Screen
+          name="PitchDeck"
+          component={PitchDeckScreen}
+          options={{
+            title: t('pitchDeckTitle'),
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.bg },
+          }}
+          initialParams={{ publicAccess: true }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
 function AuthGate() {
   const { ready, session } = useAuth();
+  const [publicPitch, setPublicPitch] = React.useState(() =>
+    isPublicPitchPath(),
+  );
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const sync = () => setPublicPitch(isPublicPitchPath());
+    sync();
+    window.addEventListener('popstate', sync);
+    return () => window.removeEventListener('popstate', sync);
+  }, []);
 
   if (!ready) {
     return (
@@ -525,6 +580,9 @@ function AuthGate() {
   }
 
   if (!session) {
+    if (publicPitch) {
+      return <PublicPitchNavigator />;
+    }
     return <SignInScreen />;
   }
 

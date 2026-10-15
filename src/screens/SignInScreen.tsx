@@ -194,6 +194,21 @@ export function SignInScreen() {
               <Text style={styles.btnText}>{t('gateSubmit')}</Text>
             )}
           </Pressable>
+
+          {Platform.OS === 'web' ? (
+            <Pressable
+              onPress={() => {
+                if (typeof window !== 'undefined') {
+                  window.location.assign('/investor');
+                }
+              }}
+              style={styles.pitchLink}
+              accessibilityRole="link"
+              accessibilityLabel={t('pitchDeckTitle')}
+            >
+              <Text style={styles.pitchLinkText}>{t('pitchDeckTitle')} →</Text>
+            </Pressable>
+          ) : null}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -311,6 +326,16 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.7 },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  pitchLink: {
+    marginTop: spacing.md,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  pitchLinkText: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
   pressed: { opacity: 0.9 },
   error: {
     marginTop: spacing.md,

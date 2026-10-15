@@ -1,4 +1,7 @@
-import type { LinkingOptions } from '@react-navigation/native';
+import {
+  getStateFromPath as defaultGetStateFromPath,
+  type LinkingOptions,
+} from '@react-navigation/native';
 import type { RootStackParamList } from '../data/types';
 
 /**
@@ -49,5 +52,14 @@ export const linking: LinkingOptions<RootStackParamList> = {
       AdminDeck: 'admin',
       PitchDeck: 'pitch',
     },
+  },
+  getStateFromPath(path, options) {
+    const clean = path.split('?')[0]?.replace(/^\//, '').replace(/\/$/, '') ?? '';
+    if (clean === 'investor') {
+      return {
+        routes: [{ name: 'PitchDeck', params: { publicAccess: true } }],
+      };
+    }
+    return defaultGetStateFromPath(path, options);
   },
 };
