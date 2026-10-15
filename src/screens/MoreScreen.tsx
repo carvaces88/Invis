@@ -21,6 +21,7 @@ import type { MainTabParamList, RootStackParamList } from '../data/types';
 import { useI18n, type Locale } from '../i18n';
 import { alertAck, alertConfirm } from '../lib/alertAck';
 import { hardReloadApp } from '../lib/hardReloadApp';
+import { moreAccountStatusLine } from '../lib/kitchenIdentity';
 import { useUnitSystem, type UnitSystem } from '../lib/unitSystem';
 import { SimpleInvisIcon } from '../components/SimpCountDockIcons';
 import { colors, radius, shadows, spacing, surfaces } from '../theme/colors';
@@ -43,14 +44,15 @@ export function MoreScreen() {
   const { t, locale, setLocale } = useI18n();
   const { unitSystem, setUnitSystem } = useUnitSystem();
   const { clearAllInventory, siteName } = useInventory();
-  const { profile, isMaster, isInvestor, isPro, signOut } = useAuth();
+  const { session, profile, isMaster, isInvestor, isPro, signOut } = useAuth();
   const [valueOpen, setValueOpen] = useState(false);
-  const kitchenLine =
-    siteName?.trim() && profile?.displayName?.trim()
-      ? `${siteName.trim()} · ${profile.displayName.trim()}`
-      : profile
-        ? t('signedInAs').replace('{name}', profile.displayName)
-        : null;
+  const kitchenLine = profile
+    ? moreAccountStatusLine({
+        sessionName: session?.name ?? profile.username,
+        displayName: profile.displayName,
+        siteName,
+      }) || t('signedInAs').replace('{name}', profile.displayName)
+    : null;
   const [refreshing, setRefreshing] = useState(false);
 
   const openRoot = (
