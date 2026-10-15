@@ -630,6 +630,7 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
   }, [ownerKey, storageKeys.hidden, storageKeys.extras]);
 
   // Mini Invis mirrors this user's main inventory — never a shared Lönkka/Daily Dose sheet.
+  // Counting writes inventorySession; that must NOT exit fire/speed mode or clear selection.
   useEffect(() => {
     if (!ownerReady || !extrasHydrated) return;
     const fromInventory = buildSimpCategoriesFromInventory(
@@ -649,9 +650,6 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
       next[extra.categoryId] = [...list, { ...extra.item }];
     }
     setByCategory(next);
-    setSelectedId(null);
-    setArmedItemId(null);
-    setGameMode(false);
   }, [
     ownerReady,
     extrasHydrated,
@@ -661,6 +659,14 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
     extras,
     emptyStart,
   ]);
+
+  // Only leave fire mode / clear selection when the workspace itself changes.
+  useEffect(() => {
+    setSelectedId(null);
+    setArmedItemId(null);
+    setGameMode(false);
+    setGameIndex(0);
+  }, [ownerKey, emptyStart]);
 
   useEffect(() => {
     if (!hiddenHydrated) return;
@@ -1342,18 +1348,24 @@ export function SimplifiedCountingScreen({ navigation }: Props) {
     });
   };
 
+  // Keep fire-mode index valid when the filtered list shrinks (e.g. missing-only).
+  const safeGameIndex =
+    filteredItems.length === 0
+      ? 0
+      : Math.min(gameIndex, filteredItems.length - 1);
+
   if (gameMode) {
     return (
       <GamifiedCountingView
         items={filteredItems}
-        index={gameIndex}
+        index={safeGameIndex}
         topInset={insets.top}
         bottomInset={insets.bottom}
         onIndexChange={setGameIndex}
         onSetQuantity={setQuantity}
         onSetUnit={setUnit}
         onExit={() => {
-          const current = filteredItems[gameIndex];
+          const current = filteredItems[safeGameIndex];
           if (current) setSelectedId(current.id);
           setGameMode(false);
         }}
