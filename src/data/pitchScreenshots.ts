@@ -23,28 +23,27 @@ export const pitchFeatureShots: PitchFeatureShot[] = [
     tab: 'Photo',
     title: 'Photo → inventaario',
     caption:
-      'Snap a fridge shelf, freezer, or pack label. Vision matches catalog / K-Ruoka; chefs confirm qty in kitchen units.',
+      'Scan fridge / take photos from Home — many items → confirm → verify → Restolution. Pack labels and shelves both work.',
     beat: 'Fridge & pack photos become counted stock',
-    source: require('../../assets/pitch/pitch-home.png'),
+    source: require('../../assets/pitch/pitch-photo.png'),
   },
   {
     id: 'voice',
     tab: 'Voice',
     title: 'Voice walk-through',
     caption:
-      'Dictate while walking the walk-in — transcript → review lines → confirm. Hands stay free mid-count (beta).',
+      'Mic on the inventaario sheet: dictate while walking the walk-in — transcript → review lines → confirm (beta).',
     beat: 'Mic in, stock lines out',
-    // Inventory sheet is where Mic / voice dictate lives; dedicated mic shot pending capture.
-    source: require('../../assets/pitch/pitch-inventory.png'),
+    source: require('../../assets/pitch/pitch-voice.png'),
   },
   {
     id: 'places',
     tab: 'Places',
     title: 'Multi-location · multi-fridge',
     caption:
-      'Sites and storages — kitchens, freezers, dry stores. Counts stay tagged to the right place, not one flat list.',
+      'Site + named places: Dry storage, Freezer, Prep fridge, Drawers… Counts always belong to one place.',
     beat: 'Every fridge / site has its own sheet',
-    source: require('../../assets/pitch/pitch-more-mini.png'),
+    source: require('../../assets/pitch/pitch-places.png'),
   },
   {
     id: 'mini',
@@ -58,12 +57,11 @@ export const pitchFeatureShots: PitchFeatureShot[] = [
   {
     id: 'fire',
     tab: 'Fire mode',
-    title: 'Fire mode · swipe counting',
+    title: 'Fire mode · focused counting',
     caption:
-      'Play / fire mode: focus one item at a time, swipe to bump qty, stay in the flow. 🔥 On fire when the kitchen is moving.',
-    beat: 'One item · swipe · next — no clipboard',
-    // Same Mini Invis surface until dedicated fire-mode capture lands.
-    source: require('../../assets/pitch/pitch-mini-invis.png'),
+      'One item at a time with keypad + swipe next/prev. Stay in the flow mid-service — no scrolling a clipboard.',
+    beat: 'One item · set qty · next',
+    source: require('../../assets/pitch/pitch-fire.png'),
   },
   {
     id: 'catalog',
