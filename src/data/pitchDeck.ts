@@ -15,7 +15,7 @@ export const pitchMeta = {
 
 export const pitchVision = {
   headline: 'Our solution',
-  body: "Become Europe's premier AI-powered kitchen inventory app. INVIS replaces clipboard inventaario with photo → match → confirm counting, cuts food waste admin, and exports Restolution-ready sheets — saving Head Chefs 10+ hours of stock work weekly.",
+  body: 'INVIS turns fridge and pack photos into counted stock. Vision + K-Ruoka recognize products, chefs confirm quantities in kitchen units (YKSIKKÖ) with prices at 0% ALV, Mini Invis keeps counts fast mid-service, and Restolution-ready export closes the period — accurate inventaario without the clipboard grind.',
   vsLegacyTitle: 'vs legacy software',
   vsLegacy:
     'Legacy kitchen systems (MarketMan, Restaurant365) are desktop-heavy, clunky, and require months of onboarding. INVIS is built for prep-room speed: mobile counting, delivery & waste lists, POS-ready exports, and Nordic distributor price checks.',
@@ -326,7 +326,7 @@ export const pitchRoi = {
 
 export const pitchAsk = {
   headline: 'The ask',
-  body: 'Pilot Finnish full-service kitchens → prove waste & labor ROI → expand across the Nordics. Edit this block with raise size, use of funds, and pilot logos when ready.',
+  body: "Pilot Finnish full-service kitchens → prove waste & labor ROI → expand across the Nordics — on the path to becoming Europe's kitchen inventory app. Edit this block with raise size, use of funds, and pilot logos when ready.",
   bullets: [
     'Finland beachhead with real kitchen workflows',
     'Pro tools: live walkthrough + deeper POS sync',
