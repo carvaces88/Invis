@@ -33,7 +33,7 @@ When someone enters via the welcome gate as a **new name + email** (not a kitche
 | `jani` | Kamppi · Kulturikasarmi | Kamppi-style places |
 | `patricio` | Daily Dose | Empty fridge + freezer |
 | `heidi` | Fair Buffet · Messukeskus | **Pro**; sample stock visible in both Invis + Mini Invis |
-| `investor` | Investor demo · Catering buffet | **Master** (same as Cesar) + Pro; 10 SKUs × ingredient categories; same stock in Invis + Mini Invis |
+| `investor` | Investor demo · Catering buffet | **Master** (same as Cesar) + Pro; 20 SKUs × Dry storage / Freezer / Prep fridge / Drawers; same stock in Invis + Mini Invis |
 
 Pro unlock: `PRO_NAMES` / `isProName` in `authAccounts.ts`.
 
