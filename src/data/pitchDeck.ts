@@ -31,6 +31,35 @@ export const pitchVision = {
   ],
 };
 
+/** Product + how-it-works (core kitchen flow) */
+export const pitchProduct = {
+  headline: 'The product',
+  body: 'INVIS is mobile inventaario for Finnish full-service kitchens — photo counting, catalog match, stock at 0% ALV, and Restolution-ready export. Chefs finish the count on the phone, not on a clipboard.',
+  flowLabel: 'How it works',
+  steps: [
+    {
+      short: 'Photo',
+      title: 'Scan fridge or pack',
+      body: 'Snap a fridge shelf, freezer, or product label. One photo can cover many items mid-prep.',
+    },
+    {
+      short: 'Match',
+      title: 'Recognize products',
+      body: 'AI reads names, size, and EAN, then matches the kitchen catalog — or suggests adding a new SKU.',
+    },
+    {
+      short: 'Count',
+      title: 'Confirm inventory',
+      body: 'Adjust quantities in kitchen units (KPL, KG, L…). Delivery and hävikki stay in the same flow.',
+    },
+    {
+      short: 'Export',
+      title: 'Restolution sheet',
+      body: 'Export the period close kitchen managers already need — no retyping clipboard inventaario into POS.',
+    },
+  ],
+};
+
 export const pitchMoat = [
   {
     title: 'First-hand chef expertise',

@@ -22,6 +22,7 @@ import {
   pitchMarket,
   pitchMeta,
   pitchMoat,
+  pitchProduct,
   pitchProjections,
   pitchRoi,
   pitchVision,
@@ -637,6 +638,26 @@ export function PitchDeckScreen(_props: Props) {
         </View>
       </Slide>
 
+      {/* Product + how it works */}
+      <Slide title={pitchProduct.headline} tealTitle band>
+        <Text style={styles.body}>{pitchProduct.body}</Text>
+        <Text style={styles.flowLabel}>{pitchProduct.flowLabel}</Text>
+        <View style={styles.flowRow}>
+          {pitchProduct.steps.map((step, i) => (
+            <View key={step.short} style={styles.flowStep}>
+              <View style={styles.flowStepHead}>
+                <View style={styles.flowNum}>
+                  <Text style={styles.flowNumText}>{i + 1}</Text>
+                </View>
+                <Text style={styles.flowShort}>{step.short}</Text>
+              </View>
+              <Text style={styles.flowTitle}>{step.title}</Text>
+              <Text style={styles.flowBody}>{step.body}</Text>
+            </View>
+          ))}
+        </View>
+      </Slide>
+
       {/* Market analysis peaks */}
       <Slide title="Market analysis" tealTitle band>
         <MarketPeaks />
@@ -820,6 +841,52 @@ const styles = StyleSheet.create({
   },
   body: { color: T.ink, fontSize: 15, lineHeight: 23 },
   bodyMuted: { color: T.muted, fontSize: 14, lineHeight: 21 },
+  flowLabel: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+    color: T.teal,
+    fontWeight: '800',
+    fontSize: 12,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  flowRow: { gap: 10 },
+  flowStep: {
+    backgroundColor: T.white,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: T.tealSoft,
+  },
+  flowStepHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 6,
+  },
+  flowNum: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: T.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flowNumText: { color: T.white, fontWeight: '800', fontSize: 13 },
+  flowShort: {
+    color: T.tealDeep,
+    fontWeight: '800',
+    fontSize: 12,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  flowTitle: {
+    fontWeight: '800',
+    color: T.ink,
+    fontSize: 15,
+    marginBottom: 4,
+  },
+  flowBody: { color: T.muted, fontSize: 13, lineHeight: 19 },
   compareRow: { flexDirection: 'row', gap: 12, marginTop: spacing.lg },
   compareCol: {
     flex: 1,
