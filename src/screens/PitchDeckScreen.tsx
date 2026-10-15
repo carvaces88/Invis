@@ -26,6 +26,7 @@ import {
   pitchMarket,
   pitchMeta,
   pitchMoat,
+  pitchProblem,
   pitchProduct,
   pitchProjections,
   pitchRoi,
@@ -1001,8 +1002,42 @@ export function PitchDeckScreen({ navigation, route }: Props) {
         <Text style={styles.bodyMuted}>{pitchWho.niche}</Text>
       </Slide>
 
+      {/* Problem — clipboard multi-step vs 1-step */}
+      <Slide title={pitchProblem.headline} tealTitle band>
+        <Text style={styles.body}>{pitchProblem.body}</Text>
+        <View style={styles.problemCompare}>
+          <View style={styles.problemLegacy}>
+            <Text style={styles.problemColHead}>{pitchProblem.legacyTitle}</Text>
+            {pitchProblem.legacySteps.map((step) => (
+              <View key={step.n} style={styles.problemStep}>
+                <View style={styles.problemStepNum}>
+                  <Text style={styles.problemStepNumText}>{step.n}</Text>
+                </View>
+                <View style={styles.problemStepCopy}>
+                  <Text style={styles.problemStepTitle}>{step.title}</Text>
+                  <Text style={styles.problemStepBody}>{step.body}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+          <View style={styles.problemInvis}>
+            <Text style={[styles.problemColHead, { color: T.tealDeep }]}>
+              {pitchProblem.solutionTitle}
+            </Text>
+            <Text style={styles.problemSolutionBody}>{pitchProblem.solutionBody}</Text>
+            {pitchProblem.contrast.map((row) => (
+              <View key={row.invis} style={styles.contrastRow}>
+                <Text style={styles.contrastLegacy}>{row.legacy}</Text>
+                <Text style={styles.contrastArrow}>→</Text>
+                <Text style={styles.contrastInvis}>{row.invis}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </Slide>
+
       {/* Solution */}
-      <Slide title={pitchVision.headline} tealTitle band>
+      <Slide title={pitchVision.headline} tealTitle>
         <Text style={styles.body}>{pitchVision.body}</Text>
         <View style={styles.compareRow}>
           <View style={styles.compareCol}>
@@ -1558,6 +1593,77 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   bullet: { color: T.ink, fontSize: 13, lineHeight: 20 },
+  problemCompare: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    marginTop: spacing.lg,
+  },
+  problemLegacy: {
+    flexGrow: 1,
+    flexBasis: 280,
+    backgroundColor: T.page,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: T.line,
+    gap: 12,
+  },
+  problemInvis: {
+    flexGrow: 1,
+    flexBasis: 280,
+    backgroundColor: T.tealPale,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: T.teal,
+    gap: 12,
+  },
+  problemColHead: {
+    fontWeight: '800',
+    fontSize: 14,
+    color: T.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  problemStep: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  problemStepNum: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  problemStepNumText: { fontWeight: '800', fontSize: 12, color: T.ink },
+  problemStepCopy: { flex: 1 },
+  problemStepTitle: { fontWeight: '700', fontSize: 14, color: T.ink },
+  problemStepBody: { fontSize: 12, lineHeight: 17, color: T.muted, marginTop: 2 },
+  problemSolutionBody: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: T.ink,
+    fontWeight: '600',
+  },
+  contrastRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(13,148,136,0.25)',
+  },
+  contrastLegacy: { flexGrow: 1, flexBasis: 120, fontSize: 12, color: T.muted },
+  contrastArrow: { fontSize: 12, color: T.tealDeep, fontWeight: '800' },
+  contrastInvis: {
+    flexGrow: 1,
+    flexBasis: 120,
+    fontSize: 12,
+    color: T.tealDeep,
+    fontWeight: '700',
+  },
   peaksBlock: {
     flexDirection: 'row',
     gap: 12,

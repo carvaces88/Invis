@@ -9,6 +9,7 @@ import {
   pitchMarket,
   pitchMeta,
   pitchMoat,
+  pitchProblem,
   pitchProduct,
   pitchProjections,
   pitchRoi,
@@ -89,6 +90,26 @@ function buildSlides(): DeckSlide[] {
       tagline: pitchMeta.tagline,
       audienceLabel: 'Target audience',
       audience: pitchMeta.audience,
+    },
+    {
+      kind: 'section',
+      title: pitchProblem.headline,
+      body: pitchProblem.body,
+      columns: [
+        {
+          head: pitchProblem.legacyTitle,
+          bullets: pitchProblem.legacySteps.map(
+            (s) => `${s.n}. ${s.title} — ${s.body}`,
+          ),
+        },
+        {
+          head: pitchProblem.solutionTitle,
+          bullets: [
+            pitchProblem.solutionBody,
+            ...pitchProblem.contrast.map((c) => `${c.legacy} → ${c.invis}`),
+          ],
+        },
+      ],
     },
     {
       kind: 'section',
@@ -340,11 +361,36 @@ function buildPitchDeckHtml(
     </section>`,
 
     `<section class="sheet">
-      ${header('Product')}
+      ${header('Problem')}
       <div class="sheet-body">
         <div class="block">
+          <h2>${escapeHtml(pitchProblem.headline)}</h2>
+          <p class="lede">${escapeHtml(pitchProblem.body)}</p>
+          <div class="cols two">
+            <div class="col muted-col">
+              <h3>${escapeHtml(pitchProblem.legacyTitle)}</h3>
+              <ul>${pitchProblem.legacySteps
+                .map(
+                  (s) =>
+                    `<li><strong>${escapeHtml(s.n)}. ${escapeHtml(s.title)}</strong> — ${escapeHtml(s.body)}</li>`,
+                )
+                .join('')}</ul>
+            </div>
+            <div class="col accent-col">
+              <h3>${escapeHtml(pitchProblem.solutionTitle)}</h3>
+              <p>${escapeHtml(pitchProblem.solutionBody)}</p>
+              <ul>${pitchProblem.contrast
+                .map(
+                  (c) =>
+                    `<li>${escapeHtml(c.legacy)} → <strong>${escapeHtml(c.invis)}</strong></li>`,
+                )
+                .join('')}</ul>
+            </div>
+          </div>
+        </div>
+        <div class="block">
           <h2>${escapeHtml(pitchVision.headline)}</h2>
-          <p class="lede">${escapeHtml(pitchVision.body)}</p>
+          <p class="lede tight">${escapeHtml(pitchVision.body)}</p>
           <div class="cols two">
             <div class="col muted-col">
               <h3>Legacy</h3>

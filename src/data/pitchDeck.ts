@@ -7,60 +7,81 @@ export const pitchMeta = {
   brand: 'Invis, by Countro',
   /** Compact mark for hub / compare columns */
   brandShort: 'INVIS',
-  tagline: 'Kitchen inventory made simple',
+  tagline: 'Kitchen inventory in one step',
   presentationLabel: 'Investor Pitch Deck',
   audience:
     'Full-service restaurant kitchens, head chefs, kitchen managers, and multi-concept restaurant groups.',
 };
 
+/** The kitchen inventaario pain we remove */
+export const pitchProblem = {
+  headline: 'The problem',
+  body: 'Inventaario still burns hours: clipboard in the walk-in, hunt the right name in the right category, then retype everything on a computer. Too many steps between the fridge and the stock sheet.',
+  legacyTitle: 'Legacy inventaario',
+  legacySteps: [
+    { n: '1', title: 'Paper clipboard', body: 'Walk the fridges with a sheet — write names and counts by hand.' },
+    { n: '2', title: 'Hunt the item', body: 'Find the right product name in the right category on a clunky list.' },
+    { n: '3', title: 'Sit at a computer', body: 'Retype every line into desktop software or a spreadsheet.' },
+    { n: '4', title: 'Close the period', body: 'Hours later — hope the numbers still match reality.' },
+  ],
+  solutionTitle: 'INVIS · one step',
+  solutionBody:
+    'Photo, voice, or swipe on the phone — products match the catalog, stock updates in place. Same speed for deliveries (kuormakirja), hävikki, and owner-ready value reports.',
+  contrast: [
+    { legacy: 'Clipboard → desk → retype', invis: 'Phone in the walk-in · done' },
+    { legacy: 'Search name + category by hand', invis: 'Catalog match · find fast' },
+    { legacy: 'Value buried in spreadsheets', invis: 'Inventory € on one tap' },
+  ],
+};
+
 export const pitchVision = {
   headline: 'Our solution',
-  body: 'INVIS turns fridge and pack photos into counted stock. Vision + K-Ruoka recognize products, chefs confirm quantities in kitchen units (YKSIKKÖ) with prices at 0% ALV. Main Invis is the full sheet; Mini / Simple Invis + fire mode keep counts alive mid-service — then Restolution-ready export closes the period.',
-  vsLegacyTitle: 'vs legacy software',
+  body: 'INVIS collapses inventaario into one fast mobile step: fridge & pack photos, voice walk-throughs, and swipe counts become stock lines with Nordic catalog match and 0% ALV prices. Delivery notes (kuormakirja), food waste, and owner-ready reports sit in the same flow — then Restolution-ready export closes the period.',
+  vsLegacyTitle: 'vs legacy inventaario',
   vsLegacy:
-    'Legacy kitchen systems (MarketMan, Restaurant365) are desktop-heavy, clunky, and require months of onboarding. INVIS is built for prep-room speed: mobile counting, delivery & waste lists, POS-ready exports, and Nordic distributor price checks.',
+    'Legacy means paper, hunting categories, and desk entry. Enterprise tools (MarketMan, Restaurant365) stay desktop-heavy. INVIS is built for prep-room speed: one-step counting, kuormakirja & hävikki photos, 1-tap inventory value, and POS-ready exports.',
   legacyBullets: [
+    'Paper → find item → computer',
     'Desktop-heavy UIs',
-    'Months of onboarding',
-    'Enterprise ERP bloat',
+    'Hours per inventaario',
   ],
   invisBullets: [
-    'Main Invis · photo + voice stock',
-    'Mini Invis · fire mode mid-service',
-    'Multi-venue · multi-fridge places',
+    '1-step photo / voice / swipe',
+    'Kuormakirja · hävikki · reports',
+    'Inventory value on one tap',
   ],
 };
 
 /** Product + how-it-works (core kitchen flow) */
 export const pitchProduct = {
   headline: 'The product',
-  body: 'Two modes, one kitchen truth: Main Invis for full inventaario (photo, voice, export), and Mini / Simple Invis for mid-service speed — including fire mode. Stock stays at 0% ALV across venues and fridges.',
+  body: 'Main Invis for full inventaario, Mini / Simple Invis + fire mode mid-service, plus reports, kuormakirja delivery photos, hävikki logging, and fast product find — one kitchen truth at 0% ALV across venues and fridges.',
   flowLabel: 'How it works',
   steps: [
     {
-      short: 'Photo',
-      title: 'Scan fridge or pack',
-      body: 'Snap a fridge shelf, freezer, or product label. One photo can cover many items mid-prep.',
+      short: 'Count',
+      title: 'Photo, voice, or swipe',
+      body: 'One step in the walk-in: scan fridge/pack, dictate, or fire-mode swipe — no clipboard detour.',
     },
     {
-      short: 'Voice',
-      title: 'Dictate the walk-in',
-      body: 'Hands-free walk-through: speak items while you move; transcript becomes reviewable stock lines.',
+      short: 'Find',
+      title: 'Products match fast',
+      body: 'Nordic catalog + search — right name, EAN, pack size, and distributor price without hunting categories.',
     },
     {
-      short: 'Places',
-      title: 'Venues & fridges',
-      body: 'A company can run several restaurants; each site has walk-ins, freezers, dry stores. Counts always belong to one place.',
+      short: 'Receive',
+      title: 'Kuormakirja in one photo',
+      body: 'Photograph the supplier delivery note → lines extract → catalog match → stock adds.',
     },
     {
-      short: 'Mini',
-      title: 'Mini Invis + fire mode',
-      body: 'Simple Invis for mid-service: swipe ±1 by category, or open fire mode for one-item focused counting.',
+      short: 'Waste',
+      title: 'Log hävikki',
+      body: 'Photo the station waste list → confirm → stock subtracts and food waste is logged.',
     },
     {
-      short: 'Export',
-      title: 'Restolution sheet',
-      body: 'Export the period close kitchen managers already need — no retyping clipboard inventaario into POS.',
+      short: 'Report',
+      title: 'Owner-ready at a glance',
+      body: 'Inventory value on one tap, reports chat, value by place — managers see € without spreadsheets.',
     },
   ],
 };
@@ -321,16 +342,16 @@ export const pitchRoi = {
   hoursSavedWeekly: 10,
   points: [
     {
+      title: 'Hours back every week',
+      body: 'Clipboard → find item → computer becomes one phone step. ~10 hours/week of inventaario admin back to the brigade.',
+    },
+    {
       title: 'Food waste reduction',
-      body: 'Food waste is 4–10% of raw food purchases. INVIS tracks hävikki and stock movements — cutting kitchen waste by up to 25%.',
+      body: 'Food waste is 4–10% of raw food purchases. INVIS logs hävikki from a photo and tracks stock — cutting kitchen waste by up to 25%.',
     },
     {
-      title: 'Accurate stock value',
-      body: 'Counts and prices stay at 0% ALV with clear ALV display — managers see real inventory € without spreadsheet rework.',
-    },
-    {
-      title: 'Faster month close',
-      body: 'Photo inventaario → confirm → Restolution export replaces clipboard sheets and hours of admin each period.',
+      title: 'Owner-ready value',
+      body: 'Inventory € on one tap at 0% ALV (with ALV view) — managers see real stock value by place without spreadsheet rework.',
     },
   ],
 };

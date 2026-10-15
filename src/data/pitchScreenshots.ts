@@ -23,7 +23,7 @@ export const pitchFeatureShots: PitchFeatureShot[] = [
     tab: 'Main Invis',
     title: 'Main Invis · full inventaario',
     caption:
-      'The full kitchen sheet: photo & voice entry, storages, 0% ALV values, filters, and Restolution-ready export.',
+      'The full kitchen sheet: photo & voice entry, storages, 0% ALV values, filters, and Restolution-ready export — inventaario without the desk detour.',
     beat: 'Full inventaario on the phone',
     source: require('../../assets/pitch/pitch-voice.png'),
   },
@@ -32,7 +32,7 @@ export const pitchFeatureShots: PitchFeatureShot[] = [
     tab: 'Photo',
     title: 'Photo → inventaario',
     caption:
-      'Scan fridge / take photos from Home — many items → confirm → verify → Restolution. Pack labels and shelves both work.',
+      'Scan fridge / take photos from Home — many items → confirm → stock. One step instead of clipboard → category hunt → computer.',
     beat: 'Fridge & pack photos become counted stock',
     source: require('../../assets/pitch/pitch-photo.png'),
   },
@@ -44,6 +44,51 @@ export const pitchFeatureShots: PitchFeatureShot[] = [
       'Mic on the inventaario sheet: dictate while walking the walk-in — transcript → review lines → confirm (beta).',
     beat: 'Mic in, stock lines out',
     source: require('../../assets/pitch/pitch-voice.png'),
+  },
+  {
+    id: 'find',
+    tab: 'Find',
+    title: 'Find products · fast',
+    caption:
+      'Search the kitchen catalog by name or EAN — K-Ruoka / S-kaupat / Lidl columns, pack size, 0% ALV. No hunting the right category on paper.',
+    beat: 'Right product in seconds',
+    source: require('../../assets/pitch/pitch-catalog.png'),
+  },
+  {
+    id: 'reports',
+    tab: 'Reports',
+    title: 'Owner-ready reports',
+    caption:
+      'Ask reports chat or tap “My inventory value right now” — stock € at a glance, low stock, value by category. Owner-ready without spreadsheets.',
+    beat: 'Inventory value on one tap',
+    source: require('../../assets/pitch/pitch-reports.png'),
+  },
+  {
+    id: 'value',
+    tab: 'Value €',
+    title: 'Inventory value · one click',
+    caption:
+      'Current inventory value in one tap — excl. VAT / 0% ALV, with ALV toggle, breakdown by place. Managers see the number instantly.',
+    beat: '€5.6k demo · by fridge at a glance',
+    source: require('../../assets/pitch/pitch-inventory-value.png'),
+  },
+  {
+    id: 'kuorma',
+    tab: 'Kuorma',
+    title: 'Kuormakirja · delivery in 1 photo',
+    caption:
+      'Photograph the supplier delivery paper (kuormalista / kuormakirja) → extract lines → match catalog → confirm adds stock.',
+    beat: 'Delivery receipt → inventory',
+    source: require('../../assets/pitch/pitch-kuorma.png'),
+  },
+  {
+    id: 'waste',
+    tab: 'Hävikki',
+    title: 'Log food waste',
+    caption:
+      'Photograph the station waste list → match catalog → confirm subtracts stock and logs hävikki. Waste tracking without a second spreadsheet.',
+    beat: 'Waste list photo → logged hävikki',
+    source: require('../../assets/pitch/pitch-waste.png'),
   },
   {
     id: 'places',
@@ -72,28 +117,19 @@ export const pitchFeatureShots: PitchFeatureShot[] = [
     beat: 'One item · set qty · next',
     source: require('../../assets/pitch/pitch-fire.png'),
   },
-  {
-    id: 'catalog',
-    tab: 'Catalog',
-    title: 'Nordic catalog match',
-    caption:
-      'Searchable kitchen catalog with K-Ruoka / S-kaupat / Lidl price columns — EAN, pack size, 0% ALV.',
-    beat: 'Distributor prices without retyping',
-    source: require('../../assets/pitch/pitch-catalog.png'),
-  },
 ];
 
 export const pitchScreensHeadline = 'Product in the kitchen';
 export const pitchScreensBody =
-  'Tap a feature — Main Invis, photo & voice, multi-venue places, Mini / Simple Invis, and fire mode. Real screens from the investor demo.';
+  'Tap a feature — inventaario, find, reports & value, kuormakirja, hävikki, places, Mini Invis & fire. Real screens from the investor demo.';
 
 /** Who we are / what we do (Chameleo-style narrative opener) */
 export const pitchWho = {
   headline: 'Who we are',
-  body: 'Countro builds INVIS — kitchen inventaario that replaces clipboard stock counts with photo, voice, and swipe-speed tools chefs open mid-service.',
+  body: 'Countro builds INVIS — kitchen inventaario that replaces the clipboard → category hunt → computer chore with one fast step on the phone: photo, voice, swipe, and owner-ready reports.',
   whatWeDoTitle: 'What we do',
   whatWeDo:
-    'Help full-service kitchens count stock across venues and fridges, keep prices at 0% ALV, cut hävikki admin, and export Restolution-ready sheets — without enterprise ERP bloat.',
+    'Help full-service kitchens count stock across venues and fridges, see inventory value on one tap, log kuormakirja deliveries and hävikki from a photo, find products fast, keep prices at 0% ALV, and export Restolution-ready sheets — without enterprise ERP bloat.',
   nicheTitle: 'Our niche',
   niche:
     'Finnish (then Nordic) full-service restaurant kitchens and multi-concept groups — head chefs and kitchen managers who still close inventaario on paper or clunky desktop tools.',
